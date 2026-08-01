@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#f7f7f5" />
+    <title>Later Space</title>
+    <link rel="icon" href="assets/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="assets/apple-touch-icon.png" />
+    <link rel="stylesheet" href="styles.css?v=24" />
+  </head>
+  <body>
+    <main class="canvas" id="canvas" tabindex="0" aria-label="Later Space 无限内容画布">
+      <div class="world" id="world"></div>
+
+      <div class="empty-cue" id="emptyCue">
+        <span class="empty-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="m7 16 3.5-3.5 2.5 2.5 2-2 2 2"/><circle cx="15.5" cy="8.5" r="1"/></svg>
+        </span>
+        <h1 id="emptyTitle">粘贴图片、链接或文字</h1>
+        <p id="emptyHint"><kbd>⌘</kbd><kbd>V</kbd></p>
+      </div>
+
+      <header class="floating brand-bar">
+        <span class="mark" aria-hidden="true"></span>
+        <strong>Later Space</strong>
+        <span class="image-count" id="imageCount">0</span>
+      </header>
+
+      <section class="search-tools" aria-label="搜索与筛选">
+        <div class="floating search-bar">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
+          <label class="visually-hidden" for="searchInput">搜索收藏内容</label>
+          <input id="searchInput" type="search" autocomplete="off" placeholder="搜索标题、用途、正文……" />
+          <button class="search-filter-button" id="filterToggleButton" type="button" aria-label="展开筛选" aria-expanded="false" title="筛选">
+            <svg viewBox="0 0 24 24"><path d="M4 6h16M7 12h10M10 18h4"/></svg>
+            <span id="filterCount" hidden>0</span>
+          </button>
+          <button class="search-clear-button" id="clearSearchButton" type="button" aria-label="清空搜索" title="清空搜索" hidden>
+            <svg viewBox="0 0 24 24"><path d="m7 7 10 10M17 7 7 17"/></svg>
+          </button>
+        </div>
+        <div class="floating filter-panel" id="filterPanel" hidden>
+          <label for="sourceFilter">来源<select id="sourceFilter"><option value="all">全部来源</option></select></label>
+          <label for="purposeFilter">用途<select id="purposeFilter"><option value="all">全部</option><option value="with">有用途</option><option value="without">无用途</option></select></label>
+          <label for="timeFilter">收藏时间<select id="timeFilter"><option value="all">全部时间</option><option value="today">今天</option><option value="week">近 7 天</option><option value="month">近 30 天</option><option value="year">今年</option></select></label>
+          <button id="resetFiltersButton" type="button">重置</button>
+        </div>
+      </section>
+
+      <div class="floating view-switcher" role="group" aria-label="内容分类视图">
+        <button class="view-button is-active" type="button" data-view="all">全部</button>
+        <button class="view-button" type="button" data-view="images">图片</button>
+        <button class="view-button" type="button" data-view="links">链接</button>
+        <button class="view-button" type="button" data-view="texts">文字</button>
+      </div>
+      <div class="floating workflow-switcher" id="workflowSwitcher" role="group" aria-label="标签快捷筛选">
+        <button type="button" class="workflow-button is-active" data-workflow="all">全部</button>
+        <button type="button" class="workflow-button" data-workflow="inbox">未整理 <span data-workflow-count="inbox">0</span></button>
+      </div>
+      <div class="floating global-cover-switcher" id="globalCoverSwitcher" role="group" aria-label="全部链接封面模式">
+        <span>链接外观</span>
+        <button type="button" data-global-cover-mode="clean">全部纯净</button>
+        <button type="button" data-global-cover-mode="editorial">全部编辑</button>
+      </div>
+
+      <nav class="floating tool-bar" aria-label="画布工具">
+        <button class="tool-button" id="addButton" type="button" aria-label="添加内容" title="添加内容">
+          <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+        </button>
+        <span class="divider"></span>
+        <button class="tool-button" id="fitButton" type="button" aria-label="显示全部图片" title="显示全部图片">
+          <svg viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
+        </button>
+        <button class="tool-button" id="organizeButton" type="button" aria-label="一键整理画布" title="一键整理">
+          <svg class="organize-icon" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+          <svg class="restore-icon" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>
+        </button>
+        <button class="zoom-value" id="resetZoomButton" type="button" aria-label="重置为百分之百缩放" title="重置缩放">100%</button>
+        <button class="tool-button" id="exportButton" type="button" aria-label="导出备份" title="导出备份">
+          <svg viewBox="0 0 24 24"><path d="M12 3v12m0 0 4-4m-4 4-4-4"/><path d="M5 15v4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4"/></svg>
+        </button>
+        <button class="tool-button" id="restoreBackupButton" type="button" aria-label="恢复上一个自动备份版本" title="恢复上一个版本">
+          <svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/><path d="M12 8v5l3 2"/></svg>
+        </button>
+        <button class="tool-button" id="storageButton" type="button" aria-label="查看数据容量" title="数据容量">
+          <svg viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v6c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 11v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/></svg>
+        </button>
+        <button class="tool-button" id="syncButton" type="button" aria-label="打开同步中心" title="同步中心">
+          <svg viewBox="0 0 24 24"><path d="M20 7h-7M17 3l4 4-4 4M4 17h7M7 21l-4-4 4-4"/><path d="M6 9a7 7 0 0 1 11-4M18 15a7 7 0 0 1-11 4"/></svg>
+        </button>
+      </nav>
+
+      <div class="floating selection-bar" id="selectionBar" hidden>
+        <span id="selectionName">图片</span>
+        <span class="selection-size" id="selectionSize"></span>
+        <button class="selection-action-button secondary-selection-action" id="editTextButton" type="button" aria-label="编辑所选文字" title="编辑文字" hidden>
+          <svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4Z"/></svg>
+          编辑文字
+        </button>
+        <button class="selection-action-button secondary-selection-action" id="editLinkButton" type="button" aria-label="编辑所选链接标题和用途" title="编辑链接" hidden>
+          <svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4Z"/></svg>
+          编辑链接
+        </button>
+        <div class="link-mode-switcher" id="linkModeSwitcher" role="group" aria-label="链接封面模式" hidden>
+          <button type="button" data-link-mode="clean">纯净版</button>
+          <button type="button" data-link-mode="editorial">编辑版</button>
+        </div>
+        <button class="selection-action-button secondary-selection-action" id="shuffleCoverButton" type="button" aria-label="切换所选链接封面" title="换封面" hidden>
+          <svg viewBox="0 0 24 24"><path d="M16 3h5v5M4 20 21 3M21 16v5h-5M15 15l6 6M4 4l5 5"/></svg>
+          换封面
+        </button>
+        <button class="selection-action-button secondary-selection-action" id="shuffleFontButton" type="button" aria-label="切换所选链接字体" title="换字体" hidden>
+          <svg viewBox="0 0 24 24"><path d="M4 19 10 5h4l6 14M6.5 14h11"/></svg>
+          换字体
+        </button>
+        <button class="selection-action-button" id="copyImageButton" type="button" aria-label="复制所选图片" title="复制图片">
+          <svg viewBox="0 0 24 24"><rect x="8" y="8" width="11" height="11" rx="2"/><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"/></svg>
+          复制图片
+        </button>
+        <button class="selection-action-button secondary-selection-action" id="cropImageButton" type="button" aria-label="裁剪所选图片" title="裁剪图片">
+          <svg viewBox="0 0 24 24"><path d="M6 3v13a2 2 0 0 0 2 2h13M3 6h13a2 2 0 0 1 2 2v13"/></svg>
+          裁剪
+        </button>
+        <button class="selection-action-button secondary-selection-action" id="batchEditButton" type="button" aria-label="编辑所选内容标签" title="编辑标签">
+          <svg viewBox="0 0 24 24"><path d="M20 13 13 20l-9-9V4h7l9 9Z"/><circle cx="8.5" cy="8.5" r="1.2"/></svg>
+          标签
+        </button>
+        <a class="open-link-button" id="openSelectedButton" href="#" target="_blank" rel="noopener noreferrer" hidden>
+          <svg viewBox="0 0 24 24"><path d="M7 17 17 7M8 7h9v9"/></svg>
+          打开原链接
+        </a>
+        <button class="tool-button" id="deleteButton" type="button" aria-label="删除所选内容" title="删除">
+          <svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M8 7l1 13h6l1-13"/></svg>
+        </button>
+      </div>
+
+      <input id="fileInput" type="file" accept="image/*" multiple hidden />
+      <div class="drop-state" id="dropState" aria-hidden="true"><span>放到画布上</span></div>
+      <div class="selection-marquee" id="selectionMarquee" hidden></div>
+      <div class="toast" id="toast" role="status" aria-live="polite"><span id="toastMessage"></span><button id="toastAction" type="button" hidden></button></div>
+    </main>
+
+    <aside class="floating storage-panel" id="storagePanel" aria-labelledby="storageTitle" hidden>
+      <header><div><span>数据状态</span><h2 id="storageTitle">容量与备份</h2></div><button class="tool-button" id="closeStorageButton" type="button" aria-label="关闭容量面板"><svg viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></svg></button></header>
+      <div class="storage-meter"><i id="storageMeterFill"></i></div>
+      <div class="storage-stats">
+        <div><span>浏览器占用</span><strong id="browserStorageValue">计算中…</strong></div>
+        <div><span>原图资产</span><strong id="originalStorageValue">计算中…</strong></div>
+        <div><span>收藏内容</span><strong id="recordStorageValue">0 条</strong></div>
+        <div><span>自动备份</span><strong id="backupStorageValue">检查中…</strong></div>
+      </div>
+      <p id="storageHint">原图按需加载，画布只使用缩略图。</p>
+    </aside>
+
+    <aside class="floating sync-panel" id="syncPanel" aria-labelledby="syncTitle" hidden>
+      <header><div><span>多设备与入口</span><h2 id="syncTitle">同步中心</h2></div><button class="tool-button" id="closeSyncButton" type="button" aria-label="关闭同步中心"><svg viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></svg></button></header>
+      <div class="sync-status"><i id="syncStatusDot"></i><div><strong id="syncStatusTitle">检查中…</strong><span id="syncStatusDetail">正在检查云端配置</span></div></div>
+      <div class="sync-actions"><button class="secondary-button" id="pullCloudButton" type="button">从云端恢复</button><button class="primary-button" id="pushCloudButton" type="button">立即同步</button></div>
+      <div class="sync-divider"></div>
+      <div class="sync-entry"><strong>浏览器插件</strong><span>保存当前网页到收件箱</span><a href="extensions/later-space" target="_blank">查看插件文件</a></div>
+      <div class="sync-entry"><strong>iOS 快捷指令</strong><span>通过分享菜单发送链接或文字</span><a href="mobile/ios-shortcut.html" target="_blank">查看设置步骤</a></div>
+    </aside>
+
+    <div class="capture-backdrop" id="captureBackdrop" hidden></div>
+    <section class="capture-dialog" id="captureDialog" role="dialog" aria-modal="true" aria-labelledby="captureTitle" hidden>
+      <div class="capture-dialog-header">
+        <div><span class="capture-eyebrow">统一入口</span><h2 id="captureTitle">添加到画布</h2></div>
+        <button class="tool-button" id="closeCaptureButton" type="button" aria-label="关闭添加窗口">
+          <svg viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></svg>
+        </button>
+      </div>
+      <div class="capture-mode-switcher" role="group" aria-label="添加内容类型">
+        <button class="capture-mode-button is-active" type="button" data-capture-mode="text" aria-pressed="true">文字</button>
+        <button class="capture-mode-button" type="button" data-capture-mode="link" aria-pressed="false">链接</button>
+        <button class="capture-mode-button" type="button" data-capture-mode="image" aria-pressed="false">图片</button>
+      </div>
+      <div id="captureInputGroup">
+        <label class="capture-input-label" id="captureInputLabel" for="captureInput">写点什么</label>
+        <textarea id="captureInput" rows="7" placeholder="一句话、一个标题，或者此刻的想法……"></textarea>
+      </div>
+      <div class="link-purpose-group" id="linkPurposeGroup" hidden>
+        <label for="linkTitleInput">封面标题 <span>选填，留空则自动识别</span></label>
+        <input id="linkTitleInput" type="text" maxlength="120" placeholder="例如：值得参考的 AI 视频选题" />
+      </div>
+      <button class="image-capture-panel" id="chooseImagesButton" type="button" hidden>
+        <svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="m7 16 3.5-3.5 2.5 2.5 2-2 2 2"/><circle cx="15.5" cy="8.5" r="1"/></svg>
+        <strong>选择图片</strong>
+        <span>支持一次添加多张</span>
+      </button>
+      <div class="capture-dialog-footer">
+        <button class="primary-button" id="addContentButton" type="button">添加文字</button>
+      </div>
+    </section>
+    <div class="duplicate-backdrop" id="duplicateBackdrop" hidden></div>
+    <section class="duplicate-dialog" id="duplicateDialog" role="dialog" aria-modal="true" aria-labelledby="duplicateTitle" hidden>
+      <span class="duplicate-mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24"><rect x="7" y="7" width="12" height="12" rx="3"/><path d="M15 7V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg>
+      </span>
+      <p>发现重复收藏</p>
+      <h2 id="duplicateTitle">这项内容已经在画布里了</h2>
+      <span class="duplicate-description">你可以再保留一份，或者回到最初收藏的位置。</span>
+      <div class="duplicate-actions">
+        <button class="secondary-button" id="findDuplicateButton" type="button">找到原内容</button>
+        <button class="primary-button" id="keepDuplicateButton" type="button">仍然收藏</button>
+      </div>
+    </section>
+    <div class="batch-backdrop" id="batchBackdrop" hidden></div>
+    <section class="batch-dialog" id="batchDialog" role="dialog" aria-modal="true" aria-labelledby="batchTitle" hidden>
+      <header><div><span>稍后整理</span><h2 id="batchTitle">添加标签</h2></div><button class="tool-button" id="closeBatchButton" type="button" aria-label="关闭标签编辑"><svg viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></svg></button></header>
+      <p class="tag-editor-hint" id="tagEditorHint">选择已有标签，或创建一个新标签。</p>
+      <label for="batchTagsInput">新标签 <span>按回车添加</span></label>
+      <input id="batchTagsInput" type="text" maxlength="24" placeholder="例如：想报名" />
+      <div class="capture-tag-suggestions tag-editor-suggestions" id="batchTagSuggestions" aria-label="已有标签"></div>
+      <footer><button class="secondary-button" id="cancelBatchButton" type="button">取消</button><button class="primary-button" id="applyBatchButton" type="button">保存标签</button></footer>
+    </section>
+    <div class="tag-manage-backdrop" id="tagManageBackdrop" hidden></div>
+    <section class="tag-manage-dialog" id="tagManageDialog" role="dialog" aria-modal="true" aria-labelledby="tagManageTitle" hidden>
+      <header><div><span>整理系统</span><h2 id="tagManageTitle">管理标签</h2></div><button class="tool-button" id="closeTagManageButton" type="button" aria-label="关闭标签管理"><svg viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></svg></button></header>
+      <p>重命名、合并或删除标签，不会删除收藏内容。</p>
+      <div class="tag-manage-list" id="tagManageList"></div>
+      <div class="tag-manage-empty" id="tagManageEmpty" hidden>还没有创建标签</div>
+    </section>
+    <div class="crop-backdrop" id="cropBackdrop" hidden></div>
+    <section class="crop-dialog" id="cropDialog" role="dialog" aria-modal="true" aria-labelledby="cropTitle" hidden>
+      <header><div><span>图片工具</span><h2 id="cropTitle">裁剪图片</h2></div><button class="tool-button" id="closeCropButton" type="button" aria-label="关闭裁剪窗口"><svg viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></svg></button></header>
+      <div class="crop-stage" id="cropStage">
+        <img id="cropPreview" alt="裁剪预览" draggable="false" />
+        <div class="crop-frame" id="cropFrame" tabindex="0" aria-label="拖动裁剪框，或拖动边缘与四角调整大小">
+          <i class="crop-grid-line crop-grid-v1"></i><i class="crop-grid-line crop-grid-v2"></i><i class="crop-grid-line crop-grid-h1"></i><i class="crop-grid-line crop-grid-h2"></i>
+          <button type="button" class="crop-handle crop-handle-w" data-crop-handle="w" aria-label="调整左边缘"></button>
+          <button type="button" class="crop-handle crop-handle-e" data-crop-handle="e" aria-label="调整右边缘"></button>
+          <button type="button" class="crop-handle crop-handle-n" data-crop-handle="n" aria-label="调整上边缘"></button>
+          <button type="button" class="crop-handle crop-handle-s" data-crop-handle="s" aria-label="调整下边缘"></button>
+          <button type="button" class="crop-handle crop-handle-nw" data-crop-handle="nw" aria-label="调整左上角"></button>
+          <button type="button" class="crop-handle crop-handle-ne" data-crop-handle="ne" aria-label="调整右上角"></button>
+          <button type="button" class="crop-handle crop-handle-sw" data-crop-handle="sw" aria-label="调整左下角"></button>
+          <button type="button" class="crop-handle crop-handle-se" data-crop-handle="se" aria-label="调整右下角"></button>
+        </div>
+      </div>
+      <div class="crop-ratios" role="group" aria-label="裁剪比例">
+        <button type="button" data-crop-ratio="free">自由</button><button type="button" data-crop-ratio="1">1:1</button><button type="button" data-crop-ratio="1.333333">4:3</button><button type="button" data-crop-ratio="1.777778">16:9</button>
+      </div>
+      <p class="crop-hint">拖动框选择区域，拖动任意边缘或四角调整大小</p>
+      <footer><button class="secondary-button" id="resetCropButton" type="button">重置</button><button class="primary-button" id="applyCropButton" type="button">完成裁剪</button></footer>
+    </section>
+    <script src="app.js?v=52" defer></script>
+  </body>
+</html>

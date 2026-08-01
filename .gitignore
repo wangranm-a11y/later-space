@@ -1,0 +1,14 @@
+backups/
+coffee-chat-cards/
+covers/
+extensions/
+mobile/
+playground.css
+playground.html
+playground.js
+studio.css
+studio.html
+studio.js
+tests/
+__pycache__/
+.DS_Store
