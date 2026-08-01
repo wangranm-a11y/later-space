@@ -4,7 +4,7 @@ const STORE_NAME = "images";
 const ASSET_STORE_NAME = "image-assets";
 const THUMBNAIL_VERSION = 5;
 const STATIC_DEPLOYMENT = location.hostname.endsWith(".github.io");
-document.documentElement.dataset.appVersion = "52";
+document.documentElement.dataset.appVersion = "53";
 document.documentElement.dataset.deployment = STATIC_DEPLOYMENT ? "static" : "local";
 
 const state = {
@@ -70,6 +70,8 @@ const elements = {
   organizeButton: document.querySelector("#organizeButton"),
   resetZoomButton: document.querySelector("#resetZoomButton"),
   exportButton: document.querySelector("#exportButton"),
+  importButton: document.querySelector("#importButton"),
+  backupInput: document.querySelector("#backupInput"),
   restoreBackupButton: document.querySelector("#restoreBackupButton"),
   storageButton: document.querySelector("#storageButton"),
   storagePanel: document.querySelector("#storagePanel"),
@@ -1750,6 +1752,19 @@ async function restoreLatestBackup() {
   }
 }
 
+async function importBackupFile(file) {
+  if (!file) return;
+  try {
+    const payload = JSON.parse(await file.text());
+    if (!confirm(`导入备份会替换当前画布，确定继续吗？`)) return;
+    const count = await restorePayload(payload);
+    showToast(`已导入 ${count} 条内容`);
+  } catch (error) {
+    console.error(error);
+    showToast("备份文件无法读取");
+  }
+}
+
 async function changeSelectedStatus(status) {
   if (!WORKFLOW_STATUSES.has(status)) return;
   const ids = state.selectedIds.size ? [...state.selectedIds] : state.selectedId ? [state.selectedId] : [];
@@ -2180,6 +2195,11 @@ function bindEvents() {
   elements.organizeButton.addEventListener("click", organizeCanvas);
   elements.resetZoomButton.addEventListener("click", resetView);
   elements.exportButton.addEventListener("click", exportBackup);
+  elements.importButton.addEventListener("click", () => elements.backupInput.click());
+  elements.backupInput.addEventListener("change", () => {
+    importBackupFile(elements.backupInput.files[0]);
+    elements.backupInput.value = "";
+  });
   elements.restoreBackupButton.addEventListener("click", restoreLatestBackup);
   elements.storageButton.addEventListener("click", openStoragePanel);
   elements.closeStorageButton.addEventListener("click", () => { elements.storagePanel.hidden = true; });

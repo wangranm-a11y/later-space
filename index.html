@@ -80,6 +80,9 @@
         <button class="tool-button" id="exportButton" type="button" aria-label="导出备份" title="导出备份">
           <svg viewBox="0 0 24 24"><path d="M12 3v12m0 0 4-4m-4 4-4-4"/><path d="M5 15v4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4"/></svg>
         </button>
+        <button class="tool-button" id="importButton" type="button" aria-label="导入备份文件" title="导入备份">
+          <svg viewBox="0 0 24 24"><path d="M12 16V4m0 0 4 4m-4-4L8 8"/><path d="M5 15v4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4"/></svg>
+        </button>
         <button class="tool-button" id="restoreBackupButton" type="button" aria-label="恢复上一个自动备份版本" title="恢复上一个版本">
           <svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/><path d="M12 8v5l3 2"/></svg>
         </button>
@@ -136,6 +139,7 @@
       </div>
 
       <input id="fileInput" type="file" accept="image/*" multiple hidden />
+      <input id="backupInput" type="file" accept="application/json,.json" hidden />
       <div class="drop-state" id="dropState" aria-hidden="true"><span>放到画布上</span></div>
       <div class="selection-marquee" id="selectionMarquee" hidden></div>
       <div class="toast" id="toast" role="status" aria-live="polite"><span id="toastMessage"></span><button id="toastAction" type="button" hidden></button></div>
@@ -244,6 +248,6 @@
       <p class="crop-hint">拖动框选择区域，拖动任意边缘或四角调整大小</p>
       <footer><button class="secondary-button" id="resetCropButton" type="button">重置</button><button class="primary-button" id="applyCropButton" type="button">完成裁剪</button></footer>
     </section>
-    <script src="app.js?v=52" defer></script>
+    <script src="app.js?v=53" defer></script>
   </body>
 </html>
