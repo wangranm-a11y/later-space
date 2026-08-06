@@ -7,7 +7,7 @@
     <title>Later Space</title>
     <link rel="icon" href="assets/favicon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="assets/apple-touch-icon.png" />
-    <link rel="stylesheet" href="styles.css?v=24" />
+    <link rel="stylesheet" href="styles.css?v=25" />
   </head>
   <body>
     <main class="canvas" id="canvas" tabindex="0" aria-label="Later Space 无限内容画布">
@@ -20,6 +20,32 @@
         <h1 id="emptyTitle">粘贴图片、链接或文字</h1>
         <p id="emptyHint"><kbd>⌘</kbd><kbd>V</kbd></p>
       </div>
+
+      <section class="onboarding-cards" id="onboardingCards" aria-label="Later Space 使用指南" hidden>
+        <article class="onboarding-card onboarding-principle">
+          <span>01 · WHY</span>
+          <h2>先接住，<br />再慢慢整理。</h2>
+          <p>你不需要在灵感出现的那一刻，就承担整理它的责任。</p>
+        </article>
+        <article class="onboarding-card onboarding-how">
+          <span>02 · HOW</span>
+          <h2>复制，然后粘贴。</h2>
+          <ol><li>看到喜欢的内容</li><li>按下 <kbd>⌘</kbd><kbd>V</kbd></li><li>它会落到画布空白处</li></ol>
+        </article>
+        <article class="onboarding-card onboarding-later">
+          <span>03 · LATER</span>
+          <h2>这里不是永久仓库。</h2>
+          <p>回来浏览、拖动、裁剪或整理，然后使用、归档或删除。</p>
+        </article>
+        <article class="onboarding-card onboarding-start">
+          <span>READY</span>
+          <h2>放进第一条内容。</h2>
+          <button id="onboardingStartButton" type="button">现在试试</button>
+        </article>
+        <button class="onboarding-dismiss" id="onboardingDismissButton" type="button" aria-label="关闭使用指南" title="关闭使用指南">
+          <svg viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></svg>
+        </button>
+      </section>
 
       <header class="floating brand-bar">
         <span class="mark" aria-hidden="true"></span>
@@ -248,6 +274,6 @@
       <p class="crop-hint">拖动框选择区域，拖动任意边缘或四角调整大小</p>
       <footer><button class="secondary-button" id="resetCropButton" type="button">重置</button><button class="primary-button" id="applyCropButton" type="button">完成裁剪</button></footer>
     </section>
-    <script src="app.js?v=53" defer></script>
+    <script src="app.js?v=54" defer></script>
   </body>
 </html>

@@ -3,8 +3,9 @@ const DB_VERSION = 2;
 const STORE_NAME = "images";
 const ASSET_STORE_NAME = "image-assets";
 const THUMBNAIL_VERSION = 5;
-const STATIC_DEPLOYMENT = location.hostname.endsWith(".github.io");
-document.documentElement.dataset.appVersion = "53";
+const STATIC_DEPLOYMENT = location.protocol !== "file:" && !["localhost", "127.0.0.1", "::1"].includes(location.hostname);
+const ONBOARDING_DISMISSED_KEY = "later-space-onboarding-dismissed-v1";
+document.documentElement.dataset.appVersion = "54";
 document.documentElement.dataset.deployment = STATIC_DEPLOYMENT ? "static" : "local";
 
 const state = {
@@ -55,6 +56,9 @@ const elements = {
   imageCount: document.querySelector("#imageCount"),
   emptyTitle: document.querySelector("#emptyTitle"),
   emptyHint: document.querySelector("#emptyHint"),
+  onboardingCards: document.querySelector("#onboardingCards"),
+  onboardingStartButton: document.querySelector("#onboardingStartButton"),
+  onboardingDismissButton: document.querySelector("#onboardingDismissButton"),
   searchInput: document.querySelector("#searchInput"),
   filterToggleButton: document.querySelector("#filterToggleButton"),
   filterCount: document.querySelector("#filterCount"),
@@ -735,6 +739,9 @@ function render() {
   elements.emptyCue.setAttribute("aria-hidden", filteredRecords.length > 0 ? "true" : "false");
   elements.emptyTitle.textContent = state.images.length ? "没有找到匹配内容" : "粘贴图片、链接或文字";
   elements.emptyHint.innerHTML = state.images.length ? "换个关键词，或者重置筛选" : "<kbd>⌘</kbd><kbd>V</kbd>";
+  const showOnboarding = !state.images.length && localStorage.getItem(ONBOARDING_DISMISSED_KEY) !== "true";
+  elements.onboardingCards.hidden = !showOnboarding;
+  elements.onboardingCards.setAttribute("aria-hidden", showOnboarding ? "false" : "true");
   if (state.selectedId && !filteredRecords.some((record) => record.id === state.selectedId)) state.selectedId = null;
   const filteredIds = new Set(filteredRecords.map((record) => record.id));
   state.selectedIds.forEach((id) => { if (!filteredIds.has(id)) state.selectedIds.delete(id); });
@@ -2137,6 +2144,15 @@ function showToast(message, actionLabel = "", action = null) {
 }
 
 function bindEvents() {
+  elements.onboardingStartButton.addEventListener("click", () => {
+    localStorage.setItem(ONBOARDING_DISMISSED_KEY, "true");
+    elements.onboardingCards.hidden = true;
+    openCapture();
+  });
+  elements.onboardingDismissButton.addEventListener("click", () => {
+    localStorage.setItem(ONBOARDING_DISMISSED_KEY, "true");
+    elements.onboardingCards.hidden = true;
+  });
   elements.searchInput.addEventListener("input", () => {
     state.filters.query = elements.searchInput.value;
     clearTimeout(state.searchTimer);
