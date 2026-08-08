@@ -5,7 +5,7 @@ const ASSET_STORE_NAME = "image-assets";
 const THUMBNAIL_VERSION = 5;
 const STATIC_DEPLOYMENT = location.protocol !== "file:" && !["localhost", "127.0.0.1", "::1"].includes(location.hostname);
 const ONBOARDING_DISMISSED_KEY = "later-space-onboarding-dismissed-v1";
-document.documentElement.dataset.appVersion = "55";
+document.documentElement.dataset.appVersion = "56";
 document.documentElement.dataset.deployment = STATIC_DEPLOYMENT ? "static" : "local";
 
 const state = {
@@ -1863,7 +1863,11 @@ async function importExternalInbox() {
     const payload = await response.json();
     let imported = 0;
     for (const entry of payload.items || []) {
-      if (entry.url) await saveLinks([entry.url], entry.text || entry.title || entry.url, entry.purpose || "", entry.title || "", screenCenter());
+      if (entry.kind === "image" && entry.imageData) {
+        const blob = dataUrlToBlob(entry.imageData);
+        const file = new File([blob], entry.name || `分享图片 ${new Date(entry.createdAt || Date.now()).toLocaleTimeString("zh-CN")}`, { type: entry.mimeType || blob.type || "image/jpeg" });
+        await saveFiles([file], entry.source || "external", screenCenter(), entry.purpose || "");
+      } else if (entry.url) await saveLinks([entry.url], entry.text || entry.title || entry.url, entry.purpose || "", entry.title || "", screenCenter());
       else if (entry.text) await saveText(entry.text, screenCenter());
       imported += 1;
     }

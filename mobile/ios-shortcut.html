@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Later Space · iPhone 分享入口</title>
+<style>body{margin:0;background:#f2f1ec;color:#202124;font-family:-apple-system,"PingFang SC",sans-serif}.page{max-width:740px;margin:auto;padding:56px 24px 80px}h1{font:600 34px/1.2 "Songti SC",serif}h2{margin-top:42px;font-size:18px}p,li{font-size:15px;line-height:1.75}code{padding:2px 5px;background:#e3e2dc;border-radius:4px}pre{overflow:auto;padding:16px;background:#202124;color:#fff;border-radius:7px;font-size:12px;line-height:1.6}.note{padding:14px 16px;border-left:4px solid #5061c9;background:#fff}.choice{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:28px 0}.choice article{padding:18px;border:1px solid #d7d5cd;border-radius:7px;background:#fff}.choice h2{margin:0 0 8px}.choice p{margin:0;color:#666;font-size:13px}@media(max-width:600px){.choice{grid-template-columns:1fr}}</style></head>
+<body><main class="page"><h1>任何地方看到内容，<br>Later Space 先接住。</h1><p>有两种手机入口：快捷指令无需安装 App；Share Extension 支持链接、文字和相册图片，并能离线排队。</p>
+<section class="choice"><article><h2>快捷指令</h2><p>零成本、两分钟搭好，适合先开始使用。</p></article><article><h2>iOS App</h2><p>分享体验更完整，失败时保存在手机等待重试。</p></article></section>
+<h2>快捷指令设置</h2><ol><li>新建快捷指令，打开“在共享表单中显示”，接收“网址”和“文本”。</li><li>添加“如果”：如果快捷指令输入是 URL，把它设为变量 <code>url</code>；否则设为变量 <code>text</code>。</li><li>添加“获取 URL 内容”，地址填写 <code>http://你的电脑IP:5177/api/inbox</code>，方法选择 POST。</li><li>请求正文选择 JSON，加入 <code>url</code>、<code>text</code>、<code>source</code> 三个字段；<code>source</code> 固定为 <code>ios-shortcut</code>。</li><li>若设置了令牌，在请求头加入 <code>X-Later-Space-Token</code>。</li><li>最后添加“显示通知”：文案写“Later Space 已接住”。</li></ol>
+<pre>{
+  "kind": "链接存在时填 link，否则填 text",
+  "url": "url 变量",
+  "text": "text 变量",
+  "source": "ios-shortcut"
+}</pre>
+<h2>本地服务准备</h2><ol><li>让 iPhone 和 Mac 连接同一个 Wi-Fi。</li><li>运行：<code>LATER_SPACE_HOST=0.0.0.0 LATER_SPACE_CAPTURE_TOKEN="一段随机密码" python3 server.py</code>。</li><li>在 Mac 网络设置中查看局域网 IP，例如 <code>192.168.1.8</code>。</li></ol>
+<p class="note">本地模式下，Mac 休眠或不在同一网络时，快捷指令无法发送；iOS App 会先把内容留在手机队列。真正跨网络自动同步，需要部署独立的公网收件箱 API，不能直接使用 GitHub Pages 或 Vercel 静态网址。</p></main></body></html>

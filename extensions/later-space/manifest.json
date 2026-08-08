@@ -1,0 +1,18 @@
+{
+  "manifest_version": 3,
+  "name": "Later Space Collector",
+  "version": "1.1.0",
+  "description": "一键把网页、链接、图片和选中文字保存到 Later Space。",
+  "permissions": ["activeTab", "storage", "unlimitedStorage", "contextMenus", "alarms", "notifications"],
+  "icons": { "16": "icon-16.png", "48": "icon-48.png", "128": "icon-128.png" },
+  "host_permissions": ["http://127.0.0.1/*", "http://localhost/*", "http://*/*", "https://*/*"],
+  "background": { "service_worker": "service-worker.js" },
+  "action": { "default_popup": "popup.html", "default_title": "保存到 Later Space" },
+  "commands": {
+    "capture-page": {
+      "suggested_key": { "default": "Alt+Shift+L", "mac": "MacCtrl+Shift+L" },
+      "description": "保存当前网页到 Later Space"
+    }
+  },
+  "options_page": "options.html"
+}
