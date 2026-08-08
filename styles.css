@@ -131,7 +131,7 @@ kbd { min-width: 26px; height: 24px; display: grid; place-items: center; padding
 .canvas-item.is-duplicate-focus::after { inset: -10px; border: 3px solid #151517; border-radius: 11px; animation: duplicate-focus-ring 1050ms ease-out; }
 .arrival-ghost { margin: 0; pointer-events: none; transform-origin: center; will-change: transform, opacity; filter: drop-shadow(0 18px 22px rgba(20,20,22,.24)); }
 .arrival-ghost::after { border-color: #151517; }
-.arrival-ghost .resize-handle, .arrival-ghost .item-caption { display: none !important; }
+.arrival-ghost .resize-handle, .arrival-ghost .text-resize-handle, .arrival-ghost .item-caption { display: none !important; }
 @keyframes new-item-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .38; } }
 @keyframes duplicate-focus { 0%, 100% { scale: 1; } 34% { scale: 1.12; } 62% { scale: 1.07; } }
 @keyframes duplicate-focus-ring { 0%, 100% { opacity: 0; } 16%, 72% { opacity: 1; } }
@@ -143,10 +143,20 @@ kbd { min-width: 26px; height: 24px; display: grid; place-items: center; padding
 .item-caption { display: none; position: absolute; left: 0; top: calc(100% + 9px); max-width: 100%; padding: 5px 8px; border-radius: 6px; background: rgba(29,29,31,.82); color: white; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .canvas-item.is-selected .item-caption { display: block; }
 
-.text-item { min-width: 0; border-radius: 4px; background: #111113; box-shadow: 0 10px 24px rgba(25,25,27,.14), 0 2px 5px rgba(25,25,27,.08); transform-origin: 0 0; }
+.text-item { min-width: 0; overflow: visible; border-radius: 4px; background: #111113; box-shadow: 0 10px 24px rgba(25,25,27,.14), 0 2px 5px rgba(25,25,27,.08); transform-origin: 0 0; }
 .text-item::after { inset: -7px; border-radius: 5px; }
-.text-block { padding: 12px 15px 13px; color: #fff; font-family: "Songti SC", "STSong", "Noto Serif CJK SC", Georgia, serif; font-size: 30px; font-weight: 600; line-height: 1.28; white-space: pre-wrap; overflow-wrap: anywhere; letter-spacing: 0; }
+.text-block { width: 100%; height: 100%; overflow: hidden; padding: 12px 15px 13px; color: #fff; font-family: "Songti SC", "STSong", "Noto Serif CJK SC", Georgia, serif; font-size: 30px; font-weight: 600; line-height: 1.28; white-space: pre-wrap; overflow-wrap: anywhere; letter-spacing: 0; }
 .text-item .item-caption, .text-item.is-selected .item-caption { display: none; }
+.text-resize-handle { position: absolute; z-index: 3; display: none; }
+.text-item.is-selected .text-resize-handle { display: block; }
+.text-resize-handle::after { content: ""; position: absolute; left: 50%; top: 50%; width: 7px; height: 7px; border: 2px solid white; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 1px var(--accent); transform: translate(-50%, -50%); }
+.text-resize-nw, .text-resize-ne, .text-resize-se, .text-resize-sw { width: 24px; height: 24px; }
+.text-resize-nw { left: -12px; top: -12px; cursor: nwse-resize; }.text-resize-ne { right: -12px; top: -12px; cursor: nesw-resize; }
+.text-resize-se { right: -12px; bottom: -12px; cursor: nwse-resize; }.text-resize-sw { left: -12px; bottom: -12px; cursor: nesw-resize; }
+.text-resize-n, .text-resize-s { left: 50%; width: 44px; height: 20px; transform: translateX(-50%); cursor: ns-resize; }
+.text-resize-n { top: -10px; }.text-resize-s { bottom: -10px; }
+.text-resize-e, .text-resize-w { top: 50%; width: 20px; height: 44px; transform: translateY(-50%); cursor: ew-resize; }
+.text-resize-e { right: -10px; }.text-resize-w { left: -10px; }
 
 .link-card { position: relative; aspect-ratio: 4 / 5; overflow: hidden; display: grid; grid-template-rows: 48% minmax(0, 1fr) auto; gap: 11px; padding: 22px; border: 1px solid rgba(22,22,24,.12); border-radius: 6px; background: #f1efe7; color: #202022; box-shadow: 0 14px 36px rgba(25,25,27,.1), 0 2px 7px rgba(25,25,27,.05); isolation: isolate; }
 .link-card.has-purpose { grid-template-rows: 48% minmax(0, 1fr) auto auto; }

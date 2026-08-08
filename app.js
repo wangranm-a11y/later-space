@@ -5,7 +5,7 @@ const ASSET_STORE_NAME = "image-assets";
 const THUMBNAIL_VERSION = 5;
 const STATIC_DEPLOYMENT = location.protocol !== "file:" && !["localhost", "127.0.0.1", "::1"].includes(location.hostname);
 const ONBOARDING_DISMISSED_KEY = "later-space-onboarding-dismissed-v1";
-document.documentElement.dataset.appVersion = "54";
+document.documentElement.dataset.appVersion = "55";
 document.documentElement.dataset.deployment = STATIC_DEPLOYMENT ? "static" : "local";
 
 const state = {
@@ -646,6 +646,12 @@ function textBaseSize(text) {
   };
 }
 
+function textResizeHandles() {
+  return ["nw", "n", "ne", "e", "se", "s", "sw", "w"]
+    .map((direction) => `<span class="text-resize-handle text-resize-${direction}" data-resize data-resize-direction="${direction}" aria-hidden="true"></span>`)
+    .join("");
+}
+
 function defaultPlacement(index, width, height) {
   const columns = 4;
   const displayWidth = Math.min(320, Math.max(180, width ? width * Math.min(1, 320 / width) : 280));
@@ -673,10 +679,16 @@ async function loadImages() {
       ensureLinkStyle(record);
       migrated = true;
     }
-    if (record.kind === "text" && (!record.textHeight || !record.textScale)) {
+    if (record.kind === "text" && (!record.textHeight || !record.textScale || record.textScale !== 1)) {
       const size = textBaseSize(record.text || record.name || "文字");
+      const legacyScale = Number.isFinite(record.textScale) ? record.textScale : 1;
       migrated = true;
-      return { ...record, canvasWidth: size.width, textHeight: size.height, textScale: 1 };
+      return {
+        ...record,
+        canvasWidth: (record.canvasWidth || size.width) * legacyScale,
+        textHeight: (record.textHeight || size.height) * legacyScale,
+        textScale: 1,
+      };
     }
     if (Number.isFinite(record.canvasX) && Number.isFinite(record.canvasY) && Number.isFinite(record.canvasWidth)) return record;
     migrated = true;
@@ -751,11 +763,11 @@ function render() {
     const isLink = record.kind === "link";
     const isText = record.kind === "text";
     const content = isLink ? linkCard(record) : isText ? `<div class="text-block">${escapeHtml(record.text)}</div>` : `<img src="${imageUrl(record)}" alt="${escapeHtml(record.note || record.name || "收藏图片")}" draggable="false" />`;
-    const textScale = isText ? record.textScale || 1 : 1;
-    const transform = isText ? `translate(${record.canvasX}px,${record.canvasY}px) scale(${textScale})` : `translate(${record.canvasX}px,${record.canvasY}px)`;
-    return `<article class="canvas-item${isLink ? " link-item" : ""}${isText ? " text-item" : ""}${selected ? " is-selected" : ""}${multiSelected ? " is-multi-selected" : ""}${state.recentIds.has(record.id) ? " is-new" : ""}${state.arrivingIds.has(record.id) ? " is-arriving" : ""}${state.duplicateFocusId === record.id ? " is-duplicate-focus" : ""}" data-id="${record.id}" data-status="${record.status || "unread"}" tabindex="0" aria-label="${escapeHtml(record.title || record.text || record.name || "收藏内容")}" style="width:${record.canvasWidth}px;transform:${transform};z-index:${record.zIndex || 1}">
+    const transform = `translate(${record.canvasX}px,${record.canvasY}px)`;
+    const textHeight = isText ? `height:${record.textHeight || textBaseSize(record.text).height}px;` : "";
+    return `<article class="canvas-item${isLink ? " link-item" : ""}${isText ? " text-item" : ""}${selected ? " is-selected" : ""}${multiSelected ? " is-multi-selected" : ""}${state.recentIds.has(record.id) ? " is-new" : ""}${state.arrivingIds.has(record.id) ? " is-arriving" : ""}${state.duplicateFocusId === record.id ? " is-duplicate-focus" : ""}" data-id="${record.id}" data-status="${record.status || "unread"}" tabindex="0" aria-label="${escapeHtml(record.title || record.text || record.name || "收藏内容")}" style="width:${record.canvasWidth}px;${textHeight}transform:${transform};z-index:${record.zIndex || 1}">
       ${content}
-      <span class="resize-handle" data-resize aria-hidden="true"></span>
+      ${isText ? textResizeHandles() : `<span class="resize-handle" data-resize aria-hidden="true"></span>`}
       <span class="item-caption">${escapeHtml(record.title || record.note || record.name || "内容")}</span>
     </article>`;
   }).join("");
@@ -1049,11 +1061,8 @@ async function submitCapture() {
     if (state.editingTextId) {
       const record = state.images.find((item) => item.id === state.editingTextId);
       if (record) {
-        const size = textBaseSize(text);
         record.text = text;
         record.name = text.slice(0, 32);
-        record.canvasWidth = size.width;
-        record.textHeight = size.height;
         await persistRecord(record);
         closeCapture();
         state.selectedId = record.id;
@@ -1223,13 +1232,13 @@ function isGenericTitle(title, record) {
 function itemHeight(record) {
   if (record.kind === "link") return record.canvasWidth * 1.25;
   if (record.kind === "text") {
-    return (record.textHeight || textBaseSize(record.text).height) * (record.textScale || 1);
+    return record.textHeight || textBaseSize(record.text).height;
   }
   return record.canvasWidth * (record.height && record.width ? record.height / record.width : 1);
 }
 
 function itemWidth(record) {
-  return record.canvasWidth * (record.kind === "text" ? record.textScale || 1 : 1);
+  return record.canvasWidth;
 }
 
 function closeDuplicatePrompt(keepDuplicate) {
@@ -1291,7 +1300,6 @@ async function organizeCanvas() {
     canvasY: record.canvasY,
     canvasWidth: record.canvasWidth,
     textHeight: record.textHeight,
-    textScale: record.textScale,
     zIndex: record.zIndex,
   }));
   localStorage.setItem("later-space-layout-snapshot", JSON.stringify(state.layoutSnapshot));
@@ -1302,7 +1310,11 @@ async function organizeCanvas() {
   records.forEach((record, index) => {
     const column = columnHeights.indexOf(Math.min(...columnHeights));
     if (record.kind === "text") {
-      record.textScale = Math.min(1, cardWidth / record.canvasWidth);
+      if (record.canvasWidth > cardWidth) {
+        const widthRatio = cardWidth / record.canvasWidth;
+        record.canvasWidth = cardWidth;
+        record.textHeight = Math.max(72, itemHeight(record) / widthRatio);
+      }
     } else {
       record.canvasWidth = cardWidth;
     }
@@ -1504,9 +1516,10 @@ function beginPointer(event) {
     const record = state.images.find((image) => image.id === id);
     state.pointer = {
       mode: resize ? "resize" : "item",
+      resizeDirection: resize?.dataset.resizeDirection || "se",
       id, startX: event.clientX, startY: event.clientY,
       originX: record.canvasX, originY: record.canvasY, originWidth: record.canvasWidth,
-      originScale: record.textScale || 1,
+      originHeight: itemHeight(record),
     };
   } else {
     state.selectedId = null;
@@ -1556,17 +1569,31 @@ function movePointer(event) {
     record.canvasX = state.pointer.originX + dx / state.view.zoom;
     record.canvasY = state.pointer.originY + dy / state.view.zoom;
   } else if (record.kind === "text") {
-    const renderedWidth = state.pointer.originWidth * state.pointer.originScale;
-    record.textScale = Math.min(4, Math.max(.25, state.pointer.originScale * (renderedWidth + dx / state.view.zoom) / renderedWidth));
+    const direction = state.pointer.resizeDirection;
+    const worldDx = dx / state.view.zoom;
+    const worldDy = dy / state.view.zoom;
+    const minimumWidth = 120;
+    const minimumHeight = 72;
+    if (direction.includes("e")) record.canvasWidth = Math.max(minimumWidth, state.pointer.originWidth + worldDx);
+    if (direction.includes("s")) record.textHeight = Math.max(minimumHeight, state.pointer.originHeight + worldDy);
+    if (direction.includes("w")) {
+      const nextWidth = Math.max(minimumWidth, state.pointer.originWidth - worldDx);
+      record.canvasX = state.pointer.originX + state.pointer.originWidth - nextWidth;
+      record.canvasWidth = nextWidth;
+    }
+    if (direction.includes("n")) {
+      const nextHeight = Math.max(minimumHeight, state.pointer.originHeight - worldDy);
+      record.canvasY = state.pointer.originY + state.pointer.originHeight - nextHeight;
+      record.textHeight = nextHeight;
+    }
   } else {
     record.canvasWidth = Math.max(72, state.pointer.originWidth + dx / state.view.zoom);
   }
   const node = elements.world.querySelector(`[data-id="${record.id}"]`);
   if (node) {
     node.style.width = `${record.canvasWidth}px`;
-    node.style.transform = record.kind === "text"
-      ? `translate(${record.canvasX}px,${record.canvasY}px) scale(${record.textScale || 1})`
-      : `translate(${record.canvasX}px,${record.canvasY}px)`;
+    if (record.kind === "text") node.style.height = `${record.textHeight}px`;
+    node.style.transform = `translate(${record.canvasX}px,${record.canvasY}px)`;
   }
   renderSelection();
 }
