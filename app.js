@@ -5,7 +5,7 @@ const ASSET_STORE_NAME = "image-assets";
 const THUMBNAIL_VERSION = 5;
 const STATIC_DEPLOYMENT = location.protocol !== "file:" && !["localhost", "127.0.0.1", "::1"].includes(location.hostname);
 const ONBOARDING_DISMISSED_KEY = "later-space-onboarding-dismissed-v1";
-document.documentElement.dataset.appVersion = "57";
+document.documentElement.dataset.appVersion = "58";
 document.documentElement.dataset.deployment = STATIC_DEPLOYMENT ? "static" : "local";
 
 const state = {
@@ -293,6 +293,7 @@ function worldCenter() {
 function updateView() {
   const { x, y, zoom } = state.view;
   elements.world.style.transform = `translate(${x}px, ${y}px) scale(${zoom})`;
+  elements.world.style.setProperty("--canvas-control-scale", String(1 / zoom));
   elements.canvas.style.setProperty("--pan-x", `${x % (24 * zoom)}px`);
   elements.canvas.style.setProperty("--pan-y", `${y % (24 * zoom)}px`);
   elements.canvas.style.setProperty("--grid-size", `${24 * zoom}px`);
