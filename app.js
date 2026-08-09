@@ -5,7 +5,7 @@ const ASSET_STORE_NAME = "image-assets";
 const THUMBNAIL_VERSION = 5;
 const STATIC_DEPLOYMENT = location.protocol !== "file:" && !["localhost", "127.0.0.1", "::1"].includes(location.hostname);
 const ONBOARDING_DISMISSED_KEY = "later-space-onboarding-dismissed-v1";
-document.documentElement.dataset.appVersion = "56";
+document.documentElement.dataset.appVersion = "57";
 document.documentElement.dataset.deployment = STATIC_DEPLOYMENT ? "static" : "local";
 
 const state = {
@@ -31,6 +31,7 @@ const state = {
   captureTags: new Set(),
   initialBatchTags: new Set(),
   tagUndoSnapshot: null,
+  deletionUndoSnapshot: null,
   tagManageEdit: null,
   crop: null,
   layoutSnapshot: null,
@@ -1644,6 +1645,21 @@ function resetView() {
 async function deleteSelected() {
   const ids = state.selectedIds.size ? [...state.selectedIds] : state.selectedId ? [state.selectedId] : [];
   if (!ids.length) return;
+  const records = ids
+    .map((id) => state.images.find((record) => record.id === id))
+    .filter(Boolean);
+  const assets = new Map();
+  for (const record of records) {
+    if (!record.kind) {
+      const blob = await originalBlob(record);
+      if (blob) assets.set(record.id, blob);
+    }
+  }
+  state.deletionUndoSnapshot = {
+    records: structuredClone(records),
+    assets,
+    restoring: false,
+  };
   for (const id of ids) {
     await transact("readwrite", (store) => store.delete(id));
     await transactAsset("readwrite", (store) => store.delete(id));
@@ -1656,7 +1672,35 @@ async function deleteSelected() {
   state.selectedIds.clear();
   render();
   scheduleBackup();
-  showToast(ids.length > 1 ? `已移除 ${ids.length} 项内容` : "内容已移除");
+  showToast(ids.length > 1 ? `已移除 ${ids.length} 项内容` : "内容已移除", "撤销", undoDeletion);
+}
+
+async function undoDeletion() {
+  const snapshot = state.deletionUndoSnapshot;
+  if (!snapshot || snapshot.restoring) return;
+  snapshot.restoring = true;
+  try {
+    for (const record of snapshot.records) {
+      await transact("readwrite", (store) => store.put(record));
+      const blob = snapshot.assets.get(record.id);
+      if (blob) await storeImageAsset(record, blob);
+    }
+    const restoredIds = new Set(snapshot.records.map((record) => record.id));
+    state.images = state.images
+      .filter((record) => !restoredIds.has(record.id))
+      .concat(snapshot.records)
+      .sort((left, right) => left.createdAt - right.createdAt);
+    state.selectedIds = restoredIds;
+    state.selectedId = restoredIds.size === 1 ? [...restoredIds][0] : null;
+    state.deletionUndoSnapshot = null;
+    render();
+    scheduleBackup();
+    showToast(snapshot.records.length > 1 ? `已恢复 ${snapshot.records.length} 项内容` : "内容已恢复");
+  } catch (error) {
+    snapshot.restoring = false;
+    console.error(error);
+    showToast("恢复失败，请通过备份找回内容");
+  }
 }
 
 function blobToDataUrl(blob) {
@@ -2343,11 +2387,16 @@ function bindEvents() {
   window.addEventListener("keydown", (event) => {
     const isEditing = event.target.matches?.("input, textarea, [contenteditable='true']");
     const selectedRecord = state.images.find((record) => record.id === state.selectedId);
+    if (!isEditing && !event.shiftKey && (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "z" && state.deletionUndoSnapshot) {
+      event.preventDefault();
+      undoDeletion();
+      return;
+    }
     if (!isEditing && event.key.toLowerCase() === "c" && (event.metaKey || event.ctrlKey) && selectedRecord && !selectedRecord.kind) {
       event.preventDefault();
       copySelectedImage();
     }
-    if (!isEditing && (event.key === "Delete" || event.key === "Backspace") && state.selectedId) { event.preventDefault(); deleteSelected(); }
+    if (!isEditing && (event.key === "Delete" || event.key === "Backspace") && (state.selectedId || state.selectedIds.size)) { event.preventDefault(); deleteSelected(); }
     if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "f") {
       event.preventDefault();
       elements.searchInput.focus();
