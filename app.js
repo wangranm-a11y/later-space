@@ -5,7 +5,7 @@ const ASSET_STORE_NAME = "image-assets";
 const THUMBNAIL_VERSION = 5;
 const STATIC_DEPLOYMENT = location.protocol !== "file:" && !["localhost", "127.0.0.1", "::1"].includes(location.hostname);
 const ONBOARDING_DISMISSED_KEY = "later-space-onboarding-dismissed-v1";
-document.documentElement.dataset.appVersion = "58";
+document.documentElement.dataset.appVersion = "59";
 document.documentElement.dataset.deployment = STATIC_DEPLOYMENT ? "static" : "local";
 
 const state = {
@@ -148,6 +148,7 @@ const elements = {
   tagManageList: document.querySelector("#tagManageList"),
   tagManageEmpty: document.querySelector("#tagManageEmpty"),
   workflowSwitcher: document.querySelector("#workflowSwitcher"),
+  workflowContext: document.querySelector("#workflowContext"),
   syncButton: document.querySelector("#syncButton"),
   syncPanel: document.querySelector("#syncPanel"),
   closeSyncButton: document.querySelector("#closeSyncButton"),
@@ -477,6 +478,23 @@ function renderWorkflowControls() {
     ...tags.map((tag) => button(`tag:${tag}`, tag, tagCounts.get(tag))),
     tags.length ? `<button type="button" class="workflow-manage-button" data-manage-tags aria-label="管理标签" title="管理标签"><svg viewBox="0 0 24 24"><path d="M4 7h10M4 17h16M18 7h2M10 12h10M4 12h2"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="12" r="2"/></svg></button>` : "",
   ].join("");
+  const target = currentCanvasTarget();
+  elements.workflowContext.hidden = target.value === "all";
+  elements.workflowContext.textContent = target.value === "inbox" ? "收藏到 未整理" : `收藏到 ${target.label}`;
+  elements.workflowContext.title = target.value === "inbox" ? "新内容不会添加标签" : `新内容会自动添加「${target.label}」标签`;
+}
+
+function currentCanvasTarget() {
+  if (state.workflow === "inbox") return { value: "inbox", label: "未整理", tags: [] };
+  if (state.workflow.startsWith("tag:")) {
+    const label = state.workflow.slice(4);
+    return { value: state.workflow, label, tags: label ? [label] : [] };
+  }
+  return { value: "all", label: "全部", tags: [] };
+}
+
+function currentCanvasTags(extraTags = []) {
+  return [...new Set([...currentCanvasTarget().tags, ...extraTags].filter(Boolean))];
 }
 
 function tagCounts() {
@@ -905,7 +923,7 @@ function openCapture() {
   state.editingLinkId = null;
   state.editingImageId = null;
   state.pendingImageFiles = [];
-  setCaptureTags();
+  setCaptureTags(currentCanvasTags());
   setCaptureMode("text");
   elements.captureBackdrop.hidden = false;
   elements.captureDialog.hidden = false;
@@ -1073,7 +1091,7 @@ async function submitCapture() {
       }
     } else {
       closeCapture();
-      await saveText(text, arrivalOrigin);
+      await saveText(text, arrivalOrigin, currentCanvasTags([...state.captureTags]));
     }
     return;
   }
@@ -1087,7 +1105,7 @@ async function submitCapture() {
   elements.addContentButton.disabled = true;
   closeCapture();
   try {
-    await saveLinks(urls, text, "", "", arrivalOrigin);
+    await saveLinks(urls, text, "", "", arrivalOrigin, currentCanvasTags([...state.captureTags]));
   } finally {
     state.captureSubmitting = false;
     elements.addContentButton.disabled = false;
@@ -2278,7 +2296,7 @@ function bindEvents() {
   }));
   elements.fileInput.addEventListener("change", () => {
     if (elements.fileInput.files.length) {
-      saveFiles(elements.fileInput.files, "upload", buttonCenter(elements.addButton));
+      saveFiles(elements.fileInput.files, "upload", buttonCenter(elements.addButton), "", currentCanvasTags([...state.captureTags]));
       closeCapture();
     }
     elements.fileInput.value = "";
@@ -2335,6 +2353,8 @@ function bindEvents() {
     state.workflow = button.dataset.workflow;
     render();
     fitAll();
+    const target = currentCanvasTarget();
+    if (target.value !== "all") showToast(target.value === "inbox" ? "已进入未整理子画布" : `已进入「${target.label}」子画布`);
   });
   elements.closeTagManageButton.addEventListener("click", closeTagManager);
   elements.tagManageBackdrop.addEventListener("click", closeTagManager);
@@ -2373,9 +2393,9 @@ function bindEvents() {
     const files = Array.from(event.clipboardData?.items || []).filter((item) => item.kind === "file" && item.type.startsWith("image/")).map((item) => item.getAsFile()).filter(Boolean);
     const text = event.clipboardData?.getData("text/plain") || "";
     const urls = extractUrls(text);
-    if (files.length) { event.preventDefault(); saveFiles(files, "paste", screenCenter()); }
-    else if (urls.length) { event.preventDefault(); saveLinks(urls, text, "", "", screenCenter()); }
-    else if (text.trim()) { event.preventDefault(); saveText(text.trim(), screenCenter()); }
+    if (files.length) { event.preventDefault(); saveFiles(files, "paste", screenCenter(), "", currentCanvasTags()); }
+    else if (urls.length) { event.preventDefault(); saveLinks(urls, text, "", "", screenCenter(), currentCanvasTags()); }
+    else if (text.trim()) { event.preventDefault(); saveText(text.trim(), screenCenter(), currentCanvasTags()); }
   });
 
   elements.world.addEventListener("dblclick", (event) => {
@@ -2426,7 +2446,7 @@ function bindEvents() {
   window.addEventListener("dragleave", () => { state.dragDepth -= 1; if (state.dragDepth <= 0) { state.dragDepth = 0; elements.dropState.classList.remove("is-visible"); } });
   window.addEventListener("drop", (event) => {
     event.preventDefault(); state.dragDepth = 0; elements.dropState.classList.remove("is-visible");
-    saveFiles(event.dataTransfer.files, "drop", { x: event.clientX, y: event.clientY });
+    saveFiles(event.dataTransfer.files, "drop", { x: event.clientX, y: event.clientY }, "", currentCanvasTags());
   });
   window.addEventListener("resize", () => {
     updateView();

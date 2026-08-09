@@ -51,7 +51,7 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width:
 .view-button { min-width: 52px; height: 34px; padding: 0 12px; border: 0; border-radius: 7px; background: transparent; color: var(--muted); font-size: 12px; cursor: pointer; }
 .view-button:hover { color: var(--ink); }
 .view-button.is-active { background: rgba(29,29,31,.08); color: var(--ink); font-weight: 600; }
-.workflow-switcher { top: 20px; left: 50%; z-index: 19; display: flex; max-width: min(52vw, 720px); height: 38px; padding: 3px; overflow-x: auto; overflow-y: hidden; border-radius: 9px; transform: translateX(-50%); scrollbar-width: none; }
+.workflow-switcher { top: 20px; left: 50%; z-index: 25; display: flex; max-width: min(52vw, 720px); height: 38px; padding: 3px; overflow-x: auto; overflow-y: hidden; border-radius: 9px; transform: translateX(-50%); scrollbar-width: none; }
 .workflow-switcher::-webkit-scrollbar { display: none; }
 .workflow-button { height: 30px; padding: 0 10px; border: 0; border-radius: 6px; background: transparent; color: var(--muted); font-size: 10px; cursor: pointer; white-space: nowrap; }
 .workflow-button:hover, .workflow-button.is-active { background: rgba(29,29,31,.08); color: var(--ink); }
@@ -60,6 +60,8 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width:
 .workflow-manage-button { flex: 0 0 30px; width: 30px; height: 30px; display: grid; place-items: center; border: 0; border-left: 1px solid rgba(29,29,31,.08); background: transparent; color: var(--muted); cursor: pointer; }
 .workflow-manage-button:hover { color: var(--ink); background: rgba(29,29,31,.06); }
 .workflow-manage-button svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; }
+.workflow-context { position: fixed; left: 50%; top: 116px; z-index: 18; padding: 5px 8px; border: 1px solid rgba(29,29,31,.1); border-radius: 5px; background: rgba(252,252,250,.9); color: var(--muted); font-size: 9px; line-height: 1; pointer-events: none; transform: translateX(-50%); backdrop-filter: blur(8px); }
+.workflow-context[hidden] { display: none; }
 .global-cover-switcher { top: 72px; right: 20px; gap: 2px; min-height: 38px; padding: 3px; border-radius: 9px; }
 .global-cover-switcher > span { padding: 0 8px; color: var(--muted); font-size: 10px; }
 .global-cover-switcher button { min-height: 30px; padding: 0 9px; border: 0; border-radius: 6px; background: transparent; color: var(--muted); font-size: 10px; cursor: pointer; }
@@ -76,7 +78,7 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width:
 .divider { width: 1px; height: 20px; margin: 0 3px; background: var(--hairline); }
 .zoom-value { min-width: 55px; height: 40px; padding: 0 8px; border: 0; border-radius: 8px; background: transparent; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; cursor: pointer; }
 .zoom-value:hover { color: var(--ink); background: rgba(29,29,31,.06); }
-.selection-bar { top: 20px; left: 50%; min-height: 44px; max-width: calc(100vw - 320px); gap: 10px; padding: 2px 3px 2px 13px; border-radius: 10px; transform: translateX(-50%); }
+.selection-bar { top: 66px; left: 50%; min-height: 44px; max-width: calc(100vw - 320px); gap: 10px; padding: 2px 3px 2px 13px; border-radius: 10px; transform: translateX(-50%); }
 .selection-bar[hidden] { display: none; }
 .selection-bar > span:first-child { max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
 .selection-size { color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
@@ -368,7 +370,8 @@ button:focus-visible, .canvas-item:focus-visible { outline: 3px solid rgba(80,97
   .view-switcher { top: 12px; right: 12px; }
   .global-cover-switcher { top: 62px; right: 12px; }
   .workflow-switcher { top: 112px; left: 12px; max-width: calc(100vw - 24px); overflow-x: auto; transform: none; }
-  .search-tools { top: 162px; left: 12px; width: calc(100vw - 24px); }
+  .workflow-context { left: 12px; top: 154px; transform: none; }
+  .search-tools { top: 188px; left: 12px; width: calc(100vw - 24px); }
   .view-button { min-width: 44px; padding: 0 8px; }
   .tool-bar { bottom: max(12px, env(safe-area-inset-bottom)); }
   .selection-bar { top: 64px; max-width: calc(100vw - 24px); }
