@@ -5,7 +5,7 @@ const ASSET_STORE_NAME = "image-assets";
 const THUMBNAIL_VERSION = 5;
 const STATIC_DEPLOYMENT = location.protocol !== "file:" && !["localhost", "127.0.0.1", "::1"].includes(location.hostname);
 const ONBOARDING_DISMISSED_KEY = "later-space-onboarding-dismissed-v1";
-document.documentElement.dataset.appVersion = "59";
+document.documentElement.dataset.appVersion = "60";
 document.documentElement.dataset.deployment = STATIC_DEPLOYMENT ? "static" : "local";
 
 const state = {
@@ -148,7 +148,6 @@ const elements = {
   tagManageList: document.querySelector("#tagManageList"),
   tagManageEmpty: document.querySelector("#tagManageEmpty"),
   workflowSwitcher: document.querySelector("#workflowSwitcher"),
-  workflowContext: document.querySelector("#workflowContext"),
   syncButton: document.querySelector("#syncButton"),
   syncPanel: document.querySelector("#syncPanel"),
   closeSyncButton: document.querySelector("#closeSyncButton"),
@@ -478,10 +477,6 @@ function renderWorkflowControls() {
     ...tags.map((tag) => button(`tag:${tag}`, tag, tagCounts.get(tag))),
     tags.length ? `<button type="button" class="workflow-manage-button" data-manage-tags aria-label="管理标签" title="管理标签"><svg viewBox="0 0 24 24"><path d="M4 7h10M4 17h16M18 7h2M10 12h10M4 12h2"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="12" r="2"/></svg></button>` : "",
   ].join("");
-  const target = currentCanvasTarget();
-  elements.workflowContext.hidden = target.value === "all";
-  elements.workflowContext.textContent = target.value === "inbox" ? "收藏到 未整理" : `收藏到 ${target.label}`;
-  elements.workflowContext.title = target.value === "inbox" ? "新内容不会添加标签" : `新内容会自动添加「${target.label}」标签`;
 }
 
 function currentCanvasTarget() {
