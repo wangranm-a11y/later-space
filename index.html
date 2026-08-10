@@ -7,7 +7,7 @@
     <title>Later Space</title>
     <link rel="icon" href="assets/favicon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="assets/apple-touch-icon.png" />
-    <link rel="stylesheet" href="styles.css?v=29" />
+    <link rel="stylesheet" href="styles.css?v=30" />
   </head>
   <body>
     <main class="canvas" id="canvas" tabindex="0" aria-label="Later Space 无限内容画布">
@@ -17,7 +17,7 @@
         <span class="empty-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="m7 16 3.5-3.5 2.5 2.5 2-2 2 2"/><circle cx="15.5" cy="8.5" r="1"/></svg>
         </span>
-        <h1 id="emptyTitle">粘贴图片、链接或文字</h1>
+        <h1 id="emptyTitle">粘贴图片、视频、链接或文字</h1>
         <p id="emptyHint"><kbd>⌘</kbd><kbd>V</kbd></p>
       </div>
 
@@ -77,6 +77,7 @@
       <div class="floating view-switcher" role="group" aria-label="内容分类视图">
         <button class="view-button is-active" type="button" data-view="all">全部</button>
         <button class="view-button" type="button" data-view="images">图片</button>
+        <button class="view-button" type="button" data-view="videos">视频</button>
         <button class="view-button" type="button" data-view="links">链接</button>
         <button class="view-button" type="button" data-view="texts">文字</button>
       </div>
@@ -164,7 +165,7 @@
         </button>
       </div>
 
-      <input id="fileInput" type="file" accept="image/*" multiple hidden />
+      <input id="fileInput" type="file" accept="image/*,video/*" multiple hidden />
       <input id="backupInput" type="file" accept="application/json,.json" hidden />
       <div class="drop-state" id="dropState" aria-hidden="true"><span>放到画布上</span></div>
       <div class="selection-marquee" id="selectionMarquee" hidden></div>
@@ -203,7 +204,7 @@
       <div class="capture-mode-switcher" role="group" aria-label="添加内容类型">
         <button class="capture-mode-button is-active" type="button" data-capture-mode="text" aria-pressed="true">文字</button>
         <button class="capture-mode-button" type="button" data-capture-mode="link" aria-pressed="false">链接</button>
-        <button class="capture-mode-button" type="button" data-capture-mode="image" aria-pressed="false">图片</button>
+        <button class="capture-mode-button" type="button" data-capture-mode="image" aria-pressed="false">图片 / 视频</button>
       </div>
       <div id="captureInputGroup">
         <label class="capture-input-label" id="captureInputLabel" for="captureInput">写点什么</label>
@@ -215,8 +216,8 @@
       </div>
       <button class="image-capture-panel" id="chooseImagesButton" type="button" hidden>
         <svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="m7 16 3.5-3.5 2.5 2.5 2-2 2 2"/><circle cx="15.5" cy="8.5" r="1"/></svg>
-        <strong>选择图片</strong>
-        <span>支持一次添加多张</span>
+        <strong>选择图片或视频</strong>
+        <span>支持一次添加多个文件</span>
       </button>
       <div class="capture-dialog-footer">
         <button class="primary-button" id="addContentButton" type="button">添加文字</button>
@@ -274,6 +275,6 @@
       <p class="crop-hint">拖动框选择区域，拖动任意边缘或四角调整大小</p>
       <footer><button class="secondary-button" id="resetCropButton" type="button">重置</button><button class="primary-button" id="applyCropButton" type="button">完成裁剪</button></footer>
     </section>
-    <script src="app.js?v=60" defer></script>
+    <script src="app.js?v=61" defer></script>
   </body>
 </html>

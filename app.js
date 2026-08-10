@@ -5,7 +5,7 @@ const ASSET_STORE_NAME = "image-assets";
 const THUMBNAIL_VERSION = 5;
 const STATIC_DEPLOYMENT = location.protocol !== "file:" && !["localhost", "127.0.0.1", "::1"].includes(location.hostname);
 const ONBOARDING_DISMISSED_KEY = "later-space-onboarding-dismissed-v1";
-document.documentElement.dataset.appVersion = "60";
+document.documentElement.dataset.appVersion = "61";
 document.documentElement.dataset.deployment = STATIC_DEPLOYMENT ? "static" : "local";
 
 const state = {
@@ -14,6 +14,7 @@ const state = {
   selectedId: null,
   selectedIds: new Set(),
   objectUrls: new Map(),
+  assetUrls: new Map(),
   view: { x: innerWidth / 2, y: innerHeight / 2, zoom: 1 },
   pointer: null,
   dragDepth: 0,
@@ -260,7 +261,7 @@ async function createThumbnail(blob, maximumSide = 960) {
 }
 
 async function originalBlob(record) {
-  if (record.kind) return null;
+  if (record.kind === "text" || record.kind === "link") return null;
   const asset = await transactAsset("readonly", (store) => store.get(record.id));
   return asset?.blob || record.blob || null;
 }
@@ -275,7 +276,7 @@ async function backupImageAssets() {
     if (!response.ok) return new Map();
     const payload = await response.json();
     return new Map((payload.images || [])
-      .filter((record) => !record.kind && record.dataUrl)
+      .filter((record) => record.kind !== "text" && record.kind !== "link" && record.dataUrl)
       .map((record) => [record.id, { blob: dataUrlToBlob(record.dataUrl), assetHash: record.assetHash }]));
   } catch {
     return new Map();
@@ -313,6 +314,23 @@ function imageUrl(record) {
   const displayBlob = record.thumbnail || record.blob;
   if (!state.objectUrls.has(record.id) && displayBlob) state.objectUrls.set(record.id, URL.createObjectURL(displayBlob));
   return state.objectUrls.get(record.id) || (record.assetHash ? `/api/backups/assets/${record.assetHash}` : "");
+}
+
+async function videoUrl(record) {
+  if (state.assetUrls.has(record.id)) return state.assetUrls.get(record.id);
+  const blob = await originalBlob(record);
+  if (!blob) return record.assetHash ? `/api/backups/assets/${record.assetHash}` : "";
+  const url = URL.createObjectURL(blob);
+  state.assetUrls.set(record.id, url);
+  return url;
+}
+
+function isImageRecord(record) {
+  return record.kind !== "text" && record.kind !== "link" && record.kind !== "video";
+}
+
+function isMediaRecord(record) {
+  return isImageRecord(record) || record.kind === "video";
 }
 
 function linkHostname(value) {
@@ -404,7 +422,8 @@ function visibleRecords() {
     const matchesView = state.activeView === "all"
       || (state.activeView === "links" && record.kind === "link")
       || (state.activeView === "texts" && record.kind === "text")
-      || (state.activeView === "images" && !record.kind);
+      || (state.activeView === "videos" && record.kind === "video")
+      || (state.activeView === "images" && isImageRecord(record));
     const isUnsorted = !(record.tags || []).length;
     const matchesWorkflow = state.workflow === "all"
       || (state.workflow === "inbox" && isUnsorted)
@@ -683,7 +702,7 @@ async function loadImages() {
   const records = await transact("readonly", (store) => store.getAll());
   records.sort((a, b) => a.createdAt - b.createdAt);
   let migrated = false;
-  const needsAssetRecovery = records.some((record) => !record.kind && record.thumbnailVersion !== THUMBNAIL_VERSION);
+  const needsAssetRecovery = records.some((record) => isMediaRecord(record) && record.thumbnailVersion !== THUMBNAIL_VERSION);
   const recoveredAssets = needsAssetRecovery ? await backupImageAssets() : new Map();
   state.images = records.map((record, index) => {
     if (!WORKFLOW_STATUSES.has(record.status)) {
@@ -714,7 +733,7 @@ async function loadImages() {
     if (record.kind === "link" && !record.canonicalUrl) {
       record.canonicalUrl = canonicalUrl(record.url);
       migrated = true;
-    } else if (!record.kind) {
+    } else if (isMediaRecord(record)) {
       if (record.blob) {
         if (!record.fingerprint) record.fingerprint = await blobFingerprint(record.blob);
         await storeImageAsset(record, record.blob);
@@ -730,7 +749,7 @@ async function loadImages() {
         }
         const original = recovered?.blob || await originalBlob(record);
         if (original) {
-          record.thumbnail = original;
+          record.thumbnail = record.kind === "video" ? await createVideoThumbnail(original) : original;
           record.thumbnailVersion = THUMBNAIL_VERSION;
           migrated = true;
         }
@@ -758,13 +777,15 @@ function render() {
       if (!renderedIds.has(id)) {
         URL.revokeObjectURL(url);
         state.objectUrls.delete(id);
+        if (state.assetUrls.has(id)) URL.revokeObjectURL(state.assetUrls.get(id));
+        state.assetUrls.delete(id);
       }
     });
   }
   elements.imageCount.textContent = filtersAreActive() ? `${filteredRecords.length}/${state.images.length}` : state.images.length;
   elements.emptyCue.hidden = filteredRecords.length > 0;
   elements.emptyCue.setAttribute("aria-hidden", filteredRecords.length > 0 ? "true" : "false");
-  elements.emptyTitle.textContent = state.images.length ? "没有找到匹配内容" : "粘贴图片、链接或文字";
+  elements.emptyTitle.textContent = state.images.length ? "没有找到匹配内容" : "粘贴图片、视频、链接或文字";
   elements.emptyHint.innerHTML = state.images.length ? "换个关键词，或者重置筛选" : "<kbd>⌘</kbd><kbd>V</kbd>";
   const showOnboarding = !state.images.length && localStorage.getItem(ONBOARDING_DISMISSED_KEY) !== "true";
   elements.onboardingCards.hidden = !showOnboarding;
@@ -777,15 +798,22 @@ function render() {
     const multiSelected = state.selectedIds.has(record.id);
     const isLink = record.kind === "link";
     const isText = record.kind === "text";
-    const content = isLink ? linkCard(record) : isText ? `<div class="text-block">${escapeHtml(record.text)}</div>` : `<img src="${imageUrl(record)}" alt="${escapeHtml(record.note || record.name || "收藏图片")}" draggable="false" />`;
+    const isVideo = record.kind === "video";
+    const content = isLink ? linkCard(record) : isText ? `<div class="text-block">${escapeHtml(record.text)}</div>` : isVideo ? `<span class="video-drag-handle" aria-hidden="true"></span><video class="video-preview" controls preload="metadata" poster="${imageUrl(record)}" aria-label="${escapeHtml(record.note || record.name || "收藏视频")}"></video>` : `<img src="${imageUrl(record)}" alt="${escapeHtml(record.note || record.name || "收藏图片")}" draggable="false" />`;
     const transform = `translate(${record.canvasX}px,${record.canvasY}px)`;
     const textHeight = isText ? `height:${record.textHeight || textBaseSize(record.text).height}px;` : "";
-    return `<article class="canvas-item${isLink ? " link-item" : ""}${isText ? " text-item" : ""}${selected ? " is-selected" : ""}${multiSelected ? " is-multi-selected" : ""}${state.recentIds.has(record.id) ? " is-new" : ""}${state.arrivingIds.has(record.id) ? " is-arriving" : ""}${state.duplicateFocusId === record.id ? " is-duplicate-focus" : ""}" data-id="${record.id}" data-status="${record.status || "unread"}" tabindex="0" aria-label="${escapeHtml(record.title || record.text || record.name || "收藏内容")}" style="width:${record.canvasWidth}px;${textHeight}transform:${transform};z-index:${record.zIndex || 1}">
+    return `<article class="canvas-item${isLink ? " link-item" : ""}${isText ? " text-item" : ""}${isVideo ? " video-item" : ""}${selected ? " is-selected" : ""}${multiSelected ? " is-multi-selected" : ""}${state.recentIds.has(record.id) ? " is-new" : ""}${state.arrivingIds.has(record.id) ? " is-arriving" : ""}${state.duplicateFocusId === record.id ? " is-duplicate-focus" : ""}" data-id="${record.id}" data-status="${record.status || "unread"}" tabindex="0" aria-label="${escapeHtml(record.title || record.text || record.name || "收藏内容")}" style="width:${record.canvasWidth}px;${textHeight}transform:${transform};z-index:${record.zIndex || 1}">
       ${content}
       ${isText ? textResizeHandles() : `<span class="resize-handle" data-resize aria-hidden="true"></span>`}
       <span class="item-caption">${escapeHtml(record.title || record.note || record.name || "内容")}</span>
     </article>`;
   }).join("");
+  renderedRecords.filter((record) => record.kind === "video").forEach((record) => {
+    videoUrl(record).then((url) => {
+      const node = elements.world.querySelector(`[data-id="${record.id}"] video`);
+      if (node && url) node.src = url;
+    }).catch(() => {});
+  });
   renderFilterControls();
   renderWorkflowControls();
   renderSelection();
@@ -834,8 +862,8 @@ function renderSelection() {
   });
   elements.shuffleCoverButton.hidden = record.kind !== "link" || record.coverMode === "clean";
   elements.shuffleFontButton.hidden = record.kind !== "link" || record.coverMode === "clean";
-  elements.copyImageButton.hidden = Boolean(record.kind);
-  elements.cropImageButton.hidden = Boolean(record.kind);
+  elements.copyImageButton.hidden = !isImageRecord(record);
+  elements.cropImageButton.hidden = !isImageRecord(record);
   elements.batchEditButton.hidden = false;
   elements.openSelectedButton.hidden = record.kind !== "link";
   elements.openSelectedButton.href = record.kind === "link" ? record.url : "#";
@@ -1150,24 +1178,69 @@ function getDimensions(blob) {
   });
 }
 
+function getVideoInfo(blob) {
+  return new Promise((resolve) => {
+    const url = URL.createObjectURL(blob);
+    const video = document.createElement("video");
+    video.preload = "metadata";
+    video.onloadedmetadata = () => {
+      resolve({ width: video.videoWidth || 0, height: video.videoHeight || 0, duration: video.duration || 0 });
+      URL.revokeObjectURL(url);
+    };
+    video.onerror = () => { resolve({ width: 0, height: 0, duration: 0 }); URL.revokeObjectURL(url); };
+    video.src = url;
+  });
+}
+
+function createVideoThumbnail(blob) {
+  return new Promise((resolve) => {
+    const url = URL.createObjectURL(blob);
+    const video = document.createElement("video");
+    video.muted = true;
+    video.preload = "metadata";
+    let finished = false;
+    const finish = (thumbnail = null) => {
+      if (finished) return;
+      finished = true;
+      clearTimeout(timeout);
+      URL.revokeObjectURL(url);
+      resolve(thumbnail);
+    };
+    const timeout = setTimeout(() => finish(), 5000);
+    video.onerror = () => finish();
+    video.onloadedmetadata = () => { video.currentTime = Math.min(.1, video.duration || 0); };
+    video.onseeked = () => {
+      const canvas = document.createElement("canvas");
+      const scale = Math.min(1, 960 / Math.max(video.videoWidth || 1, video.videoHeight || 1));
+      canvas.width = Math.max(1, Math.round((video.videoWidth || 320) * scale));
+      canvas.height = Math.max(1, Math.round((video.videoHeight || 180) * scale));
+      canvas.getContext("2d").drawImage(video, 0, 0, canvas.width, canvas.height);
+      canvas.toBlob((thumbnail) => finish(thumbnail), "image/jpeg", .82);
+    };
+    video.src = url;
+  });
+}
+
 async function saveFiles(fileList, source, screenPoint, purpose = "", tags = []) {
-  const files = Array.from(fileList).filter((file) => file?.type?.startsWith("image/"));
-  if (!files.length) return showToast("没有找到图片");
+  const files = Array.from(fileList).filter((file) => file?.type?.startsWith("image/") || file?.type?.startsWith("video/"));
+  if (!files.length) return showToast("没有找到图片或视频");
   const center = screenPoint ? screenToWorld(screenPoint.x, screenPoint.y) : worldCenter();
   const baseOffset = state.pasteOffset;
   const savedRecords = [];
   for (const [index, file] of files.entries()) {
     const fingerprint = await blobFingerprint(file);
-    const duplicate = state.images.find((record) => !record.kind && record.fingerprint === fingerprint);
-    if (duplicate && !await confirmDuplicateUpload("这张图片", duplicate)) continue;
-    const dimensions = await getDimensions(file);
+    const isVideo = file.type.startsWith("video/");
+    const duplicate = state.images.find((record) => isMediaRecord(record) && record.fingerprint === fingerprint);
+    if (duplicate && !await confirmDuplicateUpload(isVideo ? "这个视频" : "这张图片", duplicate)) continue;
+    const dimensions = isVideo ? await getVideoInfo(file) : await getDimensions(file);
+    const thumbnail = isVideo ? await createVideoThumbnail(file) : file;
     const canvasWidth = Math.min(360, Math.max(180, dimensions.width ? Math.min(dimensions.width, 320) : 280));
     const ratio = dimensions.width ? dimensions.height / dimensions.width : 1;
     const placement = openPlacement(center, canvasWidth, canvasWidth * ratio);
     const now = Date.now() + index;
     const record = {
-      id: makeId(), thumbnail: file, thumbnailVersion: THUMBNAIL_VERSION, name: file.name || `粘贴图片 ${new Date(now).toLocaleTimeString("zh-CN")}`,
-      type: file.type, size: file.size, width: dimensions.width, height: dimensions.height, fingerprint,
+      id: makeId(), ...(isVideo ? { kind: "video" } : {}), thumbnail, thumbnailVersion: THUMBNAIL_VERSION, name: file.name || `${isVideo ? "粘贴视频" : "粘贴图片"} ${new Date(now).toLocaleTimeString("zh-CN")}`,
+      type: file.type, size: file.size, width: dimensions.width, height: dimensions.height, duration: dimensions.duration || 0, fingerprint,
       status: "inbox", tags: [...tags], note: purpose, source, createdAt: now, updatedAt: now,
       canvasX: placement.x,
       canvasY: placement.y,
@@ -1183,7 +1256,7 @@ async function saveFiles(fileList, source, screenPoint, purpose = "", tags = [])
   if (savedRecords.length) {
     highlightNewRecords(savedRecords, screenPoint || screenCenter());
     scheduleBackup();
-    showToast(`${savedRecords.length} 张图片已放入画布`);
+    showToast(`${savedRecords.length} 个媒体已放入画布`);
   }
 }
 
@@ -1510,6 +1583,7 @@ function selectItem(id) {
 function beginPointer(event) {
   if (event.button !== 0) return;
   if (event.target.closest("button, a, input, textarea, select, label")) return;
+  if (event.target.closest("video")) return;
   const openButton = event.target.closest("[data-open-link]");
   if (openButton) {
     event.stopPropagation();
@@ -1664,7 +1738,7 @@ async function deleteSelected() {
     .filter(Boolean);
   const assets = new Map();
   for (const record of records) {
-    if (!record.kind) {
+    if (isMediaRecord(record)) {
       const blob = await originalBlob(record);
       if (blob) assets.set(record.id, blob);
     }
@@ -1679,6 +1753,8 @@ async function deleteSelected() {
     await transactAsset("readwrite", (store) => store.delete(id));
     if (state.objectUrls.has(id)) URL.revokeObjectURL(state.objectUrls.get(id));
     state.objectUrls.delete(id);
+    if (state.assetUrls.has(id)) URL.revokeObjectURL(state.assetUrls.get(id));
+    state.assetUrls.delete(id);
   }
   const deletedIds = new Set(ids);
   state.images = state.images.filter((image) => !deletedIds.has(image.id));
@@ -1810,7 +1886,7 @@ async function restorePayload(payload) {
     if (restored.dataUrl) {
       const blob = dataUrlToBlob(restored.dataUrl);
       await storeImageAsset(restored, blob);
-      restored.thumbnail = blob;
+      restored.thumbnail = restored.kind === "video" ? await createVideoThumbnail(blob) : blob;
       restored.thumbnailVersion = THUMBNAIL_VERSION;
     }
     delete restored.dataUrl;
@@ -1821,6 +1897,8 @@ async function restorePayload(payload) {
   for (const record of records) await transact("readwrite", (store) => store.put(record));
   state.objectUrls.forEach((url) => URL.revokeObjectURL(url));
   state.objectUrls.clear();
+  state.assetUrls.forEach((url) => URL.revokeObjectURL(url));
+  state.assetUrls.clear();
   state.images = records.sort((left, right) => left.createdAt - right.createdAt);
   state.selectedId = null;
   state.selectedIds.clear();
@@ -1990,7 +2068,7 @@ function initialCropBox(ratio, image) {
 
 async function openCropEditor() {
   const record = state.images.find((item) => item.id === state.selectedId);
-  if (record?.kind) return;
+  if (!isImageRecord(record)) return;
   try {
     const blob = await originalBlob(record);
     if (!blob) throw new Error("missing image");
@@ -2186,7 +2264,7 @@ async function imageBlobAsPng(blob) {
 
 async function copySelectedImage() {
   const record = state.images.find((image) => image.id === state.selectedId);
-  if (!record || record.kind) return;
+  if (!record || !isImageRecord(record)) return;
   if (!navigator.clipboard?.write || typeof ClipboardItem === "undefined") {
     showToast("当前浏览器不支持复制图片");
     return;
@@ -2385,7 +2463,7 @@ function bindEvents() {
   }, { passive: false });
   window.addEventListener("paste", (event) => {
     if (event.target.matches?.("input, textarea, [contenteditable='true']")) return;
-    const files = Array.from(event.clipboardData?.items || []).filter((item) => item.kind === "file" && item.type.startsWith("image/")).map((item) => item.getAsFile()).filter(Boolean);
+    const files = Array.from(event.clipboardData?.items || []).filter((item) => item.kind === "file" && (item.type.startsWith("image/") || item.type.startsWith("video/"))).map((item) => item.getAsFile()).filter(Boolean);
     const text = event.clipboardData?.getData("text/plain") || "";
     const urls = extractUrls(text);
     if (files.length) { event.preventDefault(); saveFiles(files, "paste", screenCenter(), "", currentCanvasTags()); }
@@ -2394,6 +2472,7 @@ function bindEvents() {
   });
 
   elements.world.addEventListener("dblclick", (event) => {
+    if (event.target.closest("video")) return;
     const item = event.target.closest(".canvas-item");
     const record = item && state.images.find((entry) => entry.id === item.dataset.id);
     if (record?.kind === "link") openLink(record);
@@ -2408,7 +2487,7 @@ function bindEvents() {
       undoDeletion();
       return;
     }
-    if (!isEditing && event.key.toLowerCase() === "c" && (event.metaKey || event.ctrlKey) && selectedRecord && !selectedRecord.kind) {
+    if (!isEditing && event.key.toLowerCase() === "c" && (event.metaKey || event.ctrlKey) && selectedRecord && isImageRecord(selectedRecord)) {
       event.preventDefault();
       copySelectedImage();
     }
