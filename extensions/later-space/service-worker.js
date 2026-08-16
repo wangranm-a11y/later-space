@@ -33,7 +33,7 @@ async function sendCapture(capture) {
     const result = await deliverToTab(tab.id, capture);
     if (!result || !["saved", "duplicate"].includes(result.state)) throw new Error("Later Space unavailable");
     await removeQueued(capture.id);
-    return true;
+    return result;
   } finally {
     if (temporaryTab) await chrome.tabs.remove(tab.id).catch(() => {});
   }
@@ -55,10 +55,20 @@ async function saveCapture(capture) {
   const normalized = { id: capture.id || captureId(), createdAt: capture.createdAt || Date.now(), source: "chrome-extension", ...capture };
   await queueCapture(normalized);
   try {
-    await sendCapture(normalized);
-    return { state: "saved" };
+    return await sendCapture(normalized);
   } catch {
     return { state: "queued" };
+  }
+}
+
+async function destinationStatus() {
+  const [tab] = await chrome.tabs.query({ url: `${APP_URL}*` });
+  if (!tab) return { label: "当前浏览器 · 加入后确认保存位置" };
+  try {
+    const result = await deliverToTab(tab.id, { type: "status" });
+    return result?.destination || { label: "当前浏览器 · 保存位置未确认" };
+  } catch {
+    return { label: "当前浏览器 · 保存位置未确认" };
   }
 }
 
@@ -106,23 +116,28 @@ function pageCapture(tab) {
 }
 
 chrome.runtime.onInstalled.addListener(() => {
-  chrome.contextMenus.create({ id: "later-page", title: "保存此页面到 Later Space", contexts: ["page"] });
-  chrome.contextMenus.create({ id: "later-link", title: "保存此链接到 Later Space", contexts: ["link"] });
-  chrome.contextMenus.create({ id: "later-image", title: "保存此图片到 Later Space", contexts: ["image"] });
-  chrome.contextMenus.create({ id: "later-selection", title: "保存选中文字到 Later Space", contexts: ["selection"] });
+  chrome.contextMenus.removeAll(() => {
+    chrome.contextMenus.create({ id: "later-add", title: "加入 Later Space", contexts: ["page", "link", "image", "selection"] });
+  });
   chrome.alarms.create("retry-captures", { periodInMinutes: 1 });
   retryQueue();
 });
 
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   let result;
-  if (info.menuItemId === "later-link") result = await saveCapture({ kind: "link", url: info.linkUrl, title: info.selectionText || "" });
-  else if (info.menuItemId === "later-selection") result = await saveCapture({ kind: "text", text: info.selectionText || "", pageUrl: tab?.url || "" });
-  else if (info.menuItemId === "later-image") {
+  if (info.menuItemId !== "later-add") return;
+  if (info.selectionText) result = await saveCapture({ kind: "text", text: info.selectionText, pageUrl: tab?.url || "" });
+  else if (info.srcUrl) {
     try { result = await imageCapture(info.srcUrl, tab?.url || ""); }
     catch { result = await saveCapture({ kind: "link", url: info.srcUrl, title: "网页图片", pageUrl: tab?.url || "" }); }
-  } else result = await pageCapture(tab);
-  chrome.notifications.create({ type: "basic", iconUrl: "icon-128.png", title: "Later Space", message: result.state === "saved" ? "已接住" : "已暂存，连接后自动发送" }).catch(() => {});
+  } else if (info.linkUrl) result = await saveCapture({ kind: "link", url: info.linkUrl, title: "" });
+  else result = await pageCapture(tab);
+  const messages = {
+    saved: "已加入 Later Space",
+    duplicate: "已经在 Later Space 里了",
+    queued: "暂时离线，稍后自动加入",
+  };
+  chrome.notifications.create({ type: "basic", iconUrl: "icon-128.png", title: "Later Space", message: messages[result.state] || messages.queued }).catch(() => {});
 });
 
 chrome.commands.onCommand.addListener(async () => {
@@ -138,6 +153,10 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   }
   if (message.type === "retry-queue") {
     retryQueue().then(async () => sendResponse(await chrome.storage.local.get({ [QUEUE_KEY]: [] })));
+    return true;
+  }
+  if (message.type === "destination-status") {
+    destinationStatus().then(sendResponse);
     return true;
   }
 });

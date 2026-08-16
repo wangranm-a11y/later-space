@@ -1,6 +1,8 @@
 const status = document.querySelector("#status");
 const title = document.querySelector("#pageTitle");
 const retry = document.querySelector("#retry");
+const save = document.querySelector("#save");
+const destination = document.querySelector("#destination");
 
 async function refreshQueue() {
   const { laterSpaceCaptureQueue = [] } = await chrome.storage.local.get({ laterSpaceCaptureQueue: [] });
@@ -8,13 +10,29 @@ async function refreshQueue() {
   retry.textContent = laterSpaceCaptureQueue.length ? `重试 ${laterSpaceCaptureQueue.length} 条待发送` : "";
 }
 
-chrome.tabs.query({ active: true, currentWindow: true }).then(async ([tab]) => {
+chrome.tabs.query({ active: true, currentWindow: true }).then(([tab]) => {
   title.textContent = tab?.title || tab?.url || "当前网页";
-  status.textContent = "正在接住…";
+});
+
+chrome.runtime.sendMessage({ type: "destination-status" }).then((result) => {
+  if (result?.label) destination.textContent = result.label;
+});
+
+save.addEventListener("click", async () => {
+  save.disabled = true;
+  status.textContent = "正在加入…";
+  document.body.classList.remove("is-saved", "is-duplicate", "is-queued");
   const result = await chrome.runtime.sendMessage({ type: "capture-current" });
-  status.textContent = result?.state === "saved" ? "已接住，可以继续浏览" : "已暂存，连接后自动发送";
-  document.body.classList.add(result?.state === "saved" ? "is-saved" : "is-queued");
-  refreshQueue();
+  const messages = {
+    saved: "已加入 Later Space",
+    duplicate: "已经在 Later Space 里了",
+    queued: "暂时离线，稍后自动加入",
+  };
+  status.textContent = messages[result?.state] || messages.queued;
+  document.body.classList.add(`is-${result?.state || "queued"}`);
+  if (result?.destination?.label) destination.textContent = result.destination.label;
+  save.textContent = result?.state === "duplicate" ? "已经加入" : "已加入";
+  await refreshQueue();
 });
 
 retry.addEventListener("click", async () => {
@@ -23,3 +41,5 @@ retry.addEventListener("click", async () => {
   await refreshQueue();
   retry.disabled = false;
 });
+
+refreshQueue();

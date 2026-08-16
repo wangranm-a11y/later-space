@@ -15,6 +15,6 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     sendResponse(event.data.result);
   }
   window.addEventListener("message", receiveResult);
-  window.postMessage({ source: "later-space-extension", type: "capture", requestId, capture: message.capture }, PAGE_ORIGIN);
+  window.postMessage({ source: "later-space-extension", type: message.capture?.type === "status" ? "status" : "capture", requestId, capture: message.capture }, PAGE_ORIGIN);
   return true;
 });
