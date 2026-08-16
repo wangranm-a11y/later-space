@@ -9,7 +9,7 @@ const EXPANDED_TEXT_WIDTH = 420;
 const EXPANDED_TEXT_HEIGHT = 520;
 const STATIC_DEPLOYMENT = location.protocol !== "file:" && !["localhost", "127.0.0.1", "::1"].includes(location.hostname);
 const ONBOARDING_DISMISSED_KEY = "later-space-onboarding-dismissed-v1";
-document.documentElement.dataset.appVersion = "66";
+document.documentElement.dataset.appVersion = "67";
 document.documentElement.dataset.deployment = STATIC_DEPLOYMENT ? "static" : "local";
 
 const state = {
@@ -21,7 +21,6 @@ const state = {
   assetUrls: new Map(),
   view: { x: innerWidth / 2, y: innerHeight / 2, zoom: 1 },
   pointer: null,
-  lastItemClick: null,
   dragDepth: 0,
   pasteOffset: 0,
   activeView: "reading",
@@ -709,7 +708,7 @@ function textCard(record, expanded) {
     <span class="long-text-type">文字</span>
     <h2>${escapeHtml(longTextTitle(record.text))}</h2>
     <p>${escapeHtml(longTextPreview(record.text))}</p>
-    <button class="long-text-footer" type="button" data-toggle-long-text>展开全文</button>
+    <button class="long-text-footer" type="button" data-toggle-long-text>阅读全文</button>
   </div>`;
 }
 
@@ -1790,6 +1789,9 @@ function endPointer() {
   elements.selectionMarquee.hidden = true;
   state.pointer = null;
   elements.canvas.classList.remove("is-panning");
+  if (pointer.mode === "item" && !pointer.moved && record?.kind === "text" && !state.expandedTextIds.has(record.id)) {
+    toggleTextCard(record);
+  }
 }
 
 function zoomAt(clientX, clientY, factor) {
@@ -2856,19 +2858,6 @@ function bindEvents() {
       if (record) toggleTextCard(record);
       return;
     }
-    if (event.target.closest("button, a, input, textarea, select, label, video, [data-resize]")) return;
-    const item = event.target.closest(".canvas-item");
-    const record = item && state.images.find((entry) => entry.id === item.dataset.id);
-    if (!record) return;
-    const now = Date.now();
-    if (state.lastItemClick?.id !== record.id || now - state.lastItemClick.at >= 700) {
-      state.lastItemClick = { id: record.id, at: now };
-      return;
-    }
-    state.lastItemClick = null;
-    if (record.kind === "link") openLink(record);
-    else if (record.kind === "text") toggleTextCard(record);
-    else openBatchEditor();
   });
   elements.canvas.addEventListener("wheel", (event) => {
     if (event.target.closest(".text-card-item.is-expanded .long-text-full")) return;
