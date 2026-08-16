@@ -9,7 +9,7 @@ const EXPANDED_TEXT_WIDTH = 420;
 const EXPANDED_TEXT_HEIGHT = 520;
 const STATIC_DEPLOYMENT = location.protocol !== "file:" && !["localhost", "127.0.0.1", "::1"].includes(location.hostname);
 const ONBOARDING_DISMISSED_KEY = "later-space-onboarding-dismissed-v1";
-document.documentElement.dataset.appVersion = "67";
+document.documentElement.dataset.appVersion = "68";
 document.documentElement.dataset.deployment = STATIC_DEPLOYMENT ? "static" : "local";
 
 const state = {
@@ -59,6 +59,7 @@ const state = {
   cloudSyncing: false,
   cloudLastSyncAt: 0,
   globalCoverPreference: localStorage.getItem("later-space-global-cover-mode") || "editorial",
+  globalTextPreference: localStorage.getItem("later-space-global-text-theme") || "paper",
 };
 
 const elements = {
@@ -116,8 +117,11 @@ const elements = {
   batchEditButton: document.querySelector("#batchEditButton"),
   openSelectedButton: document.querySelector("#openSelectedButton"),
   viewButtons: document.querySelectorAll("[data-view]"),
+  appearanceSwitcher: document.querySelector("#appearanceSwitcher"),
   globalCoverSwitcher: document.querySelector("#globalCoverSwitcher"),
   globalCoverButtons: document.querySelectorAll("[data-global-cover-mode]"),
+  globalTextSwitcher: document.querySelector("#globalTextSwitcher"),
+  globalTextButtons: document.querySelectorAll("[data-global-text-theme]"),
   captureBackdrop: document.querySelector("#captureBackdrop"),
   captureDialog: document.querySelector("#captureDialog"),
   captureModeButtons: document.querySelectorAll("[data-capture-mode]"),
@@ -868,7 +872,8 @@ function render() {
     const transform = `translate(${record.canvasX}px,${record.canvasY}px)`;
     const textWidth = expanded ? record.expandedWidth || EXPANDED_TEXT_WIDTH : TEXT_CARD_WIDTH;
     const textHeight = isText ? `height:${expanded ? record.expandedHeight || EXPANDED_TEXT_HEIGHT : TEXT_CARD_HEIGHT}px;` : "";
-    return `<article class="canvas-item${isLink ? " link-item" : ""}${isText ? " text-item text-card-item" : ""}${expanded ? " is-expanded" : ""}${isVideo ? " video-item" : ""}${selected ? " is-selected" : ""}${multiSelected ? " is-multi-selected" : ""}${state.recentIds.has(record.id) ? " is-new" : ""}${state.arrivingIds.has(record.id) ? " is-arriving" : ""}${state.duplicateFocusId === record.id ? " is-duplicate-focus" : ""}" data-id="${record.id}" data-status="${record.status || "unread"}" tabindex="0" aria-label="${escapeHtml(record.title || longTextTitle(record.text) || record.text || record.name || "收藏内容")}" style="width:${isText ? textWidth : record.canvasWidth}px;${textHeight}transform:${transform};z-index:${record.zIndex || 1}">
+    const textTheme = record.textTheme || state.globalTextPreference;
+    return `<article class="canvas-item${isLink ? " link-item" : ""}${isText ? ` text-item text-card-item text-theme-${textTheme}` : ""}${expanded ? " is-expanded" : ""}${isVideo ? " video-item" : ""}${selected ? " is-selected" : ""}${multiSelected ? " is-multi-selected" : ""}${state.recentIds.has(record.id) ? " is-new" : ""}${state.arrivingIds.has(record.id) ? " is-arriving" : ""}${state.duplicateFocusId === record.id ? " is-duplicate-focus" : ""}" data-id="${record.id}" data-status="${record.status || "unread"}" tabindex="0" aria-label="${escapeHtml(record.title || longTextTitle(record.text) || record.text || record.name || "收藏内容")}" style="width:${isText ? textWidth : record.canvasWidth}px;${textHeight}transform:${transform};z-index:${record.zIndex || 1}">
       ${content}
       ${isText && expanded ? textResizeHandles() : isText ? "" : `<span class="resize-handle" data-resize aria-hidden="true"></span>`}
       <span class="item-caption">${escapeHtml(record.title || record.note || record.name || "内容")}</span>
@@ -884,15 +889,29 @@ function render() {
   renderWorkflowControls();
   renderSelection();
   renderGlobalCoverMode();
+  renderGlobalTextTheme();
 }
 
 function renderGlobalCoverMode() {
   const links = state.images.filter((record) => record.kind === "link");
-  elements.globalCoverSwitcher.hidden = state.activeView === "media";
+  elements.appearanceSwitcher.hidden = state.activeView === "media";
+  elements.globalCoverSwitcher.hidden = !links.length;
   const modes = new Set(links.map((record) => record.coverMode || "editorial"));
   elements.globalCoverSwitcher.dataset.state = modes.size > 1 ? "mixed" : (modes.values().next().value || "editorial");
   elements.globalCoverButtons.forEach((button) => {
     const active = links.length > 0 && modes.size === 1 && modes.has(button.dataset.globalCoverMode);
+    button.classList.toggle("is-active", active);
+    button.setAttribute("aria-pressed", String(active));
+  });
+}
+
+function renderGlobalTextTheme() {
+  const texts = state.images.filter((record) => record.kind === "text");
+  elements.globalTextSwitcher.hidden = !texts.length;
+  const themes = new Set(texts.map((record) => record.textTheme || state.globalTextPreference));
+  elements.globalTextSwitcher.dataset.state = themes.size > 1 ? "mixed" : (themes.values().next().value || state.globalTextPreference);
+  elements.globalTextButtons.forEach((button) => {
+    const active = texts.length > 0 && themes.size === 1 && themes.has(button.dataset.globalTextTheme);
     button.classList.toggle("is-active", active);
     button.setAttribute("aria-pressed", String(active));
   });
@@ -1342,6 +1361,7 @@ async function saveText(text, arrivalOrigin = screenCenter(), tags = [], confirm
   const now = Date.now();
   const record = {
     id: makeId(), kind: "text", text, name: text.slice(0, 32),
+    textTheme: state.globalTextPreference,
     status: "inbox", tags: [...tags], note: "", source: "compose", createdAt: now, updatedAt: now,
     canvasX: placement.x, canvasY: placement.y, canvasWidth: size.width, textHeight: size.height, textScale: 1,
     zIndex: Math.max(0, ...state.images.map((item) => item.zIndex || 0)) + 1,
@@ -1652,6 +1672,17 @@ async function setAllLinkModes(mode) {
   render();
   for (const record of links) await persistRecord(record);
   showToast(mode === "clean" ? "全部链接已切换为纯净版" : "全部链接已切换为编辑版");
+}
+
+async function setAllTextThemes(theme) {
+  if (!["paper", "dark"].includes(theme)) return;
+  const texts = state.images.filter((record) => record.kind === "text");
+  state.globalTextPreference = theme;
+  localStorage.setItem("later-space-global-text-theme", theme);
+  texts.forEach((record) => { record.textTheme = theme; });
+  render();
+  for (const record of texts) await persistRecord(record);
+  showToast(theme === "dark" ? "全部文字已切换为深色" : "全部文字已切换为纸张");
 }
 
 function selectItem(id) {
@@ -2764,6 +2795,9 @@ function bindEvents() {
   });
   elements.globalCoverButtons.forEach((button) => button.addEventListener("click", () => {
     setAllLinkModes(button.dataset.globalCoverMode);
+  }));
+  elements.globalTextButtons.forEach((button) => button.addEventListener("click", () => {
+    setAllTextThemes(button.dataset.globalTextTheme);
   }));
   elements.fileInput.addEventListener("change", () => {
     if (elements.fileInput.files.length) {

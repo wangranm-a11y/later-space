@@ -7,7 +7,7 @@
     <title>Later Space</title>
     <link rel="icon" href="assets/favicon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="assets/apple-touch-icon.png" />
-    <link rel="stylesheet" href="styles.css?v=35" />
+    <link rel="stylesheet" href="styles.css?v=36" />
   </head>
   <body>
     <main class="canvas" id="canvas" tabindex="0" aria-label="Later Space 无限内容画布">
@@ -84,10 +84,17 @@
         <button type="button" class="workflow-button is-active" data-workflow="all">全部</button>
         <button type="button" class="workflow-button" data-workflow="inbox">未整理 <span data-workflow-count="inbox">0</span></button>
       </div>
-      <div class="floating global-cover-switcher" id="globalCoverSwitcher" role="group" aria-label="全部链接封面模式">
-        <span>链接外观</span>
-        <button type="button" data-global-cover-mode="clean">全部纯净</button>
-        <button type="button" data-global-cover-mode="editorial">全部编辑</button>
+      <div class="floating appearance-switcher" id="appearanceSwitcher" aria-label="内容外观">
+        <div class="appearance-row" id="globalCoverSwitcher" role="group" aria-label="全部链接封面模式">
+          <span>链接</span>
+          <button type="button" data-global-cover-mode="clean">纯净</button>
+          <button type="button" data-global-cover-mode="editorial">编辑</button>
+        </div>
+        <div class="appearance-row" id="globalTextSwitcher" role="group" aria-label="全部文字外观">
+          <span>文字</span>
+          <button type="button" data-global-text-theme="paper">纸张</button>
+          <button type="button" data-global-text-theme="dark">深色</button>
+        </div>
       </div>
 
       <nav class="floating tool-bar" aria-label="画布工具">
@@ -276,6 +283,6 @@
       <footer><button class="secondary-button" id="resetCropButton" type="button">重置</button><button class="primary-button" id="applyCropButton" type="button">完成裁剪</button></footer>
     </section>
     <script src="cloud-config.js?v=1"></script>
-    <script src="app.js?v=67" defer></script>
+    <script src="app.js?v=68" defer></script>
   </body>
 </html>
