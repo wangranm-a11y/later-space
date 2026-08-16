@@ -1,8 +1,8 @@
 const APP_URL = "https://wangranm-a11y.github.io/later-space/";
 const QUEUE_KEY = "laterSpaceCaptureQueue";
+const UNDO_KEY = "laterSpaceUndoCaptures";
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 const contextImages = new Map();
-const undoCaptures = new Map();
 
 function captureId() {
   return crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -65,22 +65,27 @@ async function saveCapture(capture) {
 
 function feedbackText(state) {
   if (state === "saved") return "已加入 Later Space";
-  if (state === "duplicate") return "已经在 Later Space 里了";
+  if (state === "duplicate") return "已加入 Later Space";
   if (state === "undone") return "已撤销";
   if (state === "unavailable") return "这张图片暂时无法加入";
   return "暂时离线，稍后自动加入";
 }
 
-function registerUndo(result) {
+async function registerUndo(result) {
   if (result?.state !== "saved" || !result.recordIds?.length) return result;
   const undoToken = captureId();
-  undoCaptures.set(undoToken, { recordIds: result.recordIds, createdAt: Date.now() });
-  setTimeout(() => undoCaptures.delete(undoToken), 30000);
+  const stored = await chrome.storage.session.get({ [UNDO_KEY]: {} });
+  const now = Date.now();
+  const captures = Object.fromEntries(Object.entries(stored[UNDO_KEY]).filter(([, item]) => now - item.createdAt < 60000));
+  captures[undoToken] = { recordIds: result.recordIds, createdAt: now };
+  await chrome.storage.session.set({ [UNDO_KEY]: captures });
   return { ...result, undoToken };
 }
 
 async function undoCapture(token) {
-  const undo = undoCaptures.get(token);
+  const stored = await chrome.storage.session.get({ [UNDO_KEY]: {} });
+  const undo = stored[UNDO_KEY][token];
+  if (undo && Date.now() - undo.createdAt >= 60000) return { state: "expired" };
   if (!undo) return { state: "unavailable" };
   let [tab] = await chrome.tabs.query({ url: `${APP_URL}*` });
   let temporaryTab = false;
@@ -90,7 +95,10 @@ async function undoCapture(token) {
   }
   try {
     const result = await deliverToTab(tab.id, { type: "undo", recordIds: undo.recordIds });
-    if (result?.state === "undone") undoCaptures.delete(token);
+    if (result?.state === "undone") {
+      delete stored[UNDO_KEY][token];
+      await chrome.storage.session.set({ [UNDO_KEY]: stored[UNDO_KEY] });
+    }
     return result || { state: "unavailable" };
   } finally {
     if (temporaryTab) await chrome.tabs.remove(tab.id).catch(() => {});
@@ -98,12 +106,35 @@ async function undoCapture(token) {
 }
 
 async function notifySourceTab(tabId, result) {
-  if (!tabId) return;
-  await chrome.tabs.sendMessage(tabId, {
+  if (!tabId) return false;
+  return chrome.tabs.sendMessage(tabId, {
     type: "later-space-feedback",
     text: feedbackText(result.state),
+    recordIds: result.recordIds || [],
     undoToken: result.undoToken || "",
-  }).catch(() => {});
+  }).then(() => true).catch(() => false);
+}
+
+async function currentContextImage(tabId) {
+  const cached = contextImages.get(tabId)?.image;
+  if (cached?.rect && cached?.viewport) return cached;
+  try {
+    const result = await chrome.tabs.sendMessage(tabId, { type: "later-space-context-image" });
+    return result?.image || cached;
+  } catch {
+    return cached;
+  }
+}
+
+async function viewCapture(recordIds) {
+  if (!recordIds?.length) return { state: "unavailable" };
+  let [tab] = await chrome.tabs.query({ url: `${APP_URL}*` });
+  if (!tab) tab = await chrome.tabs.create({ url: `${APP_URL}?view=extension`, active: false });
+  const result = await deliverToTab(tab.id, { type: "view", recordIds });
+  if (result?.state !== "viewed") return result || { state: "unavailable" };
+  await chrome.tabs.update(tab.id, { active: true });
+  await chrome.windows.update(tab.windowId, { focused: true });
+  return result;
 }
 
 async function destinationStatus() {
@@ -192,10 +223,10 @@ chrome.runtime.onInstalled.addListener(() => {
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   let result;
   if (info.menuItemId !== "later-add") return;
+  const contextImage = await currentContextImage(tab?.id);
   if (info.selectionText) result = await saveCapture({ kind: "text", text: info.selectionText, pageUrl: tab?.url || "" });
-  else if (info.srcUrl || (Date.now() - Number(contextImages.get(tab?.id)?.createdAt || 0) < 15000 && contextImages.get(tab?.id)?.image?.url)) {
-    const contextImage = contextImages.get(tab?.id)?.image;
-    const imageUrl = info.srcUrl || contextImage.url;
+  else if (info.srcUrl || (Date.now() - Number(contextImages.get(tab?.id)?.createdAt || 0) < 15000 && contextImage?.url)) {
+    const imageUrl = info.srcUrl || contextImage?.url;
     try { result = await imageCapture(imageUrl, tab?.url || ""); }
     catch {
       try { result = await visibleImageCapture(tab, contextImage); }
@@ -203,20 +234,20 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
     }
   } else if (info.linkUrl) result = await saveCapture({ kind: "link", url: info.linkUrl, title: "" });
   else result = await pageCapture(tab);
-  result = registerUndo(result);
-  await notifySourceTab(tab?.id, result);
+  result = await registerUndo(result);
+  const sourceFeedbackShown = await notifySourceTab(tab?.id, result);
   const messages = {
     saved: "已加入 Later Space",
-    duplicate: "已经在 Later Space 里了",
+    duplicate: "已加入 Later Space",
     queued: "暂时离线，稍后自动加入",
     unavailable: "这张图片暂时无法加入",
   };
-  chrome.notifications.create({ type: "basic", iconUrl: "icon-128.png", title: "Later Space", message: messages[result.state] || messages.queued }).catch(() => {});
+  if (!sourceFeedbackShown) chrome.notifications.create({ type: "basic", iconUrl: "icon-128.png", title: "Later Space", message: messages[result.state] || messages.queued }).catch(() => {});
 });
 
 chrome.commands.onCommand.addListener(async () => {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  const result = registerUndo(await pageCapture(tab));
+  const result = await registerUndo(await pageCapture(tab));
   await notifySourceTab(tab?.id, result);
 });
 
@@ -224,7 +255,7 @@ chrome.alarms.onAlarm.addListener((alarm) => { if (alarm.name === "retry-capture
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message.type === "capture-current") {
     chrome.tabs.query({ active: true, currentWindow: true }).then(async ([tab]) => {
-      const result = registerUndo(await pageCapture(tab));
+      const result = await registerUndo(await pageCapture(tab));
       await notifySourceTab(tab?.id, result);
       return result;
     }).then(sendResponse);
@@ -245,6 +276,10 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   }
   if (message.type === "undo-capture") {
     undoCapture(message.token).then(sendResponse);
+    return true;
+  }
+  if (message.type === "view-capture") {
+    viewCapture(message.recordIds).then(sendResponse);
     return true;
   }
 });

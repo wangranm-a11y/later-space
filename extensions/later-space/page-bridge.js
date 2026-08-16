@@ -6,7 +6,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   const timeout = setTimeout(() => {
     window.removeEventListener("message", receiveResult);
     sendResponse({ state: "unavailable" });
-  }, 1200);
+  }, 10000);
   function receiveResult(event) {
     if (event.source !== window || event.origin !== PAGE_ORIGIN) return;
     if (event.data?.source !== "later-space-page" || event.data?.requestId !== requestId) return;
@@ -15,7 +15,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     sendResponse(event.data.result);
   }
   window.addEventListener("message", receiveResult);
-  const type = message.capture?.type === "status" ? "status" : message.capture?.type === "undo" ? "undo" : "capture";
+  const type = ["status", "undo", "view"].includes(message.capture?.type) ? message.capture.type : "capture";
   window.postMessage({ source: "later-space-extension", type, requestId, capture: message.capture }, PAGE_ORIGIN);
   return true;
 });

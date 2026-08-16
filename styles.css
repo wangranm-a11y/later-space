@@ -61,12 +61,11 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width:
 .workflow-manage-button { flex: 0 0 30px; width: 30px; height: 30px; display: grid; place-items: center; border: 0; border-left: 1px solid rgba(29,29,31,.08); background: transparent; color: var(--muted); cursor: pointer; }
 .workflow-manage-button:hover { color: var(--ink); background: rgba(29,29,31,.06); }
 .workflow-manage-button svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; }
-.appearance-switcher { top: 72px; right: 20px; display: grid; gap: 2px; padding: 3px; border-radius: 9px; }
+.appearance-switcher { top: 72px; right: 20px; display: grid; gap: 8px; padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
 .appearance-switcher[hidden], .appearance-row[hidden] { display: none; }
-.appearance-row { min-height: 30px; display: flex; align-items: center; gap: 2px; }
-.appearance-row + .appearance-row { border-top: 1px solid rgba(29,29,31,.07); }
-.appearance-row > span { width: 42px; padding-left: 8px; color: var(--muted); font-size: 10px; }
-.appearance-row button { min-height: 28px; padding: 0 9px; border: 0; border-radius: 6px; background: transparent; color: var(--muted); font-size: 10px; cursor: pointer; }
+.appearance-row { min-height: 38px; display: flex; align-items: center; gap: 2px; padding: 4px; border: 1px solid var(--hairline); border-radius: 9px; background: rgba(255,255,255,.9); box-shadow: 0 5px 18px rgba(28,28,30,.07); backdrop-filter: blur(16px); }
+.appearance-row > span { width: 38px; padding-left: 6px; color: var(--muted); font-size: 10px; }
+.appearance-row button { height: 30px; padding: 0 9px; border: 0; border-radius: 6px; background: transparent; color: var(--muted); font-size: 10px; cursor: pointer; }
 .appearance-row button.is-active { background: rgba(29,29,31,.08); color: var(--ink); font-weight: 600; }
 .appearance-row[data-state="mixed"]::after { content: "混合"; padding: 0 7px; color: #77777b; font-size: 9px; }
 .tool-bar { left: 50%; bottom: max(20px, env(safe-area-inset-bottom)); height: 50px; gap: 2px; padding: 4px; border-radius: 12px; transform: translateX(-50%); }

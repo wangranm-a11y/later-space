@@ -9,7 +9,7 @@ const EXPANDED_TEXT_WIDTH = 420;
 const EXPANDED_TEXT_HEIGHT = 520;
 const STATIC_DEPLOYMENT = location.protocol !== "file:" && !["localhost", "127.0.0.1", "::1"].includes(location.hostname);
 const ONBOARDING_DISMISSED_KEY = "later-space-onboarding-dismissed-v1";
-document.documentElement.dataset.appVersion = "70";
+document.documentElement.dataset.appVersion = "71";
 document.documentElement.dataset.deployment = STATIC_DEPLOYMENT ? "static" : "local";
 
 const state = {
@@ -1454,7 +1454,8 @@ function confirmDuplicateUpload(label, record) {
   });
 }
 
-function revealDuplicate(record, label) {
+function revealRecord(record, message = "已定位到这条内容") {
+  if (!record) return false;
   state.selectedId = record.id;
   state.selectedIds.clear();
   state.selectedIds.add(record.id);
@@ -1467,12 +1468,17 @@ function revealDuplicate(record, label) {
   state.view.y = innerHeight / 2 - centerY * state.view.zoom;
   render();
   updateView();
-  showToast(`${label}已经收藏过，已带你找到原内容`);
+  showToast(message);
   setTimeout(() => {
     if (state.duplicateFocusId !== record.id) return;
     state.duplicateFocusId = null;
     render();
   }, 1100);
+  return true;
+}
+
+function revealDuplicate(record, label) {
+  revealRecord(record, `${label}已经收藏过，已带你找到原内容`);
 }
 
 function updateOrganizeButton() {
@@ -2411,15 +2417,24 @@ async function importExtensionCapture(capture) {
   if (!capture || capture.source !== "chrome-extension") return { state: "invalid" };
   if (capture.kind === "image" && capture.imageData) {
     const blob = dataUrlToBlob(capture.imageData);
+    const fingerprint = await blobFingerprint(blob);
+    const duplicate = state.images.find((record) => isMediaRecord(record) && record.fingerprint === fingerprint);
+    if (duplicate) return { state: "duplicate", recordIds: [duplicate.id] };
     const file = new File([blob], capture.name || "网页图片.jpg", { type: capture.mimeType || blob.type || "image/jpeg" });
     const records = await saveFiles([file], "chrome-extension", screenCenter(), capture.purpose || "", [], false);
     return { state: records.length ? "saved" : "duplicate", recordIds: records.map((record) => record.id) };
   }
   if (capture.kind === "link" && capture.url) {
+    const canonical = canonicalUrl(capture.url);
+    const duplicate = state.images.find((record) => record.kind === "link" && canonicalUrl(record.url) === canonical);
+    if (duplicate) return { state: "duplicate", recordIds: [duplicate.id] };
     const records = await saveLinks([capture.url], capture.title || capture.url, capture.purpose || "", capture.title || "", screenCenter(), [], false);
     return { state: records.length ? "saved" : "duplicate", recordIds: records.map((record) => record.id) };
   }
   if (capture.kind === "text" && capture.text) {
+    const fingerprint = normalizedTextFingerprint(capture.text);
+    const duplicate = state.images.find((record) => record.kind === "text" && normalizedTextFingerprint(record.text) === fingerprint);
+    if (duplicate) return { state: "duplicate", recordIds: [duplicate.id] };
     const record = await saveText(capture.text, screenCenter(), [], false);
     return { state: record ? "saved" : "duplicate", recordIds: record ? [record.id] : [] };
   }
@@ -2454,7 +2469,7 @@ async function undoExtensionCapture(recordIds) {
 function bindExtensionBridge() {
   window.addEventListener("message", async (event) => {
     if (event.source !== window || event.origin !== location.origin) return;
-    if (event.data?.source !== "later-space-extension" || !["capture", "status", "undo"].includes(event.data?.type)) return;
+    if (event.data?.source !== "later-space-extension" || !["capture", "status", "undo", "view"].includes(event.data?.type)) return;
     const user = state.cloudSession?.user;
     const localOnly = user && localStorage.getItem(`later-space-cloud-merged-${user.id}`) === "no";
     const destination = user
@@ -2466,6 +2481,12 @@ function bindExtensionBridge() {
     }
     if (event.data.type === "undo") {
       const result = await undoExtensionCapture(event.data.capture?.recordIds);
+      window.postMessage({ source: "later-space-page", requestId: event.data.requestId, result }, location.origin);
+      return;
+    }
+    if (event.data.type === "view") {
+      const record = state.images.find((item) => event.data.capture?.recordIds?.includes(item.id));
+      const result = revealRecord(record, "已定位到刚刚加入的内容") ? { state: "viewed" } : { state: "unavailable" };
       window.postMessage({ source: "later-space-page", requestId: event.data.requestId, result }, location.origin);
       return;
     }

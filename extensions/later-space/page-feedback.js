@@ -6,11 +6,10 @@ function backgroundImageUrl(element) {
   return match?.[1] || "";
 }
 
-function findImage(target) {
-  const candidates = [];
-  for (let element = target; element && element !== document.documentElement; element = element.parentElement) {
-    candidates.push(element);
-    if (candidates.length >= 5) break;
+function findImage(target, clientX, clientY) {
+  const candidates = [...document.elementsFromPoint(clientX, clientY), target];
+  for (const origin of [...candidates]) {
+    for (let element = origin; element && element !== document.documentElement; element = element.parentElement) candidates.push(element);
   }
   for (const element of candidates) {
     if (element instanceof HTMLImageElement) return { url: element.currentSrc || element.src, element };
@@ -22,8 +21,8 @@ function findImage(target) {
   return null;
 }
 
-document.addEventListener("contextmenu", (event) => {
-  const image = findImage(event.target);
+function rememberContextImage(event) {
+  const image = findImage(event.target, event.clientX, event.clientY);
   const rect = image?.element.getBoundingClientRect();
   contextImage = image && rect?.width > 0 && rect?.height > 0 ? {
     url: image.url,
@@ -31,16 +30,41 @@ document.addEventListener("contextmenu", (event) => {
     viewport: { width: innerWidth, height: innerHeight },
   } : { url: "" };
   chrome.runtime.sendMessage({ type: "context-image", image: contextImage }).catch(() => {});
+}
+
+function imageAtViewportCenter() {
+  const image = findImage(document.elementFromPoint(innerWidth / 2, innerHeight / 2), innerWidth / 2, innerHeight / 2);
+  const rect = image?.element.getBoundingClientRect();
+  return image && rect?.width > 0 && rect?.height > 0 ? {
+    url: image.url,
+    rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
+    viewport: { width: innerWidth, height: innerHeight },
+  } : contextImage;
+}
+
+document.addEventListener("pointerdown", (event) => {
+  if (event.button === 2) rememberContextImage(event);
 }, true);
+document.addEventListener("contextmenu", rememberContextImage, true);
 
 function showFeedback(message) {
   document.querySelector("#later-space-feedback")?.remove();
   const toast = document.createElement("div");
   toast.id = "later-space-feedback";
-  toast.style.cssText = "position:fixed;right:20px;top:20px;z-index:2147483647;display:flex;align-items:center;gap:14px;max-width:340px;padding:12px 14px;border:1px solid rgba(255,255,255,.14);border-radius:10px;background:#202124;color:#f7f7f5;box-shadow:0 14px 36px rgba(0,0,0,.24);font:12px/1.4 -apple-system,BlinkMacSystemFont,'PingFang SC',sans-serif;transform:translateY(0);opacity:1;transition:transform .18s ease-out,opacity .18s ease-out";
+  toast.style.cssText = "position:fixed;right:20px;top:20px;z-index:2147483647;display:grid;gap:7px;min-width:190px;max-width:340px;padding:12px 14px;border:1px solid rgba(255,255,255,.14);border-radius:10px;background:#202124;color:#f7f7f5;box-shadow:0 14px 36px rgba(0,0,0,.24);font:12px/1.4 -apple-system,BlinkMacSystemFont,'PingFang SC',sans-serif;transform:translateY(0);opacity:1;transition:transform .18s ease-out,opacity .18s ease-out";
   const label = document.createElement("span");
   label.textContent = message.text;
   toast.append(label);
+  const actions = document.createElement("div");
+  actions.style.cssText = "display:flex;gap:14px";
+  if (message.recordIds?.length) {
+    const view = document.createElement("button");
+    view.type = "button";
+    view.textContent = "查看";
+    view.style.cssText = "padding:0;border:0;background:transparent;color:#c6cdff;font:inherit;font-weight:600;cursor:pointer";
+    view.addEventListener("click", () => chrome.runtime.sendMessage({ type: "view-capture", recordIds: message.recordIds }));
+    actions.append(view);
+  }
   if (message.undoToken) {
     const undo = document.createElement("button");
     undo.type = "button";
@@ -49,12 +73,13 @@ function showFeedback(message) {
     undo.addEventListener("click", async () => {
       undo.disabled = true;
       const result = await chrome.runtime.sendMessage({ type: "undo-capture", token: message.undoToken });
-      label.textContent = result?.state === "undone" ? "已撤销" : "暂时无法撤销";
+      label.textContent = result?.state === "undone" ? "已撤销" : result?.state === "expired" ? "撤销时间已过" : "暂时无法撤销";
       undo.remove();
       setTimeout(() => toast.remove(), 1400);
     });
-    toast.append(undo);
+    actions.append(undo);
   }
+  if (actions.childElementCount) toast.append(actions);
   toast.style.transform = "translateY(-8px)";
   toast.style.opacity = "0";
   document.documentElement.append(toast);
@@ -65,7 +90,11 @@ function showFeedback(message) {
   setTimeout(() => toast.remove(), message.undoToken ? 6000 : 3200);
 }
 
-chrome.runtime.onMessage.addListener((message) => {
+chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message.type === "later-space-feedback") showFeedback(message);
+  if (message.type === "later-space-context-image") {
+    sendResponse({ image: contextImage?.rect ? contextImage : imageAtViewportCenter() });
+    return false;
+  }
   return undefined;
 });
