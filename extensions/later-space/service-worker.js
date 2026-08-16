@@ -24,8 +24,13 @@ async function removeQueued(id) {
   await chrome.action.setBadgeText({ text: queue.length ? String(Math.min(queue.length, 99)) : "" });
 }
 
+async function laterSpaceTab(windowId) {
+  const tabs = await chrome.tabs.query({ url: `${APP_URL}*` });
+  return tabs.find((tab) => tab.windowId === windowId) || tabs[0];
+}
+
 async function sendCapture(capture) {
-  let [tab] = await chrome.tabs.query({ url: `${APP_URL}*` });
+  let tab = await laterSpaceTab(capture.windowId);
   let temporaryTab = false;
   if (!tab) {
     tab = await chrome.tabs.create({ url: `${APP_URL}?capture=extension`, active: false });
@@ -35,7 +40,7 @@ async function sendCapture(capture) {
     const result = await deliverToTab(tab.id, capture);
     if (!result || !["saved", "duplicate"].includes(result.state)) throw new Error("Later Space unavailable");
     await removeQueued(capture.id);
-    return result;
+    return { ...result, windowId: capture.windowId };
   } finally {
     if (temporaryTab) await chrome.tabs.remove(tab.id).catch(() => {});
   }
@@ -77,7 +82,7 @@ async function registerUndo(result) {
   const stored = await chrome.storage.session.get({ [UNDO_KEY]: {} });
   const now = Date.now();
   const captures = Object.fromEntries(Object.entries(stored[UNDO_KEY]).filter(([, item]) => now - item.createdAt < 60000));
-  captures[undoToken] = { recordIds: result.recordIds, createdAt: now };
+  captures[undoToken] = { recordIds: result.recordIds, createdAt: now, windowId: result.windowId };
   await chrome.storage.session.set({ [UNDO_KEY]: captures });
   return { ...result, undoToken };
 }
@@ -87,7 +92,7 @@ async function undoCapture(token) {
   const undo = stored[UNDO_KEY][token];
   if (undo && Date.now() - undo.createdAt >= 60000) return { state: "expired" };
   if (!undo) return { state: "unavailable" };
-  let [tab] = await chrome.tabs.query({ url: `${APP_URL}*` });
+  let tab = await laterSpaceTab(undo.windowId);
   let temporaryTab = false;
   if (!tab) {
     tab = await chrome.tabs.create({ url: `${APP_URL}?undo=extension`, active: false });
@@ -126,9 +131,9 @@ async function currentContextImage(tabId) {
   }
 }
 
-async function viewCapture(recordIds) {
+async function viewCapture(recordIds, windowId) {
   if (!recordIds?.length) return { state: "unavailable" };
-  let [tab] = await chrome.tabs.query({ url: `${APP_URL}*` });
+  let tab = await laterSpaceTab(windowId);
   if (!tab) tab = await chrome.tabs.create({ url: `${APP_URL}?view=extension`, active: false });
   const result = await deliverToTab(tab.id, { type: "view", recordIds });
   if (result?.state !== "viewed") return result || { state: "unavailable" };
@@ -177,14 +182,14 @@ async function optimizedImage(blob) {
   return canvas.convertToBlob({ type: "image/jpeg", quality: .82 });
 }
 
-async function imageCapture(srcUrl, pageUrl) {
+async function imageCapture(srcUrl, pageUrl, windowId) {
   const response = await fetch(srcUrl, { credentials: "include" });
   if (!response.ok) throw new Error("image fetch failed");
   const blob = await response.blob();
   if (!blob.type.startsWith("image/") || blob.size > MAX_IMAGE_BYTES) throw new Error("image too large");
   const optimized = await optimizedImage(blob);
   const name = decodeURIComponent(new URL(srcUrl).pathname.split("/").pop() || "网页图片").slice(0, 180);
-  return saveCapture({ kind: "image", imageData: await blobToDataUrl(optimized), mimeType: optimized.type, name: name.replace(/\.[^.]+$/, "") + ".jpg", pageUrl });
+  return saveCapture({ kind: "image", imageData: await blobToDataUrl(optimized), mimeType: optimized.type, name: name.replace(/\.[^.]+$/, "") + ".jpg", pageUrl, windowId });
 }
 
 async function visibleImageCapture(tab, image) {
@@ -205,11 +210,11 @@ async function visibleImageCapture(tab, image) {
   context.drawImage(source, x, y, width, height, 0, 0, canvas.width, canvas.height);
   source.close();
   const blob = await canvas.convertToBlob({ type: "image/jpeg", quality: .9 });
-  return saveCapture({ kind: "image", imageData: await blobToDataUrl(blob), mimeType: blob.type, name: "网页图片.jpg", pageUrl: tab?.url || "" });
+  return saveCapture({ kind: "image", imageData: await blobToDataUrl(blob), mimeType: blob.type, name: "网页图片.jpg", pageUrl: tab?.url || "", windowId: tab?.windowId });
 }
 
 function pageCapture(tab) {
-  return saveCapture({ kind: "link", url: tab?.url || "", title: tab?.title || "" });
+  return saveCapture({ kind: "link", url: tab?.url || "", title: tab?.title || "", windowId: tab?.windowId });
 }
 
 chrome.runtime.onInstalled.addListener(() => {
@@ -224,15 +229,15 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   let result;
   if (info.menuItemId !== "later-add") return;
   const contextImage = await currentContextImage(tab?.id);
-  if (info.selectionText) result = await saveCapture({ kind: "text", text: info.selectionText, pageUrl: tab?.url || "" });
+  if (info.selectionText) result = await saveCapture({ kind: "text", text: info.selectionText, pageUrl: tab?.url || "", windowId: tab?.windowId });
   else if (info.srcUrl || (Date.now() - Number(contextImages.get(tab?.id)?.createdAt || 0) < 15000 && contextImage?.url)) {
     const imageUrl = info.srcUrl || contextImage?.url;
-    try { result = await imageCapture(imageUrl, tab?.url || ""); }
+    try { result = await imageCapture(imageUrl, tab?.url || "", tab?.windowId); }
     catch {
       try { result = await visibleImageCapture(tab, contextImage); }
       catch { result = { state: "unavailable" }; }
     }
-  } else if (info.linkUrl) result = await saveCapture({ kind: "link", url: info.linkUrl, title: "" });
+  } else if (info.linkUrl) result = await saveCapture({ kind: "link", url: info.linkUrl, title: "", windowId: tab?.windowId });
   else result = await pageCapture(tab);
   result = await registerUndo(result);
   const sourceFeedbackShown = await notifySourceTab(tab?.id, result);
@@ -279,7 +284,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     return true;
   }
   if (message.type === "view-capture") {
-    viewCapture(message.recordIds).then(sendResponse);
+    chrome.windows.getLastFocused().then((window) => viewCapture(message.recordIds, _sender.tab?.windowId || window.id)).then(sendResponse);
     return true;
   }
 });
