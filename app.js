@@ -3,14 +3,13 @@ const DB_VERSION = 2;
 const STORE_NAME = "images";
 const ASSET_STORE_NAME = "image-assets";
 const THUMBNAIL_VERSION = 5;
-const LONG_TEXT_THRESHOLD = 160;
-const LONG_TEXT_CARD_WIDTH = 300;
-const LONG_TEXT_CARD_HEIGHT = 375;
+const TEXT_CARD_WIDTH = 300;
+const TEXT_CARD_HEIGHT = 375;
 const EXPANDED_TEXT_WIDTH = 420;
 const EXPANDED_TEXT_HEIGHT = 520;
 const STATIC_DEPLOYMENT = location.protocol !== "file:" && !["localhost", "127.0.0.1", "::1"].includes(location.hostname);
 const ONBOARDING_DISMISSED_KEY = "later-space-onboarding-dismissed-v1";
-document.documentElement.dataset.appVersion = "65";
+document.documentElement.dataset.appVersion = "66";
 document.documentElement.dataset.deployment = STATIC_DEPLOYMENT ? "static" : "local";
 
 const state = {
@@ -686,10 +685,6 @@ function displayLinkTitle(value) {
   return characters.length > 30 ? `${characters.slice(0, 29).join("")}…` : summary;
 }
 
-function isLongText(record) {
-  return record?.kind === "text" && [...String(record.text || "").trim()].length >= LONG_TEXT_THRESHOLD;
-}
-
 function longTextTitle(text) {
   const normalized = String(text || "").replace(/\r/g, "").trim();
   const firstLine = normalized.split("\n").map((line) => line.trim()).find(Boolean) || "";
@@ -709,7 +704,6 @@ function longTextPreview(text) {
 }
 
 function textCard(record, expanded) {
-  if (!isLongText(record)) return `<div class="text-block">${escapeHtml(record.text)}</div>`;
   if (expanded) return `<div class="text-block long-text-full" tabindex="0"><button class="long-text-collapse" type="button" data-toggle-long-text>收起</button><div>${escapeHtml(record.text)}</div></div>`;
   return `<div class="long-text-card">
     <span class="long-text-type">文字</span>
@@ -870,15 +864,14 @@ function render() {
     const isLink = record.kind === "link";
     const isText = record.kind === "text";
     const isVideo = record.kind === "video";
-    const isLong = isLongText(record);
-    const expanded = isLong && state.expandedTextIds.has(record.id);
+    const expanded = isText && state.expandedTextIds.has(record.id);
     const content = isLink ? linkCard(record) : isText ? textCard(record, expanded) : isVideo ? `<span class="video-drag-handle" aria-hidden="true"></span><video class="video-preview" controls preload="metadata" poster="${imageUrl(record)}" aria-label="${escapeHtml(record.note || record.name || "收藏视频")}"></video>` : `<img src="${imageUrl(record)}" alt="${escapeHtml(record.note || record.name || "收藏图片")}" draggable="false" />`;
     const transform = `translate(${record.canvasX}px,${record.canvasY}px)`;
-    const textWidth = isLong ? (expanded ? EXPANDED_TEXT_WIDTH : LONG_TEXT_CARD_WIDTH) : record.canvasWidth;
-    const textHeight = isText ? `height:${isLong ? (expanded ? EXPANDED_TEXT_HEIGHT : LONG_TEXT_CARD_HEIGHT) : record.textHeight || textBaseSize(record.text).height}px;` : "";
-    return `<article class="canvas-item${isLink ? " link-item" : ""}${isText ? " text-item" : ""}${isLong ? " long-text-item" : ""}${expanded ? " is-expanded" : ""}${isVideo ? " video-item" : ""}${selected ? " is-selected" : ""}${multiSelected ? " is-multi-selected" : ""}${state.recentIds.has(record.id) ? " is-new" : ""}${state.arrivingIds.has(record.id) ? " is-arriving" : ""}${state.duplicateFocusId === record.id ? " is-duplicate-focus" : ""}" data-id="${record.id}" data-status="${record.status || "unread"}" tabindex="0" aria-label="${escapeHtml(record.title || longTextTitle(record.text) || record.text || record.name || "收藏内容")}" style="width:${isText ? textWidth : record.canvasWidth}px;${textHeight}transform:${transform};z-index:${record.zIndex || 1}">
+    const textWidth = expanded ? record.expandedWidth || EXPANDED_TEXT_WIDTH : TEXT_CARD_WIDTH;
+    const textHeight = isText ? `height:${expanded ? record.expandedHeight || EXPANDED_TEXT_HEIGHT : TEXT_CARD_HEIGHT}px;` : "";
+    return `<article class="canvas-item${isLink ? " link-item" : ""}${isText ? " text-item text-card-item" : ""}${expanded ? " is-expanded" : ""}${isVideo ? " video-item" : ""}${selected ? " is-selected" : ""}${multiSelected ? " is-multi-selected" : ""}${state.recentIds.has(record.id) ? " is-new" : ""}${state.arrivingIds.has(record.id) ? " is-arriving" : ""}${state.duplicateFocusId === record.id ? " is-duplicate-focus" : ""}" data-id="${record.id}" data-status="${record.status || "unread"}" tabindex="0" aria-label="${escapeHtml(record.title || longTextTitle(record.text) || record.text || record.name || "收藏内容")}" style="width:${isText ? textWidth : record.canvasWidth}px;${textHeight}transform:${transform};z-index:${record.zIndex || 1}">
       ${content}
-      ${isText && !isLong ? textResizeHandles() : isText ? "" : `<span class="resize-handle" data-resize aria-hidden="true"></span>`}
+      ${isText && expanded ? textResizeHandles() : isText ? "" : `<span class="resize-handle" data-resize aria-hidden="true"></span>`}
       <span class="item-caption">${escapeHtml(record.title || record.note || record.name || "内容")}</span>
     </article>`;
   }).join("");
@@ -1179,16 +1172,8 @@ async function submitCapture() {
     if (state.editingTextId) {
       const record = state.images.find((item) => item.id === state.editingTextId);
       if (record) {
-        const wasLong = isLongText(record);
         record.text = text;
         record.name = text.slice(0, 32);
-        const nowLong = isLongText(record);
-        if (wasLong !== nowLong) {
-          const size = nowLong ? { width: LONG_TEXT_CARD_WIDTH, height: LONG_TEXT_CARD_HEIGHT } : textBaseSize(text);
-          record.canvasWidth = size.width;
-          record.textHeight = size.height;
-          state.expandedTextIds.delete(record.id);
-        }
         await persistRecord(record);
         closeCapture();
         state.selectedId = record.id;
@@ -1353,9 +1338,7 @@ async function saveText(text, arrivalOrigin = screenCenter(), tags = [], confirm
   const duplicate = state.images.find((record) => record.kind === "text" && normalizedTextFingerprint(record.text) === fingerprint);
   if (duplicate && (!confirmDuplicates || !await confirmDuplicateUpload("这段文字", duplicate))) return null;
   const center = worldCenter();
-  const size = [...text.trim()].length >= LONG_TEXT_THRESHOLD
-    ? { width: LONG_TEXT_CARD_WIDTH, height: LONG_TEXT_CARD_HEIGHT }
-    : textBaseSize(text);
+  const size = { width: TEXT_CARD_WIDTH, height: TEXT_CARD_HEIGHT };
   const placement = openPlacement(center, size.width, size.height);
   const now = Date.now();
   const record = {
@@ -1411,19 +1394,18 @@ function isGenericTitle(title, record) {
 function itemHeight(record) {
   if (record.kind === "link") return record.canvasWidth * 1.25;
   if (record.kind === "text") {
-    if (isLongText(record)) return state.expandedTextIds.has(record.id) ? EXPANDED_TEXT_HEIGHT : LONG_TEXT_CARD_HEIGHT;
-    return record.textHeight || textBaseSize(record.text).height;
+    return state.expandedTextIds.has(record.id) ? record.expandedHeight || EXPANDED_TEXT_HEIGHT : TEXT_CARD_HEIGHT;
   }
   return record.canvasWidth * (record.height && record.width ? record.height / record.width : 1);
 }
 
 function itemWidth(record) {
-  if (isLongText(record)) return state.expandedTextIds.has(record.id) ? EXPANDED_TEXT_WIDTH : LONG_TEXT_CARD_WIDTH;
+  if (record.kind === "text") return state.expandedTextIds.has(record.id) ? record.expandedWidth || EXPANDED_TEXT_WIDTH : TEXT_CARD_WIDTH;
   return record.canvasWidth;
 }
 
-function toggleLongText(record) {
-  if (!isLongText(record)) return;
+function toggleTextCard(record) {
+  if (record?.kind !== "text") return;
   if (state.expandedTextIds.has(record.id)) state.expandedTextIds.delete(record.id);
   else state.expandedTextIds.add(record.id);
   state.selectedId = record.id;
@@ -1680,13 +1662,19 @@ function selectItem(id) {
   const top = Math.max(0, ...state.images.map((item) => item.zIndex || 0)) + 1;
   const record = state.images.find((image) => image.id === id);
   if (record) record.zIndex = top;
-  render();
+  elements.world.querySelectorAll(".canvas-item.is-selected, .canvas-item.is-multi-selected").forEach((item) => item.classList.remove("is-selected", "is-multi-selected"));
+  const node = elements.world.querySelector(`[data-id="${id}"]`);
+  if (node) {
+    node.classList.add("is-selected");
+    node.style.zIndex = String(top);
+  }
+  renderSelection();
   if (record) persistRecord(record);
 }
 
 function beginPointer(event) {
   if (event.button !== 0) return;
-  if (event.target.closest(".long-text-item.is-expanded .long-text-full")) return;
+  if (event.target.closest(".text-card-item.is-expanded .long-text-full")) return;
   if (event.target.closest("button, a, input, textarea, select, label")) return;
   if (event.target.closest("video")) return;
   const openButton = event.target.closest("[data-open-link]");
@@ -1700,16 +1688,6 @@ function beginPointer(event) {
     event.stopPropagation();
     const id = item.dataset.id;
     const record = state.images.find((image) => image.id === id);
-    const now = Date.now();
-    if (!resize && !event.shiftKey && state.lastItemClick?.id === id && now - state.lastItemClick.at < 420) {
-      state.lastItemClick = null;
-      if (record.kind === "link") openLink(record);
-      else if (isLongText(record)) toggleLongText(record);
-      else if (record.kind === "text") openTextEditor(record);
-      else openBatchEditor();
-      return;
-    }
-    state.lastItemClick = { id, at: now };
     if (event.shiftKey && !resize) {
       if (state.selectedIds.has(id)) state.selectedIds.delete(id);
       else state.selectedIds.add(id);
@@ -1723,7 +1701,7 @@ function beginPointer(event) {
       resizeDirection: resize?.dataset.resizeDirection || "se",
       id, startX: event.clientX, startY: event.clientY,
       moved: false,
-      originX: record.canvasX, originY: record.canvasY, originWidth: record.canvasWidth,
+      originX: record.canvasX, originY: record.canvasY, originWidth: itemWidth(record),
       originHeight: itemHeight(record),
     };
   } else {
@@ -1774,31 +1752,31 @@ function movePointer(event) {
   if (state.pointer.mode === "item") {
     record.canvasX = state.pointer.originX + dx / state.view.zoom;
     record.canvasY = state.pointer.originY + dy / state.view.zoom;
-  } else if (record.kind === "text") {
+  } else if (record.kind === "text" && state.expandedTextIds.has(record.id)) {
     const direction = state.pointer.resizeDirection;
     const worldDx = dx / state.view.zoom;
     const worldDy = dy / state.view.zoom;
     const minimumWidth = 120;
     const minimumHeight = 72;
-    if (direction.includes("e")) record.canvasWidth = Math.max(minimumWidth, state.pointer.originWidth + worldDx);
-    if (direction.includes("s")) record.textHeight = Math.max(minimumHeight, state.pointer.originHeight + worldDy);
+    if (direction.includes("e")) record.expandedWidth = Math.max(minimumWidth, state.pointer.originWidth + worldDx);
+    if (direction.includes("s")) record.expandedHeight = Math.max(minimumHeight, state.pointer.originHeight + worldDy);
     if (direction.includes("w")) {
       const nextWidth = Math.max(minimumWidth, state.pointer.originWidth - worldDx);
       record.canvasX = state.pointer.originX + state.pointer.originWidth - nextWidth;
-      record.canvasWidth = nextWidth;
+      record.expandedWidth = nextWidth;
     }
     if (direction.includes("n")) {
       const nextHeight = Math.max(minimumHeight, state.pointer.originHeight - worldDy);
       record.canvasY = state.pointer.originY + state.pointer.originHeight - nextHeight;
-      record.textHeight = nextHeight;
+      record.expandedHeight = nextHeight;
     }
   } else {
     record.canvasWidth = Math.max(72, state.pointer.originWidth + dx / state.view.zoom);
   }
   const node = elements.world.querySelector(`[data-id="${record.id}"]`);
   if (node) {
-    node.style.width = `${record.canvasWidth}px`;
-    if (record.kind === "text") node.style.height = `${record.textHeight}px`;
+    node.style.width = `${itemWidth(record)}px`;
+    if (record.kind === "text") node.style.height = `${itemHeight(record)}px`;
     node.style.transform = `translate(${record.canvasX}px,${record.canvasY}px)`;
   }
   renderSelection();
@@ -2873,12 +2851,27 @@ function bindEvents() {
   elements.canvas.addEventListener("pointercancel", endPointer);
   elements.canvas.addEventListener("click", (event) => {
     const toggle = event.target.closest("[data-toggle-long-text]");
-    if (!toggle) return;
-    const record = state.images.find((entry) => entry.id === toggle.closest(".canvas-item")?.dataset.id);
-    if (record) toggleLongText(record);
+    if (toggle) {
+      const record = state.images.find((entry) => entry.id === toggle.closest(".canvas-item")?.dataset.id);
+      if (record) toggleTextCard(record);
+      return;
+    }
+    if (event.target.closest("button, a, input, textarea, select, label, video, [data-resize]")) return;
+    const item = event.target.closest(".canvas-item");
+    const record = item && state.images.find((entry) => entry.id === item.dataset.id);
+    if (!record) return;
+    const now = Date.now();
+    if (state.lastItemClick?.id !== record.id || now - state.lastItemClick.at >= 700) {
+      state.lastItemClick = { id: record.id, at: now };
+      return;
+    }
+    state.lastItemClick = null;
+    if (record.kind === "link") openLink(record);
+    else if (record.kind === "text") toggleTextCard(record);
+    else openBatchEditor();
   });
   elements.canvas.addEventListener("wheel", (event) => {
-    if (event.target.closest(".long-text-item.is-expanded .long-text-full")) return;
+    if (event.target.closest(".text-card-item.is-expanded .long-text-full")) return;
     event.preventDefault();
     if (event.ctrlKey || event.metaKey) zoomAt(event.clientX, event.clientY, Math.exp(-event.deltaY * .008));
     else {
