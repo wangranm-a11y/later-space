@@ -154,6 +154,18 @@ kbd { min-width: 26px; height: 24px; display: grid; place-items: center; padding
 .text-item .item-caption, .text-item.is-selected .item-caption { display: none; }
 .text-resize-handle { position: absolute; z-index: 3; display: none; }
 .text-item.is-selected .text-resize-handle { display: block; }
+.long-text-item { overflow: hidden; border: 1px solid rgba(22,22,24,.12); border-radius: 6px; background: #f1efe7; box-shadow: 0 14px 36px rgba(25,25,27,.1), 0 2px 7px rgba(25,25,27,.05); transition: width 180ms ease, height 180ms ease, background 180ms ease; }
+.long-text-item::after { inset: -7px; border-radius: 9px; }
+.long-text-card { position: relative; width: 100%; height: 100%; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; gap: 16px; padding: 24px; color: #202022; isolation: isolate; }
+.long-text-card::after { content: ""; position: absolute; inset: 0; z-index: -1; opacity: .32; background-image: radial-gradient(rgba(44,39,31,.12) .45px, transparent .65px); background-size: 6px 6px; }
+.long-text-type { width: fit-content; padding-bottom: 5px; border-bottom: 1px solid rgba(32,32,34,.24); color: rgba(32,32,34,.58); font-size: 9px; letter-spacing: .08em; }
+.long-text-card h2 { align-self: end; margin: 0; font-family: "Songti SC", "STSong", Georgia, serif; font-size: 28px; font-weight: 600; line-height: 1.3; }
+.long-text-card p { display: -webkit-box; margin: 0; overflow: hidden; color: rgba(32,32,34,.62); font-size: 11px; line-height: 1.65; -webkit-box-orient: vertical; -webkit-line-clamp: 3; }
+.long-text-footer { width: fit-content; padding: 5px 0; border: 0; border-bottom: 1px solid rgba(32,32,34,.22); background: transparent; color: rgba(32,32,34,.52); font-size: 9px; cursor: pointer; }
+.long-text-item.is-expanded { overflow: hidden; border-color: #111113; background: #111113; }
+.long-text-full { overflow: auto; padding: 28px 30px 34px; font-size: 22px; font-weight: 500; line-height: 1.55; cursor: text; user-select: text; overscroll-behavior: contain; scrollbar-width: thin; }
+.long-text-collapse { position: sticky; top: 0; float: right; margin: 0 0 12px 18px; padding: 6px 9px; border: 1px solid rgba(255,255,255,.22); border-radius: 5px; background: rgba(17,17,19,.88); color: rgba(255,255,255,.72); font-size: 9px; cursor: pointer; backdrop-filter: blur(8px); }
+.long-text-item .item-caption, .long-text-item.is-selected .item-caption { display: none; }
 .text-resize-handle::after { content: ""; position: absolute; left: 50%; top: 50%; width: calc(7px * var(--canvas-control-scale, 1)); height: calc(7px * var(--canvas-control-scale, 1)); border: calc(2px * var(--canvas-control-scale, 1)) solid white; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 calc(1px * var(--canvas-control-scale, 1)) var(--accent); transform: translate(-50%, -50%); }
 .text-resize-nw, .text-resize-ne, .text-resize-se, .text-resize-sw { width: calc(24px * var(--canvas-control-scale, 1)); height: calc(24px * var(--canvas-control-scale, 1)); }
 .text-resize-nw { left: calc(-12px * var(--canvas-control-scale, 1)); top: calc(-12px * var(--canvas-control-scale, 1)); cursor: nwse-resize; }.text-resize-ne { right: calc(-12px * var(--canvas-control-scale, 1)); top: calc(-12px * var(--canvas-control-scale, 1)); cursor: nesw-resize; }

@@ -3,9 +3,14 @@ const DB_VERSION = 2;
 const STORE_NAME = "images";
 const ASSET_STORE_NAME = "image-assets";
 const THUMBNAIL_VERSION = 5;
+const LONG_TEXT_THRESHOLD = 160;
+const LONG_TEXT_CARD_WIDTH = 300;
+const LONG_TEXT_CARD_HEIGHT = 375;
+const EXPANDED_TEXT_WIDTH = 420;
+const EXPANDED_TEXT_HEIGHT = 520;
 const STATIC_DEPLOYMENT = location.protocol !== "file:" && !["localhost", "127.0.0.1", "::1"].includes(location.hostname);
 const ONBOARDING_DISMISSED_KEY = "later-space-onboarding-dismissed-v1";
-document.documentElement.dataset.appVersion = "64";
+document.documentElement.dataset.appVersion = "65";
 document.documentElement.dataset.deployment = STATIC_DEPLOYMENT ? "static" : "local";
 
 const state = {
@@ -17,6 +22,7 @@ const state = {
   assetUrls: new Map(),
   view: { x: innerWidth / 2, y: innerHeight / 2, zoom: 1 },
   pointer: null,
+  lastItemClick: null,
   dragDepth: 0,
   pasteOffset: 0,
   activeView: "reading",
@@ -40,6 +46,7 @@ const state = {
   arrivingIds: new Set(),
   duplicateFocusId: null,
   duplicatePrompt: null,
+  expandedTextIds: new Set(),
   backupTimer: null,
   backupInFlight: false,
   backupQueued: false,
@@ -679,6 +686,39 @@ function displayLinkTitle(value) {
   return characters.length > 30 ? `${characters.slice(0, 29).join("")}…` : summary;
 }
 
+function isLongText(record) {
+  return record?.kind === "text" && [...String(record.text || "").trim()].length >= LONG_TEXT_THRESHOLD;
+}
+
+function longTextTitle(text) {
+  const normalized = String(text || "").replace(/\r/g, "").trim();
+  const firstLine = normalized.split("\n").map((line) => line.trim()).find(Boolean) || "";
+  const firstSentence = normalized.split(/[。！？!?；;\n]/).map((part) => part.trim()).find((part) => [...part].length >= 6) || firstLine;
+  const weakOpening = /^(?:好的|然后|所以|其实|就是|我觉得|我想|突然觉得|想要说一下)[，,：:\s]*/u;
+  const candidate = weakOpening.test(firstLine) && firstSentence !== firstLine ? firstSentence : firstLine || firstSentence;
+  const cleaned = candidate.replace(/^[-—–•·\d.、\s]+/u, "").replace(/\s+/g, " ").trim();
+  const characters = [...(cleaned || "文字收藏")];
+  return characters.length > 24 ? `${characters.slice(0, 23).join("")}…` : characters.join("");
+}
+
+function longTextPreview(text) {
+  const normalized = String(text || "").replace(/\s+/g, " ").trim();
+  const title = longTextTitle(text).replace(/…$/, "");
+  const preview = normalized.startsWith(title) ? normalized.slice(title.length).replace(/^[，,。！？!?；;：:\s]+/u, "") : normalized;
+  return preview || normalized;
+}
+
+function textCard(record, expanded) {
+  if (!isLongText(record)) return `<div class="text-block">${escapeHtml(record.text)}</div>`;
+  if (expanded) return `<div class="text-block long-text-full" tabindex="0"><button class="long-text-collapse" type="button" data-toggle-long-text>收起</button><div>${escapeHtml(record.text)}</div></div>`;
+  return `<div class="long-text-card">
+    <span class="long-text-type">文字</span>
+    <h2>${escapeHtml(longTextTitle(record.text))}</h2>
+    <p>${escapeHtml(longTextPreview(record.text))}</p>
+    <button class="long-text-footer" type="button" data-toggle-long-text>展开全文</button>
+  </div>`;
+}
+
 function linkCard(record) {
   const title = record.title || record.url;
   const displayTitle = displayLinkTitle(title);
@@ -830,12 +870,15 @@ function render() {
     const isLink = record.kind === "link";
     const isText = record.kind === "text";
     const isVideo = record.kind === "video";
-    const content = isLink ? linkCard(record) : isText ? `<div class="text-block">${escapeHtml(record.text)}</div>` : isVideo ? `<span class="video-drag-handle" aria-hidden="true"></span><video class="video-preview" controls preload="metadata" poster="${imageUrl(record)}" aria-label="${escapeHtml(record.note || record.name || "收藏视频")}"></video>` : `<img src="${imageUrl(record)}" alt="${escapeHtml(record.note || record.name || "收藏图片")}" draggable="false" />`;
+    const isLong = isLongText(record);
+    const expanded = isLong && state.expandedTextIds.has(record.id);
+    const content = isLink ? linkCard(record) : isText ? textCard(record, expanded) : isVideo ? `<span class="video-drag-handle" aria-hidden="true"></span><video class="video-preview" controls preload="metadata" poster="${imageUrl(record)}" aria-label="${escapeHtml(record.note || record.name || "收藏视频")}"></video>` : `<img src="${imageUrl(record)}" alt="${escapeHtml(record.note || record.name || "收藏图片")}" draggable="false" />`;
     const transform = `translate(${record.canvasX}px,${record.canvasY}px)`;
-    const textHeight = isText ? `height:${record.textHeight || textBaseSize(record.text).height}px;` : "";
-    return `<article class="canvas-item${isLink ? " link-item" : ""}${isText ? " text-item" : ""}${isVideo ? " video-item" : ""}${selected ? " is-selected" : ""}${multiSelected ? " is-multi-selected" : ""}${state.recentIds.has(record.id) ? " is-new" : ""}${state.arrivingIds.has(record.id) ? " is-arriving" : ""}${state.duplicateFocusId === record.id ? " is-duplicate-focus" : ""}" data-id="${record.id}" data-status="${record.status || "unread"}" tabindex="0" aria-label="${escapeHtml(record.title || record.text || record.name || "收藏内容")}" style="width:${record.canvasWidth}px;${textHeight}transform:${transform};z-index:${record.zIndex || 1}">
+    const textWidth = isLong ? (expanded ? EXPANDED_TEXT_WIDTH : LONG_TEXT_CARD_WIDTH) : record.canvasWidth;
+    const textHeight = isText ? `height:${isLong ? (expanded ? EXPANDED_TEXT_HEIGHT : LONG_TEXT_CARD_HEIGHT) : record.textHeight || textBaseSize(record.text).height}px;` : "";
+    return `<article class="canvas-item${isLink ? " link-item" : ""}${isText ? " text-item" : ""}${isLong ? " long-text-item" : ""}${expanded ? " is-expanded" : ""}${isVideo ? " video-item" : ""}${selected ? " is-selected" : ""}${multiSelected ? " is-multi-selected" : ""}${state.recentIds.has(record.id) ? " is-new" : ""}${state.arrivingIds.has(record.id) ? " is-arriving" : ""}${state.duplicateFocusId === record.id ? " is-duplicate-focus" : ""}" data-id="${record.id}" data-status="${record.status || "unread"}" tabindex="0" aria-label="${escapeHtml(record.title || longTextTitle(record.text) || record.text || record.name || "收藏内容")}" style="width:${isText ? textWidth : record.canvasWidth}px;${textHeight}transform:${transform};z-index:${record.zIndex || 1}">
       ${content}
-      ${isText ? textResizeHandles() : `<span class="resize-handle" data-resize aria-hidden="true"></span>`}
+      ${isText && !isLong ? textResizeHandles() : isText ? "" : `<span class="resize-handle" data-resize aria-hidden="true"></span>`}
       <span class="item-caption">${escapeHtml(record.title || record.note || record.name || "内容")}</span>
     </article>`;
   }).join("");
@@ -1136,8 +1179,16 @@ async function submitCapture() {
     if (state.editingTextId) {
       const record = state.images.find((item) => item.id === state.editingTextId);
       if (record) {
+        const wasLong = isLongText(record);
         record.text = text;
         record.name = text.slice(0, 32);
+        const nowLong = isLongText(record);
+        if (wasLong !== nowLong) {
+          const size = nowLong ? { width: LONG_TEXT_CARD_WIDTH, height: LONG_TEXT_CARD_HEIGHT } : textBaseSize(text);
+          record.canvasWidth = size.width;
+          record.textHeight = size.height;
+          state.expandedTextIds.delete(record.id);
+        }
         await persistRecord(record);
         closeCapture();
         state.selectedId = record.id;
@@ -1302,7 +1353,9 @@ async function saveText(text, arrivalOrigin = screenCenter(), tags = [], confirm
   const duplicate = state.images.find((record) => record.kind === "text" && normalizedTextFingerprint(record.text) === fingerprint);
   if (duplicate && (!confirmDuplicates || !await confirmDuplicateUpload("这段文字", duplicate))) return null;
   const center = worldCenter();
-  const size = textBaseSize(text);
+  const size = [...text.trim()].length >= LONG_TEXT_THRESHOLD
+    ? { width: LONG_TEXT_CARD_WIDTH, height: LONG_TEXT_CARD_HEIGHT }
+    : textBaseSize(text);
   const placement = openPlacement(center, size.width, size.height);
   const now = Date.now();
   const record = {
@@ -1358,13 +1411,25 @@ function isGenericTitle(title, record) {
 function itemHeight(record) {
   if (record.kind === "link") return record.canvasWidth * 1.25;
   if (record.kind === "text") {
+    if (isLongText(record)) return state.expandedTextIds.has(record.id) ? EXPANDED_TEXT_HEIGHT : LONG_TEXT_CARD_HEIGHT;
     return record.textHeight || textBaseSize(record.text).height;
   }
   return record.canvasWidth * (record.height && record.width ? record.height / record.width : 1);
 }
 
 function itemWidth(record) {
+  if (isLongText(record)) return state.expandedTextIds.has(record.id) ? EXPANDED_TEXT_WIDTH : LONG_TEXT_CARD_WIDTH;
   return record.canvasWidth;
+}
+
+function toggleLongText(record) {
+  if (!isLongText(record)) return;
+  if (state.expandedTextIds.has(record.id)) state.expandedTextIds.delete(record.id);
+  else state.expandedTextIds.add(record.id);
+  state.selectedId = record.id;
+  state.selectedIds.clear();
+  state.selectedIds.add(record.id);
+  render();
 }
 
 function closeDuplicatePrompt(keepDuplicate) {
@@ -1621,6 +1686,7 @@ function selectItem(id) {
 
 function beginPointer(event) {
   if (event.button !== 0) return;
+  if (event.target.closest(".long-text-item.is-expanded .long-text-full")) return;
   if (event.target.closest("button, a, input, textarea, select, label")) return;
   if (event.target.closest("video")) return;
   const openButton = event.target.closest("[data-open-link]");
@@ -1633,6 +1699,17 @@ function beginPointer(event) {
   if (item) {
     event.stopPropagation();
     const id = item.dataset.id;
+    const record = state.images.find((image) => image.id === id);
+    const now = Date.now();
+    if (!resize && !event.shiftKey && state.lastItemClick?.id === id && now - state.lastItemClick.at < 420) {
+      state.lastItemClick = null;
+      if (record.kind === "link") openLink(record);
+      else if (isLongText(record)) toggleLongText(record);
+      else if (record.kind === "text") openTextEditor(record);
+      else openBatchEditor();
+      return;
+    }
+    state.lastItemClick = { id, at: now };
     if (event.shiftKey && !resize) {
       if (state.selectedIds.has(id)) state.selectedIds.delete(id);
       else state.selectedIds.add(id);
@@ -1641,11 +1718,11 @@ function beginPointer(event) {
       return;
     }
     if (state.selectedId !== id) selectItem(id);
-    const record = state.images.find((image) => image.id === id);
     state.pointer = {
       mode: resize ? "resize" : "item",
       resizeDirection: resize?.dataset.resizeDirection || "se",
       id, startX: event.clientX, startY: event.clientY,
+      moved: false,
       originX: record.canvasX, originY: record.canvasY, originWidth: record.canvasWidth,
       originHeight: itemHeight(record),
     };
@@ -1668,6 +1745,7 @@ function movePointer(event) {
   if (!state.pointer) return;
   const dx = event.clientX - state.pointer.startX;
   const dy = event.clientY - state.pointer.startY;
+  if (Math.hypot(dx, dy) > 5) state.pointer.moved = true;
   if (state.pointer.mode === "marquee") {
     const left = Math.min(state.pointer.startX, event.clientX);
     const top = Math.min(state.pointer.startY, event.clientY);
@@ -1728,7 +1806,8 @@ function movePointer(event) {
 
 function endPointer() {
   if (!state.pointer) return;
-  const record = state.images.find((image) => image.id === state.pointer.id);
+  const pointer = state.pointer;
+  const record = state.images.find((image) => image.id === pointer.id);
   if (record) persistRecord(record);
   elements.selectionMarquee.hidden = true;
   state.pointer = null;
@@ -2792,7 +2871,14 @@ function bindEvents() {
   elements.canvas.addEventListener("pointermove", movePointer);
   elements.canvas.addEventListener("pointerup", endPointer);
   elements.canvas.addEventListener("pointercancel", endPointer);
+  elements.canvas.addEventListener("click", (event) => {
+    const toggle = event.target.closest("[data-toggle-long-text]");
+    if (!toggle) return;
+    const record = state.images.find((entry) => entry.id === toggle.closest(".canvas-item")?.dataset.id);
+    if (record) toggleLongText(record);
+  });
   elements.canvas.addEventListener("wheel", (event) => {
+    if (event.target.closest(".long-text-item.is-expanded .long-text-full")) return;
     event.preventDefault();
     if (event.ctrlKey || event.metaKey) zoomAt(event.clientX, event.clientY, Math.exp(-event.deltaY * .008));
     else {
@@ -2811,14 +2897,6 @@ function bindEvents() {
     else if (text.trim()) { event.preventDefault(); saveText(text.trim(), screenCenter(), currentCanvasTags()); }
   });
 
-  elements.world.addEventListener("dblclick", (event) => {
-    if (event.target.closest("video")) return;
-    const item = event.target.closest(".canvas-item");
-    const record = item && state.images.find((entry) => entry.id === item.dataset.id);
-    if (record?.kind === "link") openLink(record);
-    else if (record?.kind === "text") openTextEditor(record);
-    else if (record) openBatchEditor();
-  });
   window.addEventListener("keydown", (event) => {
     const isEditing = event.target.matches?.("input, textarea, [contenteditable='true']");
     const selectedRecord = state.images.find((record) => record.id === state.selectedId);
@@ -2847,6 +2925,7 @@ function bindEvents() {
       elements.filterToggleButton.setAttribute("aria-expanded", "false");
       renderFilterControls();
     }
+    else if (event.key === "Escape" && state.expandedTextIds.size) { state.expandedTextIds.clear(); render(); }
     else if (event.key === "Escape") { state.selectedId = null; state.selectedIds.clear(); render(); }
     if (event.key === "0" && (event.metaKey || event.ctrlKey)) { event.preventDefault(); resetView(); }
     if ((event.key === "+" || event.key === "=") && (event.metaKey || event.ctrlKey)) { event.preventDefault(); zoomAt(innerWidth / 2, innerHeight / 2, 1.15); }
