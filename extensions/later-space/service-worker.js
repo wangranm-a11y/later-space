@@ -1,6 +1,8 @@
 const APP_URL = "https://wangranm-a11y.github.io/later-space/";
 const QUEUE_KEY = "laterSpaceCaptureQueue";
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
+const contextImages = new Map();
+const undoCaptures = new Map();
 
 function captureId() {
   return crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -61,6 +63,49 @@ async function saveCapture(capture) {
   }
 }
 
+function feedbackText(state) {
+  if (state === "saved") return "已加入 Later Space";
+  if (state === "duplicate") return "已经在 Later Space 里了";
+  if (state === "undone") return "已撤销";
+  if (state === "unavailable") return "这张图片暂时无法加入";
+  return "暂时离线，稍后自动加入";
+}
+
+function registerUndo(result) {
+  if (result?.state !== "saved" || !result.recordIds?.length) return result;
+  const undoToken = captureId();
+  undoCaptures.set(undoToken, { recordIds: result.recordIds, createdAt: Date.now() });
+  setTimeout(() => undoCaptures.delete(undoToken), 30000);
+  return { ...result, undoToken };
+}
+
+async function undoCapture(token) {
+  const undo = undoCaptures.get(token);
+  if (!undo) return { state: "unavailable" };
+  let [tab] = await chrome.tabs.query({ url: `${APP_URL}*` });
+  let temporaryTab = false;
+  if (!tab) {
+    tab = await chrome.tabs.create({ url: `${APP_URL}?undo=extension`, active: false });
+    temporaryTab = true;
+  }
+  try {
+    const result = await deliverToTab(tab.id, { type: "undo", recordIds: undo.recordIds });
+    if (result?.state === "undone") undoCaptures.delete(token);
+    return result || { state: "unavailable" };
+  } finally {
+    if (temporaryTab) await chrome.tabs.remove(tab.id).catch(() => {});
+  }
+}
+
+async function notifySourceTab(tabId, result) {
+  if (!tabId) return;
+  await chrome.tabs.sendMessage(tabId, {
+    type: "later-space-feedback",
+    text: feedbackText(result.state),
+    undoToken: result.undoToken || "",
+  }).catch(() => {});
+}
+
 async function destinationStatus() {
   const [tab] = await chrome.tabs.query({ url: `${APP_URL}*` });
   if (!tab) return { label: "当前浏览器 · 加入后确认保存位置" };
@@ -102,13 +147,34 @@ async function optimizedImage(blob) {
 }
 
 async function imageCapture(srcUrl, pageUrl) {
-  const response = await fetch(srcUrl);
+  const response = await fetch(srcUrl, { credentials: "include" });
   if (!response.ok) throw new Error("image fetch failed");
   const blob = await response.blob();
   if (!blob.type.startsWith("image/") || blob.size > MAX_IMAGE_BYTES) throw new Error("image too large");
   const optimized = await optimizedImage(blob);
   const name = decodeURIComponent(new URL(srcUrl).pathname.split("/").pop() || "网页图片").slice(0, 180);
   return saveCapture({ kind: "image", imageData: await blobToDataUrl(optimized), mimeType: optimized.type, name: name.replace(/\.[^.]+$/, "") + ".jpg", pageUrl });
+}
+
+async function visibleImageCapture(tab, image) {
+  const screenshot = await chrome.tabs.captureVisibleTab(tab.windowId, { format: "png" });
+  const source = await createImageBitmap(await (await fetch(screenshot)).blob());
+  const scaleX = source.width / image.viewport.width;
+  const scaleY = source.height / image.viewport.height;
+  const x = Math.max(0, Math.round(image.rect.x * scaleX));
+  const y = Math.max(0, Math.round(image.rect.y * scaleY));
+  const width = Math.min(source.width - x, Math.max(1, Math.round(image.rect.width * scaleX)));
+  const height = Math.min(source.height - y, Math.max(1, Math.round(image.rect.height * scaleY)));
+  const maximumSide = 2400;
+  const outputScale = Math.min(1, maximumSide / Math.max(width, height));
+  const canvas = new OffscreenCanvas(Math.max(1, Math.round(width * outputScale)), Math.max(1, Math.round(height * outputScale)));
+  const context = canvas.getContext("2d", { alpha: false });
+  context.fillStyle = "#fff";
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  context.drawImage(source, x, y, width, height, 0, 0, canvas.width, canvas.height);
+  source.close();
+  const blob = await canvas.convertToBlob({ type: "image/jpeg", quality: .9 });
+  return saveCapture({ kind: "image", imageData: await blobToDataUrl(blob), mimeType: blob.type, name: "网页图片.jpg", pageUrl: tab?.url || "" });
 }
 
 function pageCapture(tab) {
@@ -127,28 +193,41 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   let result;
   if (info.menuItemId !== "later-add") return;
   if (info.selectionText) result = await saveCapture({ kind: "text", text: info.selectionText, pageUrl: tab?.url || "" });
-  else if (info.srcUrl) {
-    try { result = await imageCapture(info.srcUrl, tab?.url || ""); }
-    catch { result = await saveCapture({ kind: "link", url: info.srcUrl, title: "网页图片", pageUrl: tab?.url || "" }); }
+  else if (info.srcUrl || (Date.now() - Number(contextImages.get(tab?.id)?.createdAt || 0) < 15000 && contextImages.get(tab?.id)?.image?.url)) {
+    const contextImage = contextImages.get(tab?.id)?.image;
+    const imageUrl = info.srcUrl || contextImage.url;
+    try { result = await imageCapture(imageUrl, tab?.url || ""); }
+    catch {
+      try { result = await visibleImageCapture(tab, contextImage); }
+      catch { result = { state: "unavailable" }; }
+    }
   } else if (info.linkUrl) result = await saveCapture({ kind: "link", url: info.linkUrl, title: "" });
   else result = await pageCapture(tab);
+  result = registerUndo(result);
+  await notifySourceTab(tab?.id, result);
   const messages = {
     saved: "已加入 Later Space",
     duplicate: "已经在 Later Space 里了",
     queued: "暂时离线，稍后自动加入",
+    unavailable: "这张图片暂时无法加入",
   };
   chrome.notifications.create({ type: "basic", iconUrl: "icon-128.png", title: "Later Space", message: messages[result.state] || messages.queued }).catch(() => {});
 });
 
 chrome.commands.onCommand.addListener(async () => {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  await pageCapture(tab);
+  const result = registerUndo(await pageCapture(tab));
+  await notifySourceTab(tab?.id, result);
 });
 
 chrome.alarms.onAlarm.addListener((alarm) => { if (alarm.name === "retry-captures") retryQueue(); });
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message.type === "capture-current") {
-    chrome.tabs.query({ active: true, currentWindow: true }).then(([tab]) => pageCapture(tab)).then(sendResponse);
+    chrome.tabs.query({ active: true, currentWindow: true }).then(async ([tab]) => {
+      const result = registerUndo(await pageCapture(tab));
+      await notifySourceTab(tab?.id, result);
+      return result;
+    }).then(sendResponse);
     return true;
   }
   if (message.type === "retry-queue") {
@@ -157,6 +236,15 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   }
   if (message.type === "destination-status") {
     destinationStatus().then(sendResponse);
+    return true;
+  }
+  if (message.type === "context-image") {
+    if (_sender.tab?.id) contextImages.set(_sender.tab.id, { image: message.image || { url: "" }, createdAt: Date.now() });
+    sendResponse({ state: "ready" });
+    return false;
+  }
+  if (message.type === "undo-capture") {
+    undoCapture(message.token).then(sendResponse);
     return true;
   }
 });

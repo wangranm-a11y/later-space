@@ -9,7 +9,7 @@ const EXPANDED_TEXT_WIDTH = 420;
 const EXPANDED_TEXT_HEIGHT = 520;
 const STATIC_DEPLOYMENT = location.protocol !== "file:" && !["localhost", "127.0.0.1", "::1"].includes(location.hostname);
 const ONBOARDING_DISMISSED_KEY = "later-space-onboarding-dismissed-v1";
-document.documentElement.dataset.appVersion = "69";
+document.documentElement.dataset.appVersion = "70";
 document.documentElement.dataset.deployment = STATIC_DEPLOYMENT ? "static" : "local";
 
 const state = {
@@ -1820,9 +1820,6 @@ function endPointer() {
   elements.selectionMarquee.hidden = true;
   state.pointer = null;
   elements.canvas.classList.remove("is-panning");
-  if (pointer.mode === "item" && !pointer.moved && record?.kind === "text" && !state.expandedTextIds.has(record.id)) {
-    toggleTextCard(record);
-  }
 }
 
 function zoomAt(clientX, clientY, factor) {
@@ -2416,23 +2413,48 @@ async function importExtensionCapture(capture) {
     const blob = dataUrlToBlob(capture.imageData);
     const file = new File([blob], capture.name || "网页图片.jpg", { type: capture.mimeType || blob.type || "image/jpeg" });
     const records = await saveFiles([file], "chrome-extension", screenCenter(), capture.purpose || "", [], false);
-    return { state: records.length ? "saved" : "duplicate" };
+    return { state: records.length ? "saved" : "duplicate", recordIds: records.map((record) => record.id) };
   }
   if (capture.kind === "link" && capture.url) {
     const records = await saveLinks([capture.url], capture.title || capture.url, capture.purpose || "", capture.title || "", screenCenter(), [], false);
-    return { state: records.length ? "saved" : "duplicate" };
+    return { state: records.length ? "saved" : "duplicate", recordIds: records.map((record) => record.id) };
   }
   if (capture.kind === "text" && capture.text) {
     const record = await saveText(capture.text, screenCenter(), [], false);
-    return { state: record ? "saved" : "duplicate" };
+    return { state: record ? "saved" : "duplicate", recordIds: record ? [record.id] : [] };
   }
   return { state: "invalid" };
+}
+
+async function undoExtensionCapture(recordIds) {
+  const ids = new Set(recordIds || []);
+  const records = state.images.filter((record) => ids.has(record.id));
+  if (!records.length) return { state: "unavailable" };
+  const cloudDeletions = cloudDeletionMap();
+  records.forEach((record) => { cloudDeletions[record.id] = Date.now(); });
+  saveCloudDeletionMap(cloudDeletions);
+  for (const record of records) {
+    await transact("readwrite", (store) => store.delete(record.id));
+    await transactAsset("readwrite", (store) => store.delete(record.id));
+    if (state.objectUrls.has(record.id)) URL.revokeObjectURL(state.objectUrls.get(record.id));
+    if (state.assetUrls.has(record.id)) URL.revokeObjectURL(state.assetUrls.get(record.id));
+    state.objectUrls.delete(record.id);
+    state.assetUrls.delete(record.id);
+    state.expandedTextIds.delete(record.id);
+  }
+  state.images = state.images.filter((record) => !ids.has(record.id));
+  state.selectedId = null;
+  state.selectedIds.clear();
+  render();
+  scheduleBackup();
+  scheduleCloudSync();
+  return { state: "undone" };
 }
 
 function bindExtensionBridge() {
   window.addEventListener("message", async (event) => {
     if (event.source !== window || event.origin !== location.origin) return;
-    if (event.data?.source !== "later-space-extension" || !["capture", "status"].includes(event.data?.type)) return;
+    if (event.data?.source !== "later-space-extension" || !["capture", "status", "undo"].includes(event.data?.type)) return;
     const user = state.cloudSession?.user;
     const localOnly = user && localStorage.getItem(`later-space-cloud-merged-${user.id}`) === "no";
     const destination = user
@@ -2440,6 +2462,11 @@ function bindExtensionBridge() {
       : { label: "当前浏览器 · 本地保存", email: null, synced: false };
     if (event.data.type === "status") {
       window.postMessage({ source: "later-space-page", requestId: event.data.requestId, result: { state: "ready", destination } }, location.origin);
+      return;
+    }
+    if (event.data.type === "undo") {
+      const result = await undoExtensionCapture(event.data.capture?.recordIds);
+      window.postMessage({ source: "later-space-page", requestId: event.data.requestId, result }, location.origin);
       return;
     }
     let result;
@@ -2901,6 +2928,12 @@ function bindEvents() {
       if (record) toggleTextCard(record);
       return;
     }
+  });
+  elements.canvas.addEventListener("dblclick", (event) => {
+    if (event.target.closest("button, a, input, textarea, select, label, .text-card-item.is-expanded .long-text-full")) return;
+    const item = event.target.closest(".text-card-item");
+    const record = state.images.find((entry) => entry.id === item?.dataset.id);
+    if (record) toggleTextCard(record);
   });
   elements.canvas.addEventListener("wheel", (event) => {
     if (event.target.closest(".text-card-item.is-expanded .long-text-full")) return;
