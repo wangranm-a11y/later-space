@@ -5,7 +5,7 @@ const ASSET_STORE_NAME = "image-assets";
 const THUMBNAIL_VERSION = 5;
 const STATIC_DEPLOYMENT = location.protocol !== "file:" && !["localhost", "127.0.0.1", "::1"].includes(location.hostname);
 const ONBOARDING_DISMISSED_KEY = "later-space-onboarding-dismissed-v1";
-document.documentElement.dataset.appVersion = "63";
+document.documentElement.dataset.appVersion = "64";
 document.documentElement.dataset.deployment = STATIC_DEPLOYMENT ? "static" : "local";
 
 const state = {
@@ -19,9 +19,9 @@ const state = {
   pointer: null,
   dragDepth: 0,
   pasteOffset: 0,
-  activeView: "all",
+  activeView: "reading",
   workflow: "all",
-  filters: { query: "", source: "all", purpose: "all", time: "all" },
+  filters: { query: "", type: "all", source: "all", purpose: "all", time: "all" },
   captureMode: "text",
   captureSubmitting: false,
   editingTextId: null,
@@ -71,7 +71,10 @@ const elements = {
   filterCount: document.querySelector("#filterCount"),
   clearSearchButton: document.querySelector("#clearSearchButton"),
   filterPanel: document.querySelector("#filterPanel"),
+  typeFilter: document.querySelector("#typeFilter"),
+  sourceFilterGroup: document.querySelector("#sourceFilterGroup"),
   sourceFilter: document.querySelector("#sourceFilter"),
+  purposeFilterGroup: document.querySelector("#purposeFilterGroup"),
   purposeFilter: document.querySelector("#purposeFilter"),
   timeFilter: document.querySelector("#timeFilter"),
   resetFiltersButton: document.querySelector("#resetFiltersButton"),
@@ -428,15 +431,18 @@ function visibleRecords() {
   const query = normalizedSearchValue(state.filters.query);
   return state.images.filter((record) => {
     const matchesView = state.activeView === "all"
-      || (state.activeView === "links" && record.kind === "link")
-      || (state.activeView === "texts" && record.kind === "text")
-      || (state.activeView === "videos" && record.kind === "video")
-      || (state.activeView === "images" && isImageRecord(record));
+      || (state.activeView === "reading" && ["link", "text"].includes(record.kind))
+      || (state.activeView === "media" && isMediaRecord(record));
+    const matchesType = state.filters.type === "all"
+      || (state.filters.type === "links" && record.kind === "link")
+      || (state.filters.type === "texts" && record.kind === "text")
+      || (state.filters.type === "videos" && record.kind === "video")
+      || (state.filters.type === "images" && isImageRecord(record));
     const isUnsorted = !(record.tags || []).length;
     const matchesWorkflow = state.workflow === "all"
       || (state.workflow === "inbox" && isUnsorted)
       || (state.workflow.startsWith("tag:") && (record.tags || []).includes(state.workflow.slice(4)));
-    if (!matchesView || !matchesWorkflow || (query && !recordSearchText(record).includes(query))) return false;
+    if (!matchesView || !matchesType || !matchesWorkflow || (query && !recordSearchText(record).includes(query))) return false;
     if (state.filters.source !== "all" && (record.kind !== "link" || linkSourceName(record) !== state.filters.source)) return false;
     if (state.filters.purpose === "with" && (record.kind !== "link" || !record.purpose?.trim())) return false;
     if (state.filters.purpose === "without" && (record.kind !== "link" || record.purpose?.trim())) return false;
@@ -461,7 +467,8 @@ function recordsNearViewport(records) {
 
 function filtersAreActive() {
   return Boolean(state.filters.query)
-    || state.activeView !== "all"
+    || state.activeView !== "reading"
+    || state.filters.type !== "all"
     || state.workflow !== "all"
     || state.filters.source !== "all"
     || state.filters.purpose !== "all"
@@ -478,13 +485,28 @@ function renderSourceOptions() {
   elements.sourceFilter.value = state.filters.source;
 }
 
+function renderTypeOptions() {
+  const options = state.activeView === "reading"
+    ? [["all", "全部类型"], ["links", "链接"], ["texts", "文字"]]
+    : state.activeView === "media"
+      ? [["all", "全部类型"], ["images", "图片"], ["videos", "视频"]]
+      : [["all", "全部类型"], ["links", "链接"], ["texts", "文字"], ["images", "图片"], ["videos", "视频"]];
+  if (!options.some(([value]) => value === state.filters.type)) state.filters.type = "all";
+  elements.typeFilter.replaceChildren(...options.map(([value, label]) => new Option(label, value)));
+  elements.typeFilter.value = state.filters.type;
+}
+
 function renderFilterControls() {
+  renderTypeOptions();
   renderSourceOptions();
+  const supportsLinkFilters = state.activeView !== "media" && !["texts", "images", "videos"].includes(state.filters.type);
+  elements.sourceFilterGroup.hidden = !supportsLinkFilters;
+  elements.purposeFilterGroup.hidden = !supportsLinkFilters;
   elements.searchInput.value = state.filters.query;
   elements.purposeFilter.value = state.filters.purpose;
   elements.timeFilter.value = state.filters.time;
   elements.clearSearchButton.hidden = !state.filters.query;
-  const advancedCount = [state.filters.source, state.filters.purpose, state.filters.time].filter((value) => value !== "all").length;
+  const advancedCount = [state.filters.type, state.filters.source, state.filters.purpose, state.filters.time].filter((value) => value !== "all").length;
   elements.filterCount.textContent = advancedCount;
   elements.filterCount.hidden = advancedCount === 0;
   elements.filterToggleButton.classList.toggle("is-active", advancedCount > 0 || !elements.filterPanel.hidden);
@@ -790,7 +812,8 @@ function render() {
       }
     });
   }
-  elements.imageCount.textContent = filtersAreActive() ? `${filteredRecords.length}/${state.images.length}` : state.images.length;
+  const showsSubset = filteredRecords.length !== state.images.length;
+  elements.imageCount.textContent = filtersAreActive() || showsSubset ? `${filteredRecords.length}/${state.images.length}` : state.images.length;
   elements.emptyCue.hidden = filteredRecords.length > 0;
   elements.emptyCue.setAttribute("aria-hidden", filteredRecords.length > 0 ? "true" : "false");
   elements.emptyTitle.textContent = state.images.length ? "没有找到匹配内容" : "粘贴图片、视频、链接或文字";
@@ -830,6 +853,7 @@ function render() {
 
 function renderGlobalCoverMode() {
   const links = state.images.filter((record) => record.kind === "link");
+  elements.globalCoverSwitcher.hidden = state.activeView === "media";
   const modes = new Set(links.map((record) => record.coverMode || "editorial"));
   elements.globalCoverSwitcher.dataset.state = modes.size > 1 ? "mixed" : (modes.values().next().value || "editorial");
   elements.globalCoverButtons.forEach((button) => {
@@ -1145,6 +1169,9 @@ async function submitCapture() {
 
 function setView(view) {
   state.activeView = view;
+  state.filters.type = "all";
+  state.filters.source = "all";
+  state.filters.purpose = "all";
   elements.viewButtons.forEach((button) => {
     const active = button.dataset.view === view;
     button.classList.toggle("is-active", active);
@@ -1155,6 +1182,7 @@ function setView(view) {
 }
 
 function updateFilters() {
+  state.filters.type = elements.typeFilter.value;
   state.filters.source = elements.sourceFilter.value;
   state.filters.purpose = elements.purposeFilter.value;
   state.filters.time = elements.timeFilter.value;
@@ -1163,11 +1191,11 @@ function updateFilters() {
 }
 
 function resetFilters() {
-  state.filters = { query: "", source: "all", purpose: "all", time: "all" };
-  state.activeView = "all";
+  state.filters = { query: "", type: "all", source: "all", purpose: "all", time: "all" };
+  state.activeView = "reading";
   state.workflow = "all";
   elements.viewButtons.forEach((button) => {
-    const active = button.dataset.view === "all";
+    const active = button.dataset.view === "reading";
     button.classList.toggle("is-active", active);
     button.setAttribute("aria-pressed", String(active));
   });
@@ -1365,8 +1393,8 @@ function revealDuplicate(record, label) {
   state.selectedIds.clear();
   state.selectedIds.add(record.id);
   state.duplicateFocusId = record.id;
-  state.activeView = "all";
-  state.filters = { query: "", source: "all", purpose: "all", time: "all" };
+  state.activeView = record.kind === "link" || record.kind === "text" ? "reading" : "media";
+  state.filters = { query: "", type: "all", source: "all", purpose: "all", time: "all" };
   const centerX = record.canvasX + itemWidth(record) / 2;
   const centerY = record.canvasY + itemHeight(record) / 2;
   state.view.x = innerWidth / 2 - centerX * state.view.zoom;
@@ -2650,7 +2678,7 @@ function bindEvents() {
     elements.filterToggleButton.setAttribute("aria-expanded", String(!elements.filterPanel.hidden));
     renderFilterControls();
   });
-  [elements.sourceFilter, elements.purposeFilter, elements.timeFilter].forEach((select) => select.addEventListener("change", updateFilters));
+  [elements.typeFilter, elements.sourceFilter, elements.purposeFilter, elements.timeFilter].forEach((select) => select.addEventListener("change", updateFilters));
   elements.resetFiltersButton.addEventListener("click", resetFilters);
   elements.addButton.addEventListener("click", openCapture);
   elements.captureModeButtons.forEach((button) => button.addEventListener("click", () => setCaptureMode(button.dataset.captureMode)));

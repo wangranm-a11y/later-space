@@ -7,7 +7,7 @@
     <title>Later Space</title>
     <link rel="icon" href="assets/favicon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="assets/apple-touch-icon.png" />
-    <link rel="stylesheet" href="styles.css?v=31" />
+    <link rel="stylesheet" href="styles.css?v=32" />
   </head>
   <body>
     <main class="canvas" id="canvas" tabindex="0" aria-label="Later Space 无限内容画布">
@@ -67,19 +67,18 @@
           </button>
         </div>
         <div class="floating filter-panel" id="filterPanel" hidden>
-          <label for="sourceFilter">来源<select id="sourceFilter"><option value="all">全部来源</option></select></label>
-          <label for="purposeFilter">用途<select id="purposeFilter"><option value="all">全部</option><option value="with">有用途</option><option value="without">无用途</option></select></label>
+          <label for="typeFilter">内容类型<select id="typeFilter"><option value="all">全部类型</option></select></label>
+          <label id="sourceFilterGroup" for="sourceFilter">来源<select id="sourceFilter"><option value="all">全部来源</option></select></label>
+          <label id="purposeFilterGroup" for="purposeFilter">用途<select id="purposeFilter"><option value="all">全部</option><option value="with">有用途</option><option value="without">无用途</option></select></label>
           <label for="timeFilter">收藏时间<select id="timeFilter"><option value="all">全部时间</option><option value="today">今天</option><option value="week">近 7 天</option><option value="month">近 30 天</option><option value="year">今年</option></select></label>
           <button id="resetFiltersButton" type="button">重置</button>
         </div>
       </section>
 
       <div class="floating view-switcher" role="group" aria-label="内容分类视图">
-        <button class="view-button is-active" type="button" data-view="all">全部</button>
-        <button class="view-button" type="button" data-view="images">图片</button>
-        <button class="view-button" type="button" data-view="videos">视频</button>
-        <button class="view-button" type="button" data-view="links">链接</button>
-        <button class="view-button" type="button" data-view="texts">文字</button>
+        <button class="view-button is-active" type="button" data-view="reading">链接与文字</button>
+        <button class="view-button" type="button" data-view="media">素材</button>
+        <button class="view-button" type="button" data-view="all">全部</button>
       </div>
       <div class="floating workflow-switcher" id="workflowSwitcher" role="group" aria-label="标签快捷筛选">
         <button type="button" class="workflow-button is-active" data-workflow="all">全部</button>
@@ -277,6 +276,6 @@
       <footer><button class="secondary-button" id="resetCropButton" type="button">重置</button><button class="primary-button" id="applyCropButton" type="button">完成裁剪</button></footer>
     </section>
     <script src="cloud-config.js?v=1"></script>
-    <script src="app.js?v=63" defer></script>
+    <script src="app.js?v=64" defer></script>
   </body>
 </html>
