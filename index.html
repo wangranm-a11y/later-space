@@ -7,7 +7,7 @@
     <title>Later Space</title>
     <link rel="icon" href="assets/favicon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="assets/apple-touch-icon.png" />
-    <link rel="stylesheet" href="styles.css?v=30" />
+    <link rel="stylesheet" href="styles.css?v=31" />
   </head>
   <body>
     <main class="canvas" id="canvas" tabindex="0" aria-label="Later Space 无限内容画布">
@@ -187,7 +187,8 @@
     <aside class="floating sync-panel" id="syncPanel" aria-labelledby="syncTitle" hidden>
       <header><div><span>多设备与入口</span><h2 id="syncTitle">同步中心</h2></div><button class="tool-button" id="closeSyncButton" type="button" aria-label="关闭同步中心"><svg viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></svg></button></header>
       <div class="sync-status"><i id="syncStatusDot"></i><div><strong id="syncStatusTitle">检查中…</strong><span id="syncStatusDetail">正在检查云端配置</span></div></div>
-      <div class="sync-actions"><button class="secondary-button" id="pullCloudButton" type="button">从云端恢复</button><button class="primary-button" id="pushCloudButton" type="button">立即同步</button></div>
+      <form class="sync-login" id="syncLoginForm" hidden><label for="syncEmailInput">邮箱<input id="syncEmailInput" type="email" autocomplete="email" placeholder="name@example.com" required /></label><button class="primary-button" type="submit">发送登录链接</button></form>
+      <div class="sync-actions" id="syncActions" hidden><button class="secondary-button" id="signOutButton" type="button">退出登录</button><button class="primary-button" id="syncNowButton" type="button">立即同步</button></div>
       <div class="sync-divider"></div>
       <div class="sync-entry"><strong>浏览器插件</strong><span>保存当前网页到收件箱</span><a href="extensions/later-space" target="_blank">查看插件文件</a></div>
       <div class="sync-entry"><strong>iOS 快捷指令</strong><span>通过分享菜单发送链接或文字</span><a href="mobile/ios-shortcut.html" target="_blank">查看设置步骤</a></div>
@@ -275,6 +276,7 @@
       <p class="crop-hint">拖动框选择区域，拖动任意边缘或四角调整大小</p>
       <footer><button class="secondary-button" id="resetCropButton" type="button">重置</button><button class="primary-button" id="applyCropButton" type="button">完成裁剪</button></footer>
     </section>
-    <script src="app.js?v=61" defer></script>
+    <script src="cloud-config.js?v=1"></script>
+    <script src="app.js?v=63" defer></script>
   </body>
 </html>

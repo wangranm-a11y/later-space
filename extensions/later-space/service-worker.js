@@ -1,13 +1,9 @@
-const DEFAULT_SETTINGS = { endpoint: "http://127.0.0.1:5177", token: "" };
+const APP_URL = "https://wangranm-a11y.github.io/later-space/";
 const QUEUE_KEY = "laterSpaceCaptureQueue";
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 
 function captureId() {
   return crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-}
-
-async function settings() {
-  return chrome.storage.sync.get(DEFAULT_SETTINGS);
 }
 
 async function queueCapture(capture) {
@@ -27,18 +23,32 @@ async function removeQueued(id) {
 }
 
 async function sendCapture(capture) {
-  const config = await settings();
-  const response = await fetch(`${config.endpoint.replace(/\/$/, "")}/api/inbox`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...(config.token ? { "X-Later-Space-Token": config.token } : {}),
-    },
-    body: JSON.stringify(capture),
-  });
-  if (!response.ok) throw new Error(`HTTP ${response.status}`);
-  await removeQueued(capture.id);
-  return true;
+  let [tab] = await chrome.tabs.query({ url: `${APP_URL}*` });
+  let temporaryTab = false;
+  if (!tab) {
+    tab = await chrome.tabs.create({ url: `${APP_URL}?capture=extension`, active: false });
+    temporaryTab = true;
+  }
+  try {
+    const result = await deliverToTab(tab.id, capture);
+    if (!result || !["saved", "duplicate"].includes(result.state)) throw new Error("Later Space unavailable");
+    await removeQueued(capture.id);
+    return true;
+  } finally {
+    if (temporaryTab) await chrome.tabs.remove(tab.id).catch(() => {});
+  }
+}
+
+async function deliverToTab(tabId, capture) {
+  for (let attempt = 0; attempt < 15; attempt += 1) {
+    try {
+      const result = await chrome.tabs.sendMessage(tabId, { type: "later-space-capture", capture });
+      if (result?.state !== "unavailable") return result;
+    } catch {
+    }
+    await new Promise((resolve) => setTimeout(resolve, 300));
+  }
+  return null;
 }
 
 async function saveCapture(capture) {

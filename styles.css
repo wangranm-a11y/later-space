@@ -282,6 +282,11 @@ kbd { min-width: 26px; height: 24px; display: grid; place-items: center; padding
 .sync-status span { color: var(--muted); font-size: 10px; line-height: 1.45; }
 .sync-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
 .sync-actions button { min-width: 0; min-height: 38px; }
+.sync-login { display: grid; grid-template-columns: 1fr auto; gap: 8px; margin-top: 12px; }
+.sync-login[hidden], .sync-actions[hidden] { display: none; }
+.sync-login label { display: grid; gap: 5px; color: var(--muted); font-size: 10px; }
+.sync-login input { width: 100%; min-width: 0; height: 38px; padding: 0 10px; border: 1px solid var(--hairline); border-radius: 8px; background: white; color: var(--ink); font: inherit; }
+.sync-login button { align-self: end; min-height: 38px; padding-inline: 12px; font-size: 11px; }
 .sync-divider { height: 1px; margin: 18px 0; background: var(--hairline); }
 .sync-entry { display: grid; grid-template-columns: 1fr auto; gap: 3px 12px; padding: 10px 0; }
 .sync-entry strong { font-size: 12px; }

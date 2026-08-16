@@ -1,12 +1,17 @@
 {
   "manifest_version": 3,
   "name": "Later Space Collector",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "一键把网页、链接、图片和选中文字保存到 Later Space。",
-  "permissions": ["activeTab", "storage", "unlimitedStorage", "contextMenus", "alarms", "notifications"],
+  "permissions": ["activeTab", "storage", "unlimitedStorage", "contextMenus", "alarms", "notifications", "tabs"],
   "icons": { "16": "icon-16.png", "48": "icon-48.png", "128": "icon-128.png" },
-  "host_permissions": ["http://127.0.0.1/*", "http://localhost/*", "http://*/*", "https://*/*"],
+  "host_permissions": ["http://*/*", "https://*/*"],
   "background": { "service_worker": "service-worker.js" },
+  "content_scripts": [{
+    "matches": ["https://wangranm-a11y.github.io/later-space/*"],
+    "js": ["page-bridge.js"],
+    "run_at": "document_start"
+  }],
   "action": { "default_popup": "popup.html", "default_title": "保存到 Later Space" },
   "commands": {
     "capture-page": {

@@ -33,6 +33,8 @@ jobs:
             --exclude .github/ \
             --exclude .vercel/ \
             --exclude backups/ \
+            --exclude docs/ \
+            --exclude supabase/ \
             --exclude tests/ \
             --exclude __pycache__/ \
             --exclude '*.pyc' \

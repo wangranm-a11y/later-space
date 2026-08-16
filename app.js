@@ -5,7 +5,7 @@ const ASSET_STORE_NAME = "image-assets";
 const THUMBNAIL_VERSION = 5;
 const STATIC_DEPLOYMENT = location.protocol !== "file:" && !["localhost", "127.0.0.1", "::1"].includes(location.hostname);
 const ONBOARDING_DISMISSED_KEY = "later-space-onboarding-dismissed-v1";
-document.documentElement.dataset.appVersion = "61";
+document.documentElement.dataset.appVersion = "63";
 document.documentElement.dataset.deployment = STATIC_DEPLOYMENT ? "static" : "local";
 
 const state = {
@@ -48,6 +48,11 @@ const state = {
   searchTimer: null,
   externalInboxImporting: false,
   externalInboxTimer: null,
+  cloudSession: null,
+  cloudSyncTimer: null,
+  cloudPollTimer: null,
+  cloudSyncing: false,
+  cloudLastSyncAt: 0,
   globalCoverPreference: localStorage.getItem("later-space-global-cover-mode") || "editorial",
 };
 
@@ -155,8 +160,11 @@ const elements = {
   syncStatus: document.querySelector(".sync-status"),
   syncStatusTitle: document.querySelector("#syncStatusTitle"),
   syncStatusDetail: document.querySelector("#syncStatusDetail"),
-  pullCloudButton: document.querySelector("#pullCloudButton"),
-  pushCloudButton: document.querySelector("#pushCloudButton"),
+  syncLoginForm: document.querySelector("#syncLoginForm"),
+  syncEmailInput: document.querySelector("#syncEmailInput"),
+  syncActions: document.querySelector("#syncActions"),
+  signOutButton: document.querySelector("#signOutButton"),
+  syncNowButton: document.querySelector("#syncNowButton"),
 };
 
 const WORKFLOW_STATUSES = new Set(["inbox", "unread", "inspired", "action", "read"]);
@@ -1221,7 +1229,7 @@ function createVideoThumbnail(blob) {
   });
 }
 
-async function saveFiles(fileList, source, screenPoint, purpose = "", tags = []) {
+async function saveFiles(fileList, source, screenPoint, purpose = "", tags = [], confirmDuplicates = true) {
   const files = Array.from(fileList).filter((file) => file?.type?.startsWith("image/") || file?.type?.startsWith("video/"));
   if (!files.length) return showToast("没有找到图片或视频");
   const center = screenPoint ? screenToWorld(screenPoint.x, screenPoint.y) : worldCenter();
@@ -1231,7 +1239,7 @@ async function saveFiles(fileList, source, screenPoint, purpose = "", tags = [])
     const fingerprint = await blobFingerprint(file);
     const isVideo = file.type.startsWith("video/");
     const duplicate = state.images.find((record) => isMediaRecord(record) && record.fingerprint === fingerprint);
-    if (duplicate && !await confirmDuplicateUpload(isVideo ? "这个视频" : "这张图片", duplicate)) continue;
+    if (duplicate && (!confirmDuplicates || !await confirmDuplicateUpload(isVideo ? "这个视频" : "这张图片", duplicate))) continue;
     const dimensions = isVideo ? await getVideoInfo(file) : await getDimensions(file);
     const thumbnail = isVideo ? await createVideoThumbnail(file) : file;
     const canvasWidth = Math.min(360, Math.max(180, dimensions.width ? Math.min(dimensions.width, 320) : 280));
@@ -1258,12 +1266,13 @@ async function saveFiles(fileList, source, screenPoint, purpose = "", tags = [])
     scheduleBackup();
     showToast(`${savedRecords.length} 个媒体已放入画布`);
   }
+  return savedRecords;
 }
 
-async function saveText(text, arrivalOrigin = screenCenter(), tags = []) {
+async function saveText(text, arrivalOrigin = screenCenter(), tags = [], confirmDuplicates = true) {
   const fingerprint = normalizedTextFingerprint(text);
   const duplicate = state.images.find((record) => record.kind === "text" && normalizedTextFingerprint(record.text) === fingerprint);
-  if (duplicate && !await confirmDuplicateUpload("这段文字", duplicate)) return;
+  if (duplicate && (!confirmDuplicates || !await confirmDuplicateUpload("这段文字", duplicate))) return null;
   const center = worldCenter();
   const size = textBaseSize(text);
   const placement = openPlacement(center, size.width, size.height);
@@ -1280,6 +1289,7 @@ async function saveText(text, arrivalOrigin = screenCenter(), tags = []) {
   highlightNewRecords([record], arrivalOrigin);
   scheduleBackup();
   showToast("文字已放入画布");
+  return record;
 }
 
 function extractUrls(text) {
@@ -1470,7 +1480,7 @@ function openPlacement(center, width, height) {
   return { x: center.x - width / 2 + state.images.length * stepX, y: center.y - height / 2 };
 }
 
-async function saveLinks(urls, sourceText = "", purpose = "", customTitle = "", arrivalOrigin = screenCenter(), tags = []) {
+async function saveLinks(urls, sourceText = "", purpose = "", customTitle = "", arrivalOrigin = screenCenter(), tags = [], confirmDuplicates = true) {
   const center = worldCenter();
   const baseOffset = state.pasteOffset;
   const savedRecords = [];
@@ -1479,7 +1489,7 @@ async function saveLinks(urls, sourceText = "", purpose = "", customTitle = "", 
     try { normalized = new URL(value).href; } catch { continue; }
     const canonical = canonicalUrl(normalized);
     const duplicate = state.images.find((record) => record.kind === "link" && canonicalUrl(record.url) === canonical);
-    if (duplicate && !await confirmDuplicateUpload("这个链接", duplicate)) continue;
+    if (duplicate && (!confirmDuplicates || !await confirmDuplicateUpload("这个链接", duplicate))) continue;
     const placement = openPlacement(center, 300, 375);
     const now = Date.now() + index;
     const shareTitle = titleFromShareText(sourceText, value);
@@ -1505,6 +1515,7 @@ async function saveLinks(urls, sourceText = "", purpose = "", customTitle = "", 
     scheduleBackup();
     showToast(`${savedRecords.length} 个链接已放入画布`);
   }
+  return savedRecords;
 }
 
 async function enrichLink(record) {
@@ -1748,6 +1759,9 @@ async function deleteSelected() {
     assets,
     restoring: false,
   };
+  const cloudDeletions = cloudDeletionMap();
+  records.forEach((record) => { cloudDeletions[record.id] = Date.now(); });
+  saveCloudDeletionMap(cloudDeletions);
   for (const id of ids) {
     await transact("readwrite", (store) => store.delete(id));
     await transactAsset("readwrite", (store) => store.delete(id));
@@ -1771,6 +1785,7 @@ async function undoDeletion() {
   snapshot.restoring = true;
   try {
     for (const record of snapshot.records) {
+      record.updatedAt = Date.now();
       await transact("readwrite", (store) => store.put(record));
       const blob = snapshot.assets.get(record.id);
       if (blob) await storeImageAsset(record, blob);
@@ -1783,6 +1798,9 @@ async function undoDeletion() {
     state.selectedIds = restoredIds;
     state.selectedId = restoredIds.size === 1 ? [...restoredIds][0] : null;
     state.deletionUndoSnapshot = null;
+    const cloudDeletions = cloudDeletionMap();
+    snapshot.records.forEach((record) => { delete cloudDeletions[record.id]; });
+    saveCloudDeletionMap(cloudDeletions);
     render();
     scheduleBackup();
     showToast(snapshot.records.length > 1 ? `已恢复 ${snapshot.records.length} 项内容` : "内容已恢复");
@@ -1871,9 +1889,11 @@ async function saveAutomaticBackup() {
 }
 
 function scheduleBackup() {
-  if (STATIC_DEPLOYMENT) return;
-  clearTimeout(state.backupTimer);
-  state.backupTimer = setTimeout(saveAutomaticBackup, 900);
+  scheduleCloudSync();
+  if (!STATIC_DEPLOYMENT) {
+    clearTimeout(state.backupTimer);
+    state.backupTimer = setTimeout(saveAutomaticBackup, 900);
+  }
 }
 
 async function restorePayload(payload) {
@@ -1946,48 +1966,306 @@ async function changeSelectedStatus(status) {
   showToast(`已更新 ${records.length} 项状态`);
 }
 
+const CLOUD_SESSION_KEY = "later-space-cloud-session-v1";
+const CLOUD_DELETIONS_KEY = "later-space-cloud-deletions-v1";
+const CLOUD_DEVICE_KEY = "later-space-cloud-device-v1";
+
+function cloudConfig() {
+  return window.LATER_SPACE_CLOUD || {};
+}
+
+function cloudConfigured() {
+  const config = cloudConfig();
+  return Boolean(config.supabaseUrl && config.supabaseAnonKey);
+}
+
+function cloudDeviceId() {
+  let id = localStorage.getItem(CLOUD_DEVICE_KEY);
+  if (!id) {
+    id = makeId();
+    localStorage.setItem(CLOUD_DEVICE_KEY, id);
+  }
+  return id;
+}
+
+function cloudDeletionMap() {
+  try { return JSON.parse(localStorage.getItem(CLOUD_DELETIONS_KEY)) || {}; }
+  catch { return {}; }
+}
+
+function saveCloudDeletionMap(value) {
+  localStorage.setItem(CLOUD_DELETIONS_KEY, JSON.stringify(value));
+}
+
+function saveCloudSession(session) {
+  state.cloudSession = session;
+  if (session) localStorage.setItem(CLOUD_SESSION_KEY, JSON.stringify(session));
+  else localStorage.removeItem(CLOUD_SESSION_KEY);
+}
+
+function cloudHeaders(extra = {}) {
+  const config = cloudConfig();
+  return { apikey: config.supabaseAnonKey, Authorization: `Bearer ${state.cloudSession?.access_token || config.supabaseAnonKey}`, ...extra };
+}
+
+async function cloudRequest(path, options = {}) {
+  const response = await fetch(`${cloudConfig().supabaseUrl}${path}`, { ...options, headers: cloudHeaders(options.headers) });
+  if (response.status === 401 && state.cloudSession?.refresh_token && !options.skipRefresh) {
+    await refreshCloudSession();
+    return cloudRequest(path, { ...options, skipRefresh: true });
+  }
+  return response;
+}
+
+async function refreshCloudSession() {
+  const response = await fetch(`${cloudConfig().supabaseUrl}/auth/v1/token?grant_type=refresh_token`, {
+    method: "POST",
+    headers: { apikey: cloudConfig().supabaseAnonKey, "Content-Type": "application/json" },
+    body: JSON.stringify({ refresh_token: state.cloudSession.refresh_token }),
+  });
+  if (!response.ok) {
+    saveCloudSession(null);
+    throw new Error("session expired");
+  }
+  saveCloudSession(await response.json());
+}
+
+function captureCloudSessionFromUrl() {
+  const values = new URLSearchParams(location.hash.replace(/^#/, ""));
+  if (!values.get("access_token")) return false;
+  saveCloudSession({
+    access_token: values.get("access_token"),
+    refresh_token: values.get("refresh_token"),
+    expires_at: Math.floor(Date.now() / 1000) + Number(values.get("expires_in") || 3600),
+    user: null,
+  });
+  history.replaceState(null, "", `${location.pathname}${location.search}`);
+  return true;
+}
+
+async function loadCloudUser() {
+  if (!state.cloudSession) return null;
+  const response = await cloudRequest("/auth/v1/user");
+  if (!response.ok) {
+    saveCloudSession(null);
+    return null;
+  }
+  const user = await response.json();
+  state.cloudSession.user = user;
+  saveCloudSession(state.cloudSession);
+  return user;
+}
+
+async function initializeCloud() {
+  if (!cloudConfigured()) return;
+  const arrivedFromEmail = captureCloudSessionFromUrl();
+  if (!state.cloudSession) {
+    try { saveCloudSession(JSON.parse(localStorage.getItem(CLOUD_SESSION_KEY))); }
+    catch { saveCloudSession(null); }
+  }
+  const user = await loadCloudUser();
+  if (!user) return;
+  clearInterval(state.cloudPollTimer);
+  state.cloudPollTimer = window.setInterval(() => syncCloud(), 30000);
+  const mergeKey = `later-space-cloud-merged-${user.id}`;
+  if (!localStorage.getItem(mergeKey) && state.images.length) {
+    const shouldMerge = confirm(`这台设备有 ${state.images.length} 条本地收藏。是否合并到你的云端画布？\n\n选择“取消”会继续保留本地内容，但暂不上传。`);
+    localStorage.setItem(mergeKey, shouldMerge ? "yes" : "no");
+    if (!shouldMerge) return;
+  }
+  await syncCloud({ notify: arrivedFromEmail });
+}
+
+async function requestMagicLink(event) {
+  event.preventDefault();
+  const email = elements.syncEmailInput.value.trim();
+  if (!email) return;
+  elements.syncStatusDetail.textContent = "正在发送登录邮件…";
+  const redirectTo = `${location.origin}${location.pathname}`;
+  const response = await fetch(`${cloudConfig().supabaseUrl}/auth/v1/otp?redirect_to=${encodeURIComponent(redirectTo)}`, {
+    method: "POST",
+    headers: { apikey: cloudConfig().supabaseAnonKey, "Content-Type": "application/json" },
+    body: JSON.stringify({ email, create_user: true }),
+  });
+  if (response.ok) {
+    elements.syncStatusTitle.textContent = "登录链接已发送";
+    elements.syncStatusDetail.textContent = "打开邮件中的链接，即可回到 Later Space 完成登录";
+  } else {
+    elements.syncStatus.classList.add("is-error");
+    elements.syncStatusDetail.textContent = "邮件发送失败，请稍后重试";
+  }
+}
+
+async function signOutCloud() {
+  if (state.cloudSession) await cloudRequest("/auth/v1/logout", { method: "POST" }).catch(() => {});
+  saveCloudSession(null);
+  clearTimeout(state.cloudSyncTimer);
+  clearInterval(state.cloudPollTimer);
+  openSyncPanel();
+}
+
+function cloudRecordData(record) {
+  const stored = { ...record, thumbnail: undefined, blob: undefined };
+  delete stored.id;
+  return stored;
+}
+
+function cloudKind(record) {
+  return record.kind || "image";
+}
+
+function cloudAssetPath(userId, record) {
+  const extension = (record.type || "application/octet-stream").split("/")[1]?.replace(/[^a-z0-9.+-]/gi, "") || "bin";
+  const version = Number(record.updatedAt || record.createdAt || Date.now());
+  return `${userId}/${record.id}/${version}.${extension}`;
+}
+
+async function uploadCloudAsset(userId, record) {
+  if (!isMediaRecord(record)) return null;
+  const blob = await originalBlob(record);
+  if (!blob) return null;
+  const path = cloudAssetPath(userId, record);
+  const response = await cloudRequest(`/storage/v1/object/later-space-media/${path}`, {
+    method: "POST",
+    headers: { "Content-Type": blob.type || "application/octet-stream", "x-upsert": "true" },
+    body: blob,
+  });
+  if (!response.ok) throw new Error("asset upload failed");
+  return path;
+}
+
+async function downloadCloudAsset(path) {
+  const response = await cloudRequest(`/storage/v1/object/authenticated/later-space-media/${path}`);
+  if (!response.ok) throw new Error("asset download failed");
+  return response.blob();
+}
+
+async function upsertCloudRows(rows) {
+  if (!rows.length) return;
+  const response = await cloudRequest("/rest/v1/later_space_items?on_conflict=id", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Prefer: "resolution=merge-duplicates,return=minimal" },
+    body: JSON.stringify(rows),
+  });
+  if (!response.ok) throw new Error(await response.text());
+}
+
+async function fetchCloudRows() {
+  const response = await cloudRequest("/rest/v1/later_space_items?select=*");
+  if (!response.ok) throw new Error(await response.text());
+  return response.json();
+}
+
+async function applyCloudRow(row) {
+  const record = { ...row.data, id: row.id, updatedAt: row.client_updated_at };
+  if (row.asset_path && isMediaRecord(record)) {
+    const blob = await downloadCloudAsset(row.asset_path);
+    await storeImageAsset(record, blob);
+    record.thumbnail = record.kind === "video" ? await createVideoThumbnail(blob) : blob;
+    record.thumbnailVersion = THUMBNAIL_VERSION;
+  }
+  await transact("readwrite", (store) => store.put(record));
+  return record;
+}
+
+async function syncCloud({ notify = false } = {}) {
+  const user = state.cloudSession?.user;
+  if (!user || state.cloudSyncing || !navigator.onLine) return;
+  const mergeKey = `later-space-cloud-merged-${user.id}`;
+  if (localStorage.getItem(mergeKey) === "no") return;
+  state.cloudSyncing = true;
+  try {
+    let remoteRows = await fetchCloudRows();
+    const remoteById = new Map(remoteRows.map((row) => [row.id, row]));
+    const deletions = cloudDeletionMap();
+    const uploadRows = [];
+    for (const [id, deletedAt] of Object.entries(deletions)) {
+      const remote = remoteById.get(id);
+      if (!remote || deletedAt >= Number(remote.client_updated_at || 0)) {
+        uploadRows.push({ id, user_id: user.id, kind: remote?.kind || "text", data: remote?.data || {}, asset_path: remote?.asset_path || null, source_device_id: cloudDeviceId(), client_updated_at: deletedAt, deleted_at: new Date(deletedAt).toISOString() });
+      }
+    }
+    for (const record of state.images) {
+      const remote = remoteById.get(record.id);
+      const localUpdatedAt = Number(record.updatedAt || record.createdAt || 0);
+      if (!remote || localUpdatedAt > Number(remote.client_updated_at || 0)) {
+        const assetPath = isMediaRecord(record) ? await uploadCloudAsset(user.id, record) : null;
+        uploadRows.push({ id: record.id, user_id: user.id, kind: cloudKind(record), data: cloudRecordData(record), asset_path: assetPath, source_device_id: cloudDeviceId(), client_updated_at: localUpdatedAt, deleted_at: null });
+      }
+    }
+    await upsertCloudRows(uploadRows);
+    Object.keys(deletions).forEach((id) => {
+      if (uploadRows.some((row) => row.id === id && row.deleted_at)) delete deletions[id];
+    });
+    saveCloudDeletionMap(deletions);
+    if (uploadRows.length) remoteRows = await fetchCloudRows();
+    const localById = new Map(state.images.map((record) => [record.id, record]));
+    for (const row of remoteRows) {
+      const local = localById.get(row.id);
+      const localUpdatedAt = Number(local?.updatedAt || local?.createdAt || 0);
+      if (Number(row.client_updated_at || 0) < localUpdatedAt) continue;
+      if (Number(row.client_updated_at || 0) === localUpdatedAt && !row.deleted_at) continue;
+      if (row.deleted_at) {
+        await transact("readwrite", (store) => store.delete(row.id));
+        await transactAsset("readwrite", (store) => store.delete(row.id));
+        localById.delete(row.id);
+      } else {
+        localById.set(row.id, await applyCloudRow(row));
+      }
+    }
+    state.images = [...localById.values()].sort((left, right) => left.createdAt - right.createdAt);
+    state.cloudLastSyncAt = Date.now();
+    render();
+    if (notify) showToast("多设备画布已同步");
+  } catch (error) {
+    console.warn("Cloud sync unavailable", error);
+    if (notify) showToast("云端暂时不可用，本地收藏不受影响");
+  } finally {
+    state.cloudSyncing = false;
+    if (!elements.syncPanel.hidden) openSyncPanel();
+  }
+}
+
+async function syncNow() {
+  const user = state.cloudSession?.user;
+  if (!user) return;
+  const mergeKey = `later-space-cloud-merged-${user.id}`;
+  if (localStorage.getItem(mergeKey) === "no") {
+    if (!confirm("要把这台设备的本地收藏与云端画布合并吗？现有内容不会被整份覆盖。")) return;
+    localStorage.setItem(mergeKey, "yes");
+  }
+  clearInterval(state.cloudPollTimer);
+  state.cloudPollTimer = window.setInterval(() => syncCloud(), 30000);
+  showToast("正在同步多设备画布…");
+  await syncCloud({ notify: true });
+}
+
+function scheduleCloudSync() {
+  if (!state.cloudSession?.user) return;
+  clearTimeout(state.cloudSyncTimer);
+  state.cloudSyncTimer = setTimeout(() => syncCloud(), 1200);
+}
+
 async function openSyncPanel() {
   elements.syncPanel.hidden = false;
   elements.storagePanel.hidden = true;
   elements.syncStatus.className = "sync-status";
-  elements.syncStatusTitle.textContent = "检查中…";
-  elements.syncStatusDetail.textContent = "正在检查云端配置";
-  try {
-    const response = await fetch("/api/sync/status");
-    const payload = await response.json();
-    elements.syncStatus.classList.toggle("is-ready", Boolean(payload.configured));
-    elements.syncStatusTitle.textContent = payload.configured ? "云端同步已就绪" : "当前为本地模式";
-    elements.syncStatusDetail.textContent = payload.configured
-      ? `Supabase · ${payload.latestAt ? `最近同步 ${new Date(payload.latestAt * 1000).toLocaleString("zh-CN")}` : "尚未同步"}`
-      : "本地自动备份正常；配置 Supabase 环境变量后可跨设备同步";
-    elements.pushCloudButton.disabled = !payload.configured;
-    elements.pullCloudButton.disabled = !payload.configured || !payload.latestAt;
-  } catch {
-    elements.syncStatus.classList.add("is-error");
-    elements.syncStatusTitle.textContent = "同步服务不可用";
-    elements.syncStatusDetail.textContent = "请确认 Later Space 本地服务正在运行";
+  if (!cloudConfigured()) {
+    elements.syncStatusTitle.textContent = "当前为本地模式";
+    elements.syncStatusDetail.textContent = "云端同步尚未配置";
+    elements.syncLoginForm.hidden = true;
+    elements.syncActions.hidden = true;
+    return;
   }
-}
-
-async function pushCloudBackup() {
-  try {
-    showToast("正在同步到云端…");
-    const response = await fetch("/api/sync/push", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(await backupPayload()) });
-    if (!response.ok) throw new Error("sync failed");
-    showToast("云端同步完成");
-    openSyncPanel();
-  } catch { showToast("云端同步失败，请检查配置"); }
-}
-
-async function pullCloudBackup() {
-  if (!confirm("从云端恢复会替换当前画布，确定继续吗？")) return;
-  try {
-    await saveAutomaticBackup();
-    const response = await fetch("/api/sync/latest");
-    if (!response.ok) throw new Error("sync unavailable");
-    const count = await restorePayload(await response.json());
-    showToast(`已从云端恢复 ${count} 条内容`);
-  } catch { showToast("云端暂时没有可恢复的数据"); }
+  const user = state.cloudSession?.user;
+  elements.syncLoginForm.hidden = Boolean(user);
+  elements.syncActions.hidden = !user;
+  elements.syncStatus.classList.toggle("is-ready", Boolean(user));
+  const localOnly = user && localStorage.getItem(`later-space-cloud-merged-${user.id}`) === "no";
+  elements.syncStatusTitle.textContent = user ? (localOnly ? "已登录，当前设备尚未合并" : "多设备同步已开启") : "登录后汇合所有设备";
+  elements.syncStatusDetail.textContent = user
+    ? `${user.email} · ${localOnly ? "点击立即同步可选择合并" : state.cloudLastSyncAt ? `最近同步 ${new Date(state.cloudLastSyncAt).toLocaleTimeString("zh-CN")}` : "等待首次同步"}`
+    : "使用邮箱免密登录；未登录时内容仍只保存在当前浏览器";
 }
 
 async function importExternalInbox() {
@@ -2012,6 +2290,39 @@ async function importExternalInbox() {
   } finally {
     state.externalInboxImporting = false;
   }
+}
+
+async function importExtensionCapture(capture) {
+  if (!capture || capture.source !== "chrome-extension") return { state: "invalid" };
+  if (capture.kind === "image" && capture.imageData) {
+    const blob = dataUrlToBlob(capture.imageData);
+    const file = new File([blob], capture.name || "网页图片.jpg", { type: capture.mimeType || blob.type || "image/jpeg" });
+    const records = await saveFiles([file], "chrome-extension", screenCenter(), capture.purpose || "", [], false);
+    return { state: records.length ? "saved" : "duplicate" };
+  }
+  if (capture.kind === "link" && capture.url) {
+    const records = await saveLinks([capture.url], capture.title || capture.url, capture.purpose || "", capture.title || "", screenCenter(), [], false);
+    return { state: records.length ? "saved" : "duplicate" };
+  }
+  if (capture.kind === "text" && capture.text) {
+    const record = await saveText(capture.text, screenCenter(), [], false);
+    return { state: record ? "saved" : "duplicate" };
+  }
+  return { state: "invalid" };
+}
+
+function bindExtensionBridge() {
+  window.addEventListener("message", async (event) => {
+    if (event.source !== window || event.origin !== location.origin) return;
+    if (event.data?.source !== "later-space-extension" || event.data?.type !== "capture") return;
+    let result;
+    try {
+      result = await importExtensionCapture(event.data.capture);
+    } catch {
+      result = { state: "unavailable" };
+    }
+    window.postMessage({ source: "later-space-page", requestId: event.data.requestId, result }, location.origin);
+  });
 }
 
 function imageElementFromBlob(blob) {
@@ -2388,8 +2699,9 @@ function bindEvents() {
   elements.closeStorageButton.addEventListener("click", () => { elements.storagePanel.hidden = true; });
   elements.syncButton.addEventListener("click", openSyncPanel);
   elements.closeSyncButton.addEventListener("click", () => { elements.syncPanel.hidden = true; });
-  elements.pushCloudButton.addEventListener("click", pushCloudBackup);
-  elements.pullCloudButton.addEventListener("click", pullCloudBackup);
+  elements.syncLoginForm.addEventListener("submit", requestMagicLink);
+  elements.signOutButton.addEventListener("click", signOutCloud);
+  elements.syncNowButton.addEventListener("click", syncNow);
   elements.copyImageButton.addEventListener("click", copySelectedImage);
   elements.cropImageButton.addEventListener("click", openCropEditor);
   elements.batchEditButton.addEventListener("click", openBatchEditor);
@@ -2533,11 +2845,12 @@ async function init() {
     state.db = await openDatabase();
     if (STATIC_DEPLOYMENT) {
       elements.restoreBackupButton.hidden = true;
-      elements.syncButton.hidden = true;
     }
     bindEvents();
     updateView();
     await loadImages();
+    bindExtensionBridge();
+    await initializeCloud();
     if (!STATIC_DEPLOYMENT) {
       await importExternalInbox();
       state.externalInboxTimer = window.setInterval(importExternalInbox, 20000);
@@ -2548,6 +2861,7 @@ async function init() {
     if (state.images.length) scheduleBackup();
     const incompleteLinks = state.images.filter((record) => record.kind === "link" && isGenericTitle(record.title, record));
     incompleteLinks.forEach((record) => enrichLink(record));
+    window.addEventListener("online", () => syncCloud());
   } catch (error) {
     console.error(error);
     showToast("画布打开失败，请刷新重试");
