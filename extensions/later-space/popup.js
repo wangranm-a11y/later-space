@@ -5,8 +5,22 @@ const save = document.querySelector("#save");
 const destination = document.querySelector("#destination");
 const undo = document.querySelector("#undo");
 const view = document.querySelector("#view");
+const recent = document.querySelector("#recent");
+const recentView = document.querySelector("#recentView");
+const recentKind = document.querySelector("#recentKind");
+const recentTitle = document.querySelector("#recentTitle");
 let undoToken = "";
 let recordIds = [];
+
+function renderRecent(item) {
+  if (!item?.capture || Date.now() - Number(item.savedAt || 0) > 24 * 60 * 60 * 1000) return;
+  const labels = { link: "链接", image: "图片", text: "文字" };
+  recentKind.textContent = labels[item.capture.kind] || "内容";
+  recentTitle.textContent = item.capture.title || "收藏的内容";
+  recordIds = item.recordIds || [];
+  undoToken = item.undoToken || "";
+  recent.hidden = false;
+}
 
 async function refreshQueue() {
   const { laterSpaceCaptureQueue = [] } = await chrome.storage.local.get({ laterSpaceCaptureQueue: [] });
@@ -21,6 +35,8 @@ chrome.tabs.query({ active: true, currentWindow: true }).then(([tab]) => {
 chrome.runtime.sendMessage({ type: "destination-status" }).then((result) => {
   if (result?.label) destination.textContent = result.label;
 });
+
+chrome.runtime.sendMessage({ type: "recent-capture" }).then(renderRecent).catch(() => {});
 
 save.addEventListener("click", async () => {
   save.disabled = true;
@@ -44,7 +60,13 @@ save.addEventListener("click", async () => {
   recordIds = result?.recordIds || [];
   view.hidden = !recordIds.length;
   undo.hidden = !undoToken;
+  renderRecent({ ...result, savedAt: Date.now() });
   await refreshQueue();
+});
+
+recentView.addEventListener("click", async () => {
+  if (recordIds.length) await chrome.runtime.sendMessage({ type: "view-capture", recordIds });
+  else window.open("https://wangranm-a11y.github.io/later-space/", "_blank");
 });
 
 view.addEventListener("click", async () => {
@@ -64,6 +86,7 @@ undo.addEventListener("click", async () => {
     undoToken = "";
     undo.hidden = true;
     view.hidden = true;
+    recent.hidden = true;
     save.disabled = false;
     save.textContent = "重新加入";
   }

@@ -1,6 +1,7 @@
 const APP_URL = "https://wangranm-a11y.github.io/later-space/";
 const QUEUE_KEY = "laterSpaceCaptureQueue";
 const UNDO_KEY = "laterSpaceUndoCaptures";
+const LAST_CAPTURE_KEY = "laterSpaceLastCapture";
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 const contextImages = new Map();
 
@@ -40,7 +41,7 @@ async function sendCapture(capture) {
     const result = await deliverToTab(tab.id, capture);
     if (!result || !["saved", "duplicate"].includes(result.state)) throw new Error("Later Space unavailable");
     await removeQueued(capture.id);
-    return { ...result, windowId: capture.windowId };
+    return { ...result, windowId: capture.windowId, capture: captureSummary(capture) };
   } finally {
     if (temporaryTab) await chrome.tabs.remove(tab.id).catch(() => {});
   }
@@ -64,8 +65,32 @@ async function saveCapture(capture) {
   try {
     return await sendCapture(normalized);
   } catch {
-    return { state: "queued" };
+    return { state: "queued", windowId: normalized.windowId, capture: captureSummary(normalized) };
   }
+}
+
+function captureSummary(capture) {
+  const fallback = capture.kind === "image" ? "收藏的图片" : capture.kind === "text" ? capture.text?.slice(0, 80) : capture.url;
+  return {
+    kind: capture.kind,
+    title: capture.kind === "image" ? "收藏的图片" : capture.title || capture.name || fallback || "收藏的内容",
+    url: capture.url || capture.pageUrl || "",
+    createdAt: capture.createdAt || Date.now(),
+  };
+}
+
+async function rememberCapture(result) {
+  if (!result || !["saved", "duplicate", "queued"].includes(result.state)) return result;
+  const recent = {
+    state: result.state,
+    recordIds: result.recordIds || [],
+    undoToken: result.undoToken || "",
+    windowId: result.windowId,
+    capture: result.capture || { kind: "link", title: "收藏的内容", url: "", createdAt: Date.now() },
+    savedAt: Date.now(),
+  };
+  await chrome.storage.local.set({ [LAST_CAPTURE_KEY]: recent });
+  return result;
 }
 
 function feedbackText(state) {
@@ -103,6 +128,8 @@ async function undoCapture(token) {
     if (result?.state === "undone") {
       delete stored[UNDO_KEY][token];
       await chrome.storage.session.set({ [UNDO_KEY]: stored[UNDO_KEY] });
+      const recent = await chrome.storage.local.get({ [LAST_CAPTURE_KEY]: null });
+      if (recent[LAST_CAPTURE_KEY]?.undoToken === token) await chrome.storage.local.remove(LAST_CAPTURE_KEY);
     }
     return result || { state: "unavailable" };
   } finally {
@@ -135,10 +162,11 @@ async function viewCapture(recordIds, windowId) {
   if (!recordIds?.length) return { state: "unavailable" };
   let tab = await laterSpaceTab(windowId);
   if (!tab) tab = await chrome.tabs.create({ url: `${APP_URL}?view=extension`, active: false });
-  const result = await deliverToTab(tab.id, { type: "view", recordIds });
-  if (result?.state !== "viewed") return result || { state: "unavailable" };
   await chrome.tabs.update(tab.id, { active: true });
   await chrome.windows.update(tab.windowId, { focused: true });
+  await new Promise((resolve) => setTimeout(resolve, 180));
+  const result = await deliverToTab(tab.id, { type: "view", recordIds });
+  if (result?.state !== "viewed") return result || { state: "unavailable" };
   return result;
 }
 
@@ -239,7 +267,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
     }
   } else if (info.linkUrl) result = await saveCapture({ kind: "link", url: info.linkUrl, title: "", windowId: tab?.windowId });
   else result = await pageCapture(tab);
-  result = await registerUndo(result);
+  result = await rememberCapture(await registerUndo(result));
   const sourceFeedbackShown = await notifySourceTab(tab?.id, result);
   const messages = {
     saved: "已加入 Later Space",
@@ -252,7 +280,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
 
 chrome.commands.onCommand.addListener(async () => {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  const result = await registerUndo(await pageCapture(tab));
+  const result = await rememberCapture(await registerUndo(await pageCapture(tab)));
   await notifySourceTab(tab?.id, result);
 });
 
@@ -260,10 +288,38 @@ chrome.alarms.onAlarm.addListener((alarm) => { if (alarm.name === "retry-capture
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message.type === "capture-current") {
     chrome.tabs.query({ active: true, currentWindow: true }).then(async ([tab]) => {
-      const result = await registerUndo(await pageCapture(tab));
+      const result = await rememberCapture(await registerUndo(await pageCapture(tab)));
       await notifySourceTab(tab?.id, result);
       return result;
     }).then(sendResponse);
+    return true;
+  }
+  if (message.type === "capture-selection") {
+    chrome.tabs.query({ active: true, currentWindow: true }).then(async ([tab]) => {
+      const result = await rememberCapture(await registerUndo(await saveCapture({ kind: "text", text: message.text || "", pageUrl: tab?.url || "", windowId: tab?.windowId })));
+      await notifySourceTab(tab?.id, result);
+      return result;
+    }).then(sendResponse);
+    return true;
+  }
+  if (message.type === "capture-image") {
+    const tab = _sender.tab;
+    const image = message.image;
+    (async () => {
+      let result;
+      try { result = await imageCapture(image?.url, tab?.url || "", tab?.windowId); }
+      catch {
+        try { result = await visibleImageCapture(tab, image); }
+        catch { result = { state: "unavailable", capture: { kind: "image", title: "收藏的图片", url: tab?.url || "", createdAt: Date.now() } }; }
+      }
+      result = await rememberCapture(await registerUndo(result));
+      await notifySourceTab(tab?.id, result);
+      return result;
+    })().then(sendResponse);
+    return true;
+  }
+  if (message.type === "recent-capture") {
+    chrome.storage.local.get({ [LAST_CAPTURE_KEY]: null }).then((stored) => sendResponse(stored[LAST_CAPTURE_KEY]));
     return true;
   }
   if (message.type === "retry-queue") {
