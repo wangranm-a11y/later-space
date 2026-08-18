@@ -47,11 +47,16 @@ async function sendCapture(capture) {
 }
 
 async function deliverToTab(tabId, capture) {
+  let reinjected = false;
   for (let attempt = 0; attempt < 15; attempt += 1) {
     try {
       const result = await chrome.tabs.sendMessage(tabId, { type: "later-space-capture", capture });
       if (result?.state !== "unavailable") return result;
     } catch {
+      if (!reinjected) {
+        reinjected = true;
+        await chrome.scripting.executeScript({ target: { tabId }, files: ["page-bridge.js"] }).catch(() => {});
+      }
     }
     await new Promise((resolve) => setTimeout(resolve, 300));
   }
@@ -138,12 +143,24 @@ async function undoCapture(token) {
 
 async function notifySourceTab(tabId, result) {
   if (!tabId) return false;
-  return chrome.tabs.sendMessage(tabId, {
+  const message = {
     type: "later-space-feedback",
     text: feedbackText(result.state),
     recordIds: result.recordIds || [],
     undoToken: result.undoToken || "",
-  }).then(() => true).catch(() => false);
+  };
+  try {
+    await chrome.tabs.sendMessage(tabId, message);
+    return true;
+  } catch {
+    try {
+      await chrome.scripting.executeScript({ target: { tabId }, files: ["page-feedback.js"] });
+      await chrome.tabs.sendMessage(tabId, message);
+      return true;
+    } catch {
+      return false;
+    }
+  }
 }
 
 async function currentContextImage(tabId) {
@@ -284,7 +301,10 @@ chrome.commands.onCommand.addListener(async () => {
 chrome.alarms.onAlarm.addListener((alarm) => { if (alarm.name === "retry-captures") retryQueue(); });
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message.type === "capture-current") {
-    chrome.tabs.query({ active: true, currentWindow: true }).then(async ([tab]) => {
+    const activeTab = message.tabId
+      ? chrome.tabs.get(message.tabId).catch(() => null)
+      : chrome.tabs.query({ active: true, lastFocusedWindow: true }).then(([tab]) => tab);
+    activeTab.then(async (tab) => {
       const result = await rememberCapture(await registerUndo(await pageCapture(tab)));
       await notifySourceTab(tab?.id, result);
       return result;

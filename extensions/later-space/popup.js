@@ -11,6 +11,7 @@ const recentKind = document.querySelector("#recentKind");
 const recentTitle = document.querySelector("#recentTitle");
 let undoToken = "";
 let recordIds = [];
+let currentTabId = null;
 
 function renderRecent(item) {
   if (!item?.capture || Date.now() - Number(item.savedAt || 0) > 24 * 60 * 60 * 1000) return;
@@ -29,6 +30,7 @@ async function refreshQueue() {
 }
 
 chrome.tabs.query({ active: true, currentWindow: true }).then(([tab]) => {
+  currentTabId = tab?.id || null;
   title.textContent = tab?.title || tab?.url || "当前网页";
 });
 
@@ -43,7 +45,7 @@ save.addEventListener("click", async () => {
   status.textContent = "正在加入…";
   document.body.classList.remove("is-saved", "is-duplicate", "is-queued");
   let result;
-  try { result = await chrome.runtime.sendMessage({ type: "capture-current" }); }
+  try { result = await chrome.runtime.sendMessage({ type: "capture-current", tabId: currentTabId }); }
   catch { result = { state: "unavailable" }; }
   const messages = {
     saved: "已加入 Later Space",

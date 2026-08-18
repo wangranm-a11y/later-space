@@ -1,8 +1,19 @@
+(() => {
+try { globalThis.__laterSpaceFeedbackCleanup?.(); } catch {}
+
 let contextImage = { url: "" };
 let selectionButton = null;
 let imageButton = null;
 let selectionTimer = null;
 let selectingWithPointer = false;
+const listenerController = new AbortController();
+const listenerOptions = { signal: listenerController.signal };
+globalThis.__laterSpaceFeedbackCleanup = () => {
+  listenerController.abort();
+  try { chrome.runtime.onMessage.removeListener(receiveRuntimeMessage); } catch {}
+  clearTimeout(selectionTimer);
+  document.querySelectorAll("[data-later-space-floating], #later-space-feedback").forEach((node) => node.remove());
+};
 
 function sendRuntimeMessage(message) {
   try {
@@ -64,8 +75,8 @@ function imageAtViewportCenter() {
 
 document.addEventListener("pointerdown", (event) => {
   if (event.button === 2) rememberContextImage(event);
-}, true);
-document.addEventListener("contextmenu", rememberContextImage, true);
+}, { capture: true, signal: listenerController.signal });
+document.addEventListener("contextmenu", rememberContextImage, { capture: true, signal: listenerController.signal });
 
 function floatingButton(label) {
   const button = document.createElement("button");
@@ -73,9 +84,9 @@ function floatingButton(label) {
   button.dataset.laterSpaceFloating = "true";
   button.setAttribute("aria-label", label);
   button.innerHTML = `<svg viewBox="0 0 24 24" width="19" height="19" aria-hidden="true"><rect x="3" y="3" width="11" height="11" rx="2.5" fill="#1d1d1f"/><rect x="10" y="10" width="11" height="11" rx="2.5" fill="#a7add8"/></svg>`;
-  button.style.cssText = "position:fixed;z-index:2147483646;width:30px;height:30px;display:grid;place-items:center;padding:0;border:1px solid rgba(25,25,27,.13);border-radius:8px;background:#fff;box-shadow:0 6px 20px rgba(20,20,22,.16);cursor:pointer;transition:transform .14s ease,box-shadow .14s ease";
-  button.addEventListener("mouseenter", () => { button.style.transform = "translateY(-1px)"; button.style.boxShadow = "0 8px 24px rgba(20,20,22,.2)"; });
-  button.addEventListener("mouseleave", () => { button.style.transform = ""; button.style.boxShadow = "0 6px 20px rgba(20,20,22,.16)"; });
+  button.style.cssText = "position:fixed;z-index:2147483646;width:30px;height:30px;display:grid;place-items:center;padding:0;border:1px solid rgba(93,95,119,.14);border-radius:8px;background:rgba(235,235,242,.78);backdrop-filter:blur(8px);box-shadow:0 5px 16px rgba(37,38,49,.1);cursor:pointer;transition:transform .14s ease,background .14s ease,box-shadow .14s ease";
+  button.addEventListener("mouseenter", () => { button.style.transform = "translateY(-1px)"; button.style.background = "rgba(229,230,240,.92)"; button.style.boxShadow = "0 7px 20px rgba(37,38,49,.14)"; });
+  button.addEventListener("mouseleave", () => { button.style.transform = ""; button.style.background = "rgba(235,235,242,.78)"; button.style.boxShadow = "0 5px 16px rgba(37,38,49,.1)"; });
   document.documentElement.append(button);
   return button;
 }
@@ -89,17 +100,24 @@ function removeSelectionButton() {
 
 function scheduleSelectionButton() {
   clearTimeout(selectionTimer);
+  if (getSelection()?.toString().trim()) {
+    imageButton?.remove();
+    imageButton = null;
+  }
   if (selectingWithPointer) return;
   selectionTimer = setTimeout(() => {
     const selection = getSelection();
     const text = selection?.toString().trim();
     if (!text || selection.rangeCount === 0) return removeSelectionButton();
-    const rect = selection.getRangeAt(0).getBoundingClientRect();
+    const rects = [...selection.getRangeAt(0).getClientRects()].filter((item) => item.width || item.height);
+    const rect = rects.at(-1) || selection.getRangeAt(0).getBoundingClientRect();
     if (!rect.width && !rect.height) return removeSelectionButton();
     removeSelectionButton();
+    imageButton?.remove();
+    imageButton = null;
     selectionButton = floatingButton("加入 Later Space");
     selectionButton.style.left = `${Math.min(innerWidth - 38, Math.max(8, rect.right + 7))}px`;
-    selectionButton.style.top = `${Math.min(innerHeight - 38, Math.max(8, rect.top - 2))}px`;
+    selectionButton.style.top = `${Math.min(innerHeight - 38, Math.max(8, rect.bottom + 5))}px`;
     selectionButton.addEventListener("mousedown", (event) => event.preventDefault());
     selectionButton.addEventListener("click", async () => {
       selectionButton.disabled = true;
@@ -114,20 +132,27 @@ document.addEventListener("pointerdown", (event) => {
   if (event.button !== 0 || event.target.closest?.("#later-space-feedback, [data-later-space-floating]")) return;
   selectingWithPointer = true;
   removeSelectionButton();
-}, true);
+  imageButton?.remove();
+  imageButton = null;
+}, { capture: true, signal: listenerController.signal });
 document.addEventListener("pointerup", (event) => {
   if (event.button !== 0) return;
   selectingWithPointer = false;
   scheduleSelectionButton();
-}, true);
+}, { capture: true, signal: listenerController.signal });
 document.addEventListener("pointercancel", () => {
   selectingWithPointer = false;
   scheduleSelectionButton();
-}, true);
-document.addEventListener("selectionchange", scheduleSelectionButton);
+}, { capture: true, signal: listenerController.signal });
+document.addEventListener("selectionchange", scheduleSelectionButton, listenerOptions);
 
 document.addEventListener("pointermove", (event) => {
   if (!location.hostname.includes("xiaohongshu.com")) return;
+  if (getSelection()?.toString().trim() || selectionButton) {
+    imageButton?.remove();
+    imageButton = null;
+    return;
+  }
   const image = findImage(event.target, event.clientX, event.clientY);
   const rect = image?.element.getBoundingClientRect();
   if (!image || !rect || rect.width < 120 || rect.height < 120) {
@@ -148,7 +173,7 @@ document.addEventListener("pointermove", (event) => {
     imageButton?.remove();
     imageButton = null;
   });
-}, { passive: true, capture: true });
+}, { passive: true, capture: true, signal: listenerController.signal });
 
 function showFeedback(message) {
   document.querySelector("#later-space-feedback")?.remove();
@@ -198,11 +223,13 @@ function showFeedback(message) {
   setTimeout(() => toast.remove(), message.undoToken ? 6000 : 3200);
 }
 
-chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+function receiveRuntimeMessage(message, _sender, sendResponse) {
   if (message.type === "later-space-feedback") showFeedback(message);
   if (message.type === "later-space-context-image") {
     sendResponse({ image: contextImage?.rect ? contextImage : imageAtViewportCenter() });
     return false;
   }
   return undefined;
-});
+}
+chrome.runtime.onMessage.addListener(receiveRuntimeMessage);
+})();
