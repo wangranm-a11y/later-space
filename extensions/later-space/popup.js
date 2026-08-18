@@ -50,8 +50,8 @@ save.addEventListener("click", async () => {
   const messages = {
     saved: "已加入 Later Space",
     duplicate: "已加入 Later Space",
-    queued: "暂时离线，稍后自动加入",
-    unavailable: "暂时无法加入，请稍后重试",
+    queued: "Later Space 正在连接，稍后自动加入",
+    unavailable: "Later Space 暂时无法连接，请稍后重试",
   };
   status.textContent = messages[result?.state] || messages.queued;
   document.body.classList.add(`is-${result?.state || "queued"}`);

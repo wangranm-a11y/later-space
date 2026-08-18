@@ -102,7 +102,7 @@ function feedbackText(state) {
   if (state === "duplicate") return "已加入 Later Space";
   if (state === "undone") return "已撤销";
   if (state === "unavailable") return "这张图片暂时无法加入";
-  return "暂时离线，稍后自动加入";
+  return "Later Space 正在连接，稍后自动加入";
 }
 
 async function registerUndo(result) {
@@ -286,7 +286,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   const messages = {
     saved: "已加入 Later Space",
     duplicate: "已加入 Later Space",
-    queued: "暂时离线，稍后自动加入",
+    queued: "Later Space 正在连接，稍后自动加入",
     unavailable: "这张图片暂时无法加入",
   };
   if (!sourceFeedbackShown) chrome.notifications.create({ type: "basic", iconUrl: "icon-128.png", title: "Later Space", message: messages[result.state] || messages.queued }).catch(() => {});

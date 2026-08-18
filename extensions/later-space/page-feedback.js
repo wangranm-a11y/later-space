@@ -7,6 +7,7 @@ let imageButton = null;
 let floatingButtonElement = null;
 let selectionTimer = null;
 let selectingWithPointer = false;
+const IMAGE_HOVER_HOSTS = /(^|\.)((xiaohongshu\.com)|(x\.com)|(twitter\.com)|(google\.[a-z.]+)|(bing\.com)|(pinterest\.(com|co\.[a-z]+))|(reddit\.com))$/i;
 const listenerController = new AbortController();
 const listenerOptions = { signal: listenerController.signal };
 globalThis.__laterSpaceFeedbackCleanup = () => {
@@ -89,9 +90,9 @@ function floatingButton(label) {
   button.dataset.laterSpaceFloating = "true";
   button.setAttribute("aria-label", label);
   button.innerHTML = `<svg viewBox="0 0 24 24" width="19" height="19" aria-hidden="true"><rect x="3" y="3" width="11" height="11" rx="2.5" fill="#1d1d1f"/><rect x="10" y="10" width="11" height="11" rx="2.5" fill="#a7add8"/></svg>`;
-  button.style.cssText = "position:fixed;z-index:2147483646;width:30px;height:30px;display:grid;place-items:center;padding:0;border:1px solid rgba(93,95,119,.14);border-radius:8px;background:rgba(235,235,242,.78);backdrop-filter:blur(8px);box-shadow:0 5px 16px rgba(37,38,49,.1);cursor:pointer;transition:transform .14s ease,background .14s ease,box-shadow .14s ease";
-  button.addEventListener("mouseenter", () => { button.style.transform = "translateY(-1px)"; button.style.background = "rgba(229,230,240,.92)"; button.style.boxShadow = "0 7px 20px rgba(37,38,49,.14)"; });
-  button.addEventListener("mouseleave", () => { button.style.transform = ""; button.style.background = "rgba(235,235,242,.78)"; button.style.boxShadow = "0 5px 16px rgba(37,38,49,.1)"; });
+  button.style.cssText = "position:fixed;z-index:2147483646;width:30px;height:30px;display:grid;place-items:center;padding:0;border:1px solid rgba(93,95,119,.1);border-radius:8px;background:rgba(235,235,242,.46);backdrop-filter:blur(8px);box-shadow:0 5px 16px rgba(37,38,49,.06);opacity:.72;cursor:pointer;transition:transform .14s ease,background .14s ease,box-shadow .14s ease,opacity .14s ease";
+  button.addEventListener("mouseenter", () => { button.style.transform = "translateY(-1px)"; button.style.background = "rgba(229,230,240,.68)"; button.style.boxShadow = "0 7px 20px rgba(37,38,49,.1)"; button.style.opacity = ".94"; });
+  button.addEventListener("mouseleave", () => { button.style.transform = ""; button.style.background = "rgba(235,235,242,.46)"; button.style.boxShadow = "0 5px 16px rgba(37,38,49,.06)"; button.style.opacity = ".72"; });
   document.documentElement.append(button);
   floatingButtonElement = button;
   return button;
@@ -119,15 +120,15 @@ function scheduleSelectionButton() {
   selectionTimer = setTimeout(() => {
     const selection = getSelection();
     const text = selection?.toString().trim();
-    if (!text || selection.rangeCount === 0) return removeSelectionButton();
+    if (!text || selection.rangeCount !== 1 || selection.isCollapsed) return removeSelectionButton();
     const rect = selection.getRangeAt(0).getBoundingClientRect();
     if (!rect.width && !rect.height) return removeSelectionButton();
     removeSelectionButton();
     removeFloatingButton(imageButton);
     selectionButton = floatingButton("加入 Later Space");
     selectionButton.dataset.laterSpaceKind = "selection";
-    selectionButton.style.left = `${Math.min(innerWidth - 38, Math.max(8, rect.right + 7))}px`;
-    selectionButton.style.top = `${Math.min(innerHeight - 38, Math.max(8, rect.bottom + 5))}px`;
+    selectionButton.style.left = `${Math.min(innerWidth - 38, Math.max(8, rect.right + 10))}px`;
+    selectionButton.style.top = `${Math.min(innerHeight - 38, Math.max(8, rect.bottom + 8))}px`;
     selectionButton.addEventListener("mousedown", (event) => event.preventDefault());
     selectionButton.addEventListener("click", async () => {
       selectionButton.disabled = true;
@@ -156,7 +157,7 @@ document.addEventListener("pointercancel", () => {
 document.addEventListener("selectionchange", scheduleSelectionButton, listenerOptions);
 
 document.addEventListener("pointermove", (event) => {
-  if (!location.hostname.includes("xiaohongshu.com")) return;
+  if (!IMAGE_HOVER_HOSTS.test(location.hostname)) return;
   if (getSelection()?.toString().trim() || selectionButton) {
     removeFloatingButton(imageButton);
     return;

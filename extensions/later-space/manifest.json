@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Later Space Collector",
-  "version": "1.7.3",
+  "version": "1.7.4",
   "description": "把网页、链接、图片和选中文字加入 Later Space。",
   "permissions": ["activeTab", "storage", "unlimitedStorage", "contextMenus", "alarms", "notifications", "tabs", "windows", "scripting"],
   "icons": { "16": "icon-16.png", "48": "icon-48.png", "128": "icon-128.png" },

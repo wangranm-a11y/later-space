@@ -6,7 +6,10 @@ const pageOrigin = "https://wangranm-a11y.github.io";
 function receiveCapture(message, _sender, sendResponse) {
   if (message.type !== "later-space-capture") return undefined;
   const requestId = crypto.randomUUID();
+  let retryTimer;
+  const postCapture = () => window.postMessage({ source: "later-space-extension", type, requestId, capture: message.capture }, pageOrigin);
   const timeout = setTimeout(() => {
+    clearInterval(retryTimer);
     window.removeEventListener("message", receiveResult);
     sendResponse({ state: "unavailable" });
   }, 10000);
@@ -14,12 +17,14 @@ function receiveCapture(message, _sender, sendResponse) {
     if (event.source !== window || event.origin !== pageOrigin) return;
     if (event.data?.source !== "later-space-page" || event.data?.requestId !== requestId) return;
     clearTimeout(timeout);
+    clearInterval(retryTimer);
     window.removeEventListener("message", receiveResult);
     sendResponse(event.data.result);
   }
   window.addEventListener("message", receiveResult);
   const type = ["status", "undo", "view"].includes(message.capture?.type) ? message.capture.type : "capture";
-  window.postMessage({ source: "later-space-extension", type, requestId, capture: message.capture }, pageOrigin);
+  postCapture();
+  retryTimer = setInterval(postCapture, 250);
   return true;
 }
 
