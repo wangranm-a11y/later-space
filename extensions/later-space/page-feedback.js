@@ -4,6 +4,15 @@ let imageButton = null;
 let selectionTimer = null;
 let selectingWithPointer = false;
 
+function sendRuntimeMessage(message) {
+  try {
+    if (!chrome.runtime?.id) return Promise.resolve({ state: "unavailable" });
+    return chrome.runtime.sendMessage(message).catch(() => ({ state: "unavailable" }));
+  } catch {
+    return Promise.resolve({ state: "unavailable" });
+  }
+}
+
 function backgroundImageUrl(element) {
   const value = getComputedStyle(element).backgroundImage;
   const match = value && value !== "none" ? value.match(/^url\(["']?(.*?)["']?\)$/) : null;
@@ -41,7 +50,6 @@ function rememberContextImage(event) {
     rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
     viewport: { width: innerWidth, height: innerHeight },
   } : { url: "" };
-  chrome.runtime.sendMessage({ type: "context-image", image: contextImage }).catch(() => {});
 }
 
 function imageAtViewportCenter() {
@@ -95,7 +103,7 @@ function scheduleSelectionButton() {
     selectionButton.addEventListener("mousedown", (event) => event.preventDefault());
     selectionButton.addEventListener("click", async () => {
       selectionButton.disabled = true;
-      await chrome.runtime.sendMessage({ type: "capture-selection", text }).catch(() => {});
+      await sendRuntimeMessage({ type: "capture-selection", text });
       removeSelectionButton();
       selection.removeAllRanges();
     });
@@ -136,7 +144,7 @@ document.addEventListener("pointermove", (event) => {
   const payload = { url: image.url, rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height }, viewport: { width: innerWidth, height: innerHeight } };
   imageButton.addEventListener("click", async () => {
     imageButton.disabled = true;
-    await chrome.runtime.sendMessage({ type: "capture-image", image: payload }).catch(() => {});
+    await sendRuntimeMessage({ type: "capture-image", image: payload });
     imageButton?.remove();
     imageButton = null;
   });
@@ -162,7 +170,7 @@ function showFeedback(message) {
     view.textContent = "↗";
     view.setAttribute("aria-label", "查看刚刚加入的内容");
     view.style.cssText = "width:28px;height:28px;padding:0;border:1px solid rgba(25,25,27,.11);border-radius:7px;background:#fafaf8;color:#202124;font:600 16px/1 -apple-system,BlinkMacSystemFont,sans-serif;cursor:pointer";
-    view.addEventListener("click", () => chrome.runtime.sendMessage({ type: "view-capture", recordIds: message.recordIds }));
+    view.addEventListener("click", () => sendRuntimeMessage({ type: "view-capture", recordIds: message.recordIds }));
     actions.append(view);
   }
   if (message.undoToken) {
@@ -172,7 +180,7 @@ function showFeedback(message) {
     undo.style.cssText = "padding:0;border:0;background:transparent;color:#6f6e69;font:10px/1.4 -apple-system,BlinkMacSystemFont,'PingFang SC',sans-serif;cursor:pointer";
     undo.addEventListener("click", async () => {
       undo.disabled = true;
-      const result = await chrome.runtime.sendMessage({ type: "undo-capture", token: message.undoToken });
+      const result = await sendRuntimeMessage({ type: "undo-capture", token: message.undoToken });
       label.textContent = result?.state === "undone" ? "已撤销" : result?.state === "expired" ? "撤销时间已过" : "暂时无法撤销";
       undo.remove();
       setTimeout(() => toast.remove(), 1400);

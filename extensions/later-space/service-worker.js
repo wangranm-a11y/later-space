@@ -3,7 +3,6 @@ const QUEUE_KEY = "laterSpaceCaptureQueue";
 const UNDO_KEY = "laterSpaceUndoCaptures";
 const LAST_CAPTURE_KEY = "laterSpaceLastCapture";
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
-const contextImages = new Map();
 
 function captureId() {
   return crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -148,13 +147,11 @@ async function notifySourceTab(tabId, result) {
 }
 
 async function currentContextImage(tabId) {
-  const cached = contextImages.get(tabId)?.image;
-  if (cached?.rect && cached?.viewport) return cached;
   try {
     const result = await chrome.tabs.sendMessage(tabId, { type: "later-space-context-image" });
-    return result?.image || cached;
+    return result?.image;
   } catch {
-    return cached;
+    return undefined;
   }
 }
 
@@ -258,7 +255,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   if (info.menuItemId !== "later-add") return;
   const contextImage = await currentContextImage(tab?.id);
   if (info.selectionText) result = await saveCapture({ kind: "text", text: info.selectionText, pageUrl: tab?.url || "", windowId: tab?.windowId });
-  else if (info.srcUrl || (Date.now() - Number(contextImages.get(tab?.id)?.createdAt || 0) < 15000 && contextImage?.url)) {
+  else if (info.srcUrl || contextImage?.url) {
     const imageUrl = info.srcUrl || contextImage?.url;
     try { result = await imageCapture(imageUrl, tab?.url || "", tab?.windowId); }
     catch {
@@ -329,11 +326,6 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message.type === "destination-status") {
     destinationStatus().then(sendResponse);
     return true;
-  }
-  if (message.type === "context-image") {
-    if (_sender.tab?.id) contextImages.set(_sender.tab.id, { image: message.image || { url: "" }, createdAt: Date.now() });
-    sendResponse({ state: "ready" });
-    return false;
   }
   if (message.type === "undo-capture") {
     undoCapture(message.token).then(sendResponse);
