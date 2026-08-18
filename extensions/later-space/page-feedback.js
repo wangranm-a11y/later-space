@@ -4,6 +4,7 @@ try { globalThis.__laterSpaceFeedbackCleanup?.(); } catch {}
 let contextImage = { url: "" };
 let selectionButton = null;
 let imageButton = null;
+let floatingButtonElement = null;
 let selectionTimer = null;
 let selectingWithPointer = false;
 const listenerController = new AbortController();
@@ -79,6 +80,10 @@ document.addEventListener("pointerdown", (event) => {
 document.addEventListener("contextmenu", rememberContextImage, { capture: true, signal: listenerController.signal });
 
 function floatingButton(label) {
+  document.querySelectorAll("[data-later-space-floating]").forEach((node) => node.remove());
+  selectionButton = null;
+  imageButton = null;
+  floatingButtonElement = null;
   const button = document.createElement("button");
   button.type = "button";
   button.dataset.laterSpaceFloating = "true";
@@ -88,34 +93,39 @@ function floatingButton(label) {
   button.addEventListener("mouseenter", () => { button.style.transform = "translateY(-1px)"; button.style.background = "rgba(229,230,240,.92)"; button.style.boxShadow = "0 7px 20px rgba(37,38,49,.14)"; });
   button.addEventListener("mouseleave", () => { button.style.transform = ""; button.style.background = "rgba(235,235,242,.78)"; button.style.boxShadow = "0 5px 16px rgba(37,38,49,.1)"; });
   document.documentElement.append(button);
+  floatingButtonElement = button;
   return button;
+}
+
+function removeFloatingButton(button = floatingButtonElement) {
+  button?.remove();
+  if (floatingButtonElement === button) floatingButtonElement = null;
+  if (selectionButton === button) selectionButton = null;
+  if (imageButton === button) imageButton = null;
 }
 
 function removeSelectionButton() {
   clearTimeout(selectionTimer);
   selectionTimer = null;
-  selectionButton?.remove();
-  selectionButton = null;
+  removeFloatingButton(selectionButton);
 }
 
 function scheduleSelectionButton() {
   clearTimeout(selectionTimer);
   if (getSelection()?.toString().trim()) {
-    imageButton?.remove();
-    imageButton = null;
+    removeFloatingButton(imageButton);
   }
   if (selectingWithPointer) return;
   selectionTimer = setTimeout(() => {
     const selection = getSelection();
     const text = selection?.toString().trim();
     if (!text || selection.rangeCount === 0) return removeSelectionButton();
-    const rects = [...selection.getRangeAt(0).getClientRects()].filter((item) => item.width || item.height);
-    const rect = rects.at(-1) || selection.getRangeAt(0).getBoundingClientRect();
+    const rect = selection.getRangeAt(0).getBoundingClientRect();
     if (!rect.width && !rect.height) return removeSelectionButton();
     removeSelectionButton();
-    imageButton?.remove();
-    imageButton = null;
+    removeFloatingButton(imageButton);
     selectionButton = floatingButton("加入 Later Space");
+    selectionButton.dataset.laterSpaceKind = "selection";
     selectionButton.style.left = `${Math.min(innerWidth - 38, Math.max(8, rect.right + 7))}px`;
     selectionButton.style.top = `${Math.min(innerHeight - 38, Math.max(8, rect.bottom + 5))}px`;
     selectionButton.addEventListener("mousedown", (event) => event.preventDefault());
@@ -132,8 +142,7 @@ document.addEventListener("pointerdown", (event) => {
   if (event.button !== 0 || event.target.closest?.("#later-space-feedback, [data-later-space-floating]")) return;
   selectingWithPointer = true;
   removeSelectionButton();
-  imageButton?.remove();
-  imageButton = null;
+  removeFloatingButton(imageButton);
 }, { capture: true, signal: listenerController.signal });
 document.addEventListener("pointerup", (event) => {
   if (event.button !== 0) return;
@@ -149,20 +158,20 @@ document.addEventListener("selectionchange", scheduleSelectionButton, listenerOp
 document.addEventListener("pointermove", (event) => {
   if (!location.hostname.includes("xiaohongshu.com")) return;
   if (getSelection()?.toString().trim() || selectionButton) {
-    imageButton?.remove();
-    imageButton = null;
+    removeFloatingButton(imageButton);
     return;
   }
   const image = findImage(event.target, event.clientX, event.clientY);
   const rect = image?.element.getBoundingClientRect();
   if (!image || !rect || rect.width < 120 || rect.height < 120) {
-    if (imageButton && !imageButton.matches(":hover")) { imageButton.remove(); imageButton = null; }
+    if (imageButton && !imageButton.matches(":hover")) removeFloatingButton(imageButton);
     return;
   }
   const key = `${image.url}|${Math.round(rect.x)}|${Math.round(rect.y)}`;
   if (imageButton?.dataset.imageKey === key) return;
-  imageButton?.remove();
+  removeFloatingButton(imageButton);
   imageButton = floatingButton("收藏这张图片到 Later Space");
+  imageButton.dataset.laterSpaceKind = "image";
   imageButton.dataset.imageKey = key;
   imageButton.style.left = `${Math.min(innerWidth - 38, Math.max(8, rect.right - 38))}px`;
   imageButton.style.top = `${Math.min(innerHeight - 38, Math.max(8, rect.top + 8))}px`;
@@ -170,8 +179,7 @@ document.addEventListener("pointermove", (event) => {
   imageButton.addEventListener("click", async () => {
     imageButton.disabled = true;
     await sendRuntimeMessage({ type: "capture-image", image: payload });
-    imageButton?.remove();
-    imageButton = null;
+    removeFloatingButton(imageButton);
   });
 }, { passive: true, capture: true, signal: listenerController.signal });
 
