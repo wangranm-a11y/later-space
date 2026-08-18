@@ -1,6 +1,8 @@
 let contextImage = { url: "" };
 let selectionButton = null;
 let imageButton = null;
+let selectionTimer = null;
+let selectingWithPointer = false;
 
 function backgroundImageUrl(element) {
   const value = getComputedStyle(element).backgroundImage;
@@ -60,8 +62,9 @@ document.addEventListener("contextmenu", rememberContextImage, true);
 function floatingButton(label) {
   const button = document.createElement("button");
   button.type = "button";
+  button.dataset.laterSpaceFloating = "true";
   button.setAttribute("aria-label", label);
-  button.innerHTML = `<span style="width:14px;height:14px;display:grid;place-items:center;border-radius:4px;background:#202124;color:white;font:700 9px/1 -apple-system,BlinkMacSystemFont,sans-serif">L</span>`;
+  button.innerHTML = `<svg viewBox="0 0 24 24" width="19" height="19" aria-hidden="true"><rect x="3" y="3" width="11" height="11" rx="2.5" fill="#1d1d1f"/><rect x="10" y="10" width="11" height="11" rx="2.5" fill="#a7add8"/></svg>`;
   button.style.cssText = "position:fixed;z-index:2147483646;width:30px;height:30px;display:grid;place-items:center;padding:0;border:1px solid rgba(25,25,27,.13);border-radius:8px;background:#fff;box-shadow:0 6px 20px rgba(20,20,22,.16);cursor:pointer;transition:transform .14s ease,box-shadow .14s ease";
   button.addEventListener("mouseenter", () => { button.style.transform = "translateY(-1px)"; button.style.boxShadow = "0 8px 24px rgba(20,20,22,.2)"; });
   button.addEventListener("mouseleave", () => { button.style.transform = ""; button.style.boxShadow = "0 6px 20px rgba(20,20,22,.16)"; });
@@ -70,12 +73,16 @@ function floatingButton(label) {
 }
 
 function removeSelectionButton() {
+  clearTimeout(selectionTimer);
+  selectionTimer = null;
   selectionButton?.remove();
   selectionButton = null;
 }
 
-document.addEventListener("selectionchange", () => {
-  requestAnimationFrame(() => {
+function scheduleSelectionButton() {
+  clearTimeout(selectionTimer);
+  if (selectingWithPointer) return;
+  selectionTimer = setTimeout(() => {
     const selection = getSelection();
     const text = selection?.toString().trim();
     if (!text || selection.rangeCount === 0) return removeSelectionButton();
@@ -92,8 +99,24 @@ document.addEventListener("selectionchange", () => {
       removeSelectionButton();
       selection.removeAllRanges();
     });
-  });
-});
+  }, 380);
+}
+
+document.addEventListener("pointerdown", (event) => {
+  if (event.button !== 0 || event.target.closest?.("#later-space-feedback, [data-later-space-floating]")) return;
+  selectingWithPointer = true;
+  removeSelectionButton();
+}, true);
+document.addEventListener("pointerup", (event) => {
+  if (event.button !== 0) return;
+  selectingWithPointer = false;
+  scheduleSelectionButton();
+}, true);
+document.addEventListener("pointercancel", () => {
+  selectingWithPointer = false;
+  scheduleSelectionButton();
+}, true);
+document.addEventListener("selectionchange", scheduleSelectionButton);
 
 document.addEventListener("pointermove", (event) => {
   if (!location.hostname.includes("xiaohongshu.com")) return;
