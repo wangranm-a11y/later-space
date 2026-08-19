@@ -294,6 +294,32 @@
         .close-slide .tiny { position: absolute; right: 210px; bottom: 120px; font: 400 16px var(--mono); color: #8f8a81; }
 
         /* ===========================================
+           UPDATED DECK LAYOUTS — release notes + plugin tutorial
+           =========================================== */
+        .updates .heading { position: absolute; left: 110px; top: 150px; width: 760px; }
+        .updates h2 { margin-top: 26px; }
+        .updates .update-grid { position: absolute; left: 110px; right: 120px; top: 500px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; }
+        .updates .update-card { min-height: 260px; padding: 28px; border-radius: 12px; background: rgba(255,253,248,.7); border: 1px solid rgba(23,23,23,.12); }
+        .updates .update-card:nth-child(2) { background: var(--lavender); }
+        .updates .update-card:nth-child(3) { background: var(--coral); }
+        .updates .update-card .label { font: 500 16px var(--mono); opacity: .55; }
+        .updates .update-card h3 { margin-top: 34px; font: 600 29px/1.14 var(--body); }
+        .updates .update-card p { margin-top: 15px; font: 400 19px/1.45 var(--body); color: rgba(23,23,23,.64); }
+        .guide .guide-heading { position: absolute; left: 110px; top: 150px; width: 650px; }
+        .guide h2 { margin-top: 25px; }
+        .guide .guide-copy { position: absolute; left: 110px; top: 430px; width: 500px; color: #6c675f; }
+        .guide .guide-steps { position: absolute; left: 760px; top: 220px; display: grid; grid-template-columns: 310px 310px; gap: 18px; }
+        .guide .guide-step { min-height: 210px; padding: 26px; border-radius: 12px; background: var(--white); box-shadow: 0 12px 30px rgba(23,23,23,.11); }
+        .guide .guide-step:nth-child(2) { background: var(--mint); }
+        .guide .guide-step:nth-child(3) { background: var(--lavender); }
+        .guide .guide-step:nth-child(4) { background: var(--coral); }
+        .guide .guide-step .num { font: 500 17px var(--mono); opacity: .56; }
+        .guide .guide-step h3 { margin-top: 38px; font: 600 27px var(--body); }
+        .guide .guide-step p { margin-top: 12px; font: 400 18px/1.4 var(--body); color: rgba(23,23,23,.63); }
+        .guide .browser-frame { position: absolute; right: 120px; bottom: 120px; width: 570px; height: 175px; border-radius: 13px; background: #202020; box-shadow: 0 18px 40px rgba(23,23,23,.2); overflow: hidden; }
+        .guide .browser-frame .page { padding: 32px 38px; font-size: 21px; }
+
+        /* ===========================================
            OUTSIDE-STAGE CONTROLS + INLINE EDITING
            =========================================== */
         .progress { position: fixed; left: 24px; bottom: 24px; z-index: 1000; color: rgba(255,255,255,.5); font: 13px var(--mono); }
@@ -311,11 +337,11 @@
                  =========================================== -->
             <section class="slide dark title-slide active visible">
                 <div class="grain"></div><div class="orb a"></div><div class="orb b"></div>
-                <div class="eyebrow reveal" data-editable>Later Space / public share</div><div class="page-no reveal">01 / 10</div>
+                <div class="eyebrow reveal" data-editable>Later Space / public share</div><div class="page-no reveal">01 / 12</div>
                 <div class="title-wrap">
-                    <div class="kicker reveal" data-editable>一个先接住，再回来使用的地方</div>
-                    <h1 class="reveal delay-1" data-editable>Later<br>Space</h1>
-                    <p class="subtitle reveal delay-2" data-editable>把看到的内容，先接住。<br>让灵感和真正使用之间，少一点距离。</p>
+                    <div class="kicker reveal" data-editable>一场关于入口、摩擦与迭代的分享</div>
+                    <h1 class="reveal delay-1" data-editable>Later<br>Space<br><span style="font-size:.52em;color:var(--mint)">+ Collector</span></h1>
+                    <p class="subtitle reveal delay-2" data-editable>最近我们怎样改了 Later Space，<br>又怎样把“收藏”做成浏览器里的一次顺手动作。</p>
                     <div class="url reveal delay-3" data-editable>wangranm-a11y.github.io/later-space/</div>
                 </div>
                 <div class="canvas-sketch reveal delay-2"><div class="sheet"></div><div class="mini-card one"><div class="label">TEXT / LATER</div><div class="line"></div><div class="line"></div><div class="line short"></div></div><div class="mini-card two"><div class="label">LINK / SOURCE</div><div class="line"></div><div class="line short"></div></div><div class="mini-card three"><div class="label">VISUAL / 03</div><div class="line"></div><div class="line short"></div></div></div>
@@ -325,17 +351,25 @@
                  SLIDE 02 — PROBLEM
                  =========================================== -->
             <section class="slide paper problem">
-                <div class="grid-paper"></div><div class="grain"></div><div class="eyebrow reveal" data-editable>01 / why it exists</div><div class="page-no reveal">02 / 10</div>
-                <div class="quote"><span class="quote-mark">“</span><h2 class="reveal" data-editable>收藏不是终点。</h2><p class="body support reveal delay-1" data-editable>真正的距离，是从“我看到了”到“我真的用上了”。<br>传统收藏工具很擅长把东西存起来，却不一定让它们回来。</p></div>
-                <div class="before reveal delay-2" data-editable>看到</div><div class="arrow-path reveal delay-2"></div><div class="after reveal delay-3" data-editable>使用</div>
+                <div class="grid-paper"></div><div class="grain"></div><div class="eyebrow reveal" data-editable>01 / the shift</div><div class="page-no reveal">02 / 12</div>
+                <div class="quote"><span class="quote-mark">“</span><h2 class="reveal" data-editable>这次不是重做 Later Space。</h2><p class="body support reveal delay-1" data-editable>我们只是在缩短入口：让用户还在浏览时，就能把网页、文字、图片和视频接住。</p></div>
+                <div class="before reveal delay-2" data-editable>正在浏览</div><div class="arrow-path reveal delay-2"></div><div class="after reveal delay-3" data-editable>Later Space</div>
             </section>
 
             <!-- ===========================================
                  SLIDE 03 — PRODUCT
                  =========================================== -->
+            <section class="slide mint updates">
+                <div class="grain"></div><div class="eyebrow reveal" data-editable>02 / recent updates</div><div class="page-no reveal">03 / 12</div><div class="heading"><div class="mono reveal">Later Space 本体，改得克制一点</div><h2 class="reveal delay-1" data-editable>先降低噪音，<br>再增加能力。</h2></div>
+                <div class="update-grid"><article class="update-card reveal delay-1"><div class="label">01 / DEFAULT</div><h3 data-editable>链接与文字<br>成为默认入口</h3><p data-editable>最常用的资讯先出现，图片不再抢走注意力。</p></article><article class="update-card reveal delay-2"><div class="label">02 / TEXT</div><h3 data-editable>长文字统一<br>变成信息卡片</h3><p data-editable>自动截取临时标题；点击查看全文，先不依赖 AI。</p></article><article class="update-card reveal delay-3"><div class="label">03 / FILTER</div><h3 data-editable>素材与全部<br>各自有位置</h3><p data-editable>图片、视频放进 Visual Space，也能回到全部视图。</p></article></div>
+            </section>
+
+            <!-- ===========================================
+                 SLIDE 04 — PRODUCT UPDATE
+                 =========================================== -->
             <section class="slide mint product">
-                <div class="grain"></div><div class="eyebrow reveal" data-editable>02 / the product</div><div class="page-no reveal">03 / 10</div><div class="tab lav">CANVAS</div>
-                <div class="intro"><div class="mono reveal">不是知识库。不是任务清单。</div><h2 class="reveal delay-1" data-editable>是一个<br>稍后再回来的空间。</h2><p class="body reveal delay-2" data-editable>链接、文字、图片和视频先被接住，再在画布上慢慢整理、浏览、拖动和重新使用。</p></div>
+                <div class="grain"></div><div class="eyebrow reveal" data-editable>03 / why these updates</div><div class="page-no reveal">04 / 12</div><div class="tab lav">CANVAS</div>
+                <div class="intro"><div class="mono reveal">不是把内容分散到更多产品。</div><h2 class="reveal delay-1" data-editable>只是让每一类<br>更容易被找到。</h2><p class="body reveal delay-2" data-editable>链接与文字负责稍后阅读，图片与视频负责视觉素材；全部视图保留完整上下文。分类是为了减少噪音，不是增加流程。</p></div>
                 <div class="canvas reveal delay-2"><div class="grid-paper"></div><div class="canvas-label">LATER SPACE / UNORGANIZED</div><div class="mini-card one"><div class="label">LINK</div><div class="line"></div><div class="line short"></div></div><div class="mini-card two"><div class="label">VISUAL</div><div class="line"></div><div class="line short"></div></div><div class="mini-card three"><div class="label">TEXT CARD</div><div class="line"></div><div class="line"></div></div></div>
                 <div class="caption reveal delay-3" data-editable>先放下，不等于放弃。</div>
             </section>
@@ -344,76 +378,86 @@
                  SLIDE 04 — PLUGIN FEATURES
                  =========================================== -->
             <section class="slide paper plugin">
-                <div class="eyebrow reveal" data-editable>03 / the browser plugin</div><div class="page-no reveal">04 / 10</div><div class="tab coral">COLLECT</div>
+                <div class="eyebrow reveal" data-editable>04 / the browser plugin</div><div class="page-no reveal">05 / 12</div><div class="tab coral">COLLECT</div>
                 <div class="heading"><div class="mono reveal">Later Space Collector</div><h2 class="reveal delay-1" data-editable>把“收藏”<br>放回正在浏览的页面。</h2></div>
                 <div class="browser-frame reveal delay-2"><div class="bar"><i class="dot"></i><i class="dot"></i><i class="dot"></i><span class="urlbar"></span></div><div class="page">看到一段 <span class="selection">值得稍后再读的文字</span></div><div class="float-icon"></div></div>
                 <div class="feature-grid">
-                    <article class="feature reveal delay-1"><div class="num">01</div><h3 data-editable>收藏当前网页</h3><p data-editable>点击插件，一次接住整页链接和标题。</p></article>
-                    <article class="feature reveal delay-2"><div class="num">02</div><h3 data-editable>选中文字</h3><p data-editable>完成选区后才出现轻量按钮，不打断阅读。</p></article>
-                    <article class="feature reveal delay-3"><div class="num">03</div><h3 data-editable>图片 / 视频</h3><p data-editable>悬停大图，视频默认保存封面；右键也能加入。</p></article>
-                    <article class="feature reveal delay-4"><div class="num">04</div><h3 data-editable>加入后可确认</h3><p data-editable>提示、查看定位、最近收藏和短时撤销。</p></article>
+                    <article class="feature reveal delay-1"><div class="num">01</div><h3 data-editable>整页入口</h3><p data-editable>点击工具栏图标，保存当前网页的链接和标题。</p></article>
+                    <article class="feature reveal delay-2"><div class="num">02</div><h3 data-editable>选区入口</h3><p data-editable>完成选字后才出现一个轻量按钮，不挡住阅读。</p></article>
+                    <article class="feature reveal delay-3"><div class="num">03</div><h3 data-editable>图片 / 视频</h3><p data-editable>悬停图片或视频封面，右键菜单也统一叫“加入 Later Space”。</p></article>
+                    <article class="feature reveal delay-4"><div class="num">04</div><h3 data-editable>反馈入口</h3><p data-editable>加入后有提示、查看定位、最近收藏和撤销。</p></article>
                 </div>
+            </section>
+
+            <!-- ===========================================
+                 SLIDE 06 — HOW TO USE
+                 =========================================== -->
+            <section class="slide paper guide">
+                <div class="grid-paper"></div><div class="eyebrow reveal" data-editable>05 / how to use</div><div class="page-no reveal">06 / 12</div><div class="guide-heading"><div class="mono reveal">四步，把浏览中的内容接住</div><h2 class="reveal delay-1" data-editable>不离开当前页面，<br>也不打断当前思路。</h2></div>
+                <p class="body guide-copy reveal delay-2" data-editable>插件安装后，它会复用你已经上线的 Later Space 地址。不同浏览器里的收藏，最终都回到同一个入口。</p>
+                <div class="guide-steps"><article class="guide-step reveal delay-1"><div class="num">01</div><h3 data-editable>安装</h3><p data-editable>在扩展管理页加载 Later Space Collector。</p></article><article class="guide-step reveal delay-2"><div class="num">02</div><h3 data-editable>选择</h3><p data-editable>整页、文字、图片或视频，按当下需要选择。</p></article><article class="guide-step reveal delay-3"><div class="num">03</div><h3 data-editable>加入</h3><p data-editable>点击图标，或者右键使用统一入口。</p></article><article class="guide-step reveal delay-4"><div class="num">04</div><h3 data-editable>回来</h3><p data-editable>点“查看”，直接定位刚刚加入的卡片。</p></article></div>
+                <div class="browser-frame reveal delay-3"><div class="bar"><i class="dot"></i><i class="dot"></i><i class="dot"></i><span class="urlbar"></span></div><div class="page">Later Space <span class="selection">已加入 Later Space</span></div></div>
             </section>
 
             <!-- ===========================================
                  SLIDE 05 — FLOW
                  =========================================== -->
             <section class="slide dark flow">
-                <div class="grain"></div><div class="eyebrow reveal" data-editable>04 / under the hood</div><div class="page-no reveal">05 / 10</div>
-                <h2 class="reveal" data-editable>一次点击，<br>发生了什么？</h2><p class="body lead reveal delay-1" data-editable>插件的工作不是把用户带去另一个复杂表单，而是把当前内容送到已经上线的 Later Space。</p>
-                <div class="steps"><article class="step reveal delay-1"><div class="label">01 / INPUT</div><h3 data-editable>看到内容</h3><p data-editable>网页、选区或图片。</p></article><span class="chev reveal delay-2">→</span><article class="step reveal delay-2"><div class="label">02 / BRIDGE</div><h3 data-editable>插件接住</h3><p data-editable>识别内容类型并发送。</p></article><span class="chev reveal delay-3">→</span><article class="step reveal delay-3"><div class="label">03 / LOCAL</div><h3 data-editable>页面写入</h3><p data-editable>默认保存到本地 IndexedDB。</p></article><span class="chev reveal delay-4">→</span><article class="step reveal delay-4"><div class="label">04 / RETURN</div><h3 data-editable>回来使用</h3><p data-editable>定位、阅读、整理或撤销。</p></article></div>
-                <div class="footnote reveal delay-4" data-editable>每个人的内容，留在自己的浏览器里。</div>
+                <div class="grain"></div><div class="eyebrow reveal" data-editable>06 / selected text</div><div class="page-no reveal">07 / 12</div>
+                <h2 class="reveal" data-editable>选中的一段文字，<br>怎样变成一张卡？</h2><p class="body lead reveal delay-1" data-editable>图标只在选区完成后出现一次，位置保持在选区最后一行附近；加入成功后，右上角给出轻量反馈。</p>
+                <div class="steps"><article class="step reveal delay-1"><div class="label">01 / SELECT</div><h3 data-editable>完成选区</h3><p data-editable>拖选文字，按钮延迟出现。</p></article><span class="chev reveal delay-2">→</span><article class="step reveal delay-2"><div class="label">02 / CAPTURE</div><h3 data-editable>点击图标</h3><p data-editable>只收藏这一段内容。</p></article><span class="chev reveal delay-3">→</span><article class="step reveal delay-3"><div class="label">03 / CARD</div><h3 data-editable>生成卡片</h3><p data-editable>长文本先截取临时标题。</p></article><span class="chev reveal delay-4">→</span><article class="step reveal delay-4"><div class="label">04 / CONFIRM</div><h3 data-editable>确认与撤销</h3><p data-editable>提示、查看，必要时撤回。</p></article></div>
+                <div class="footnote reveal delay-4" data-editable>让“选中”成为收藏的上下文，而不是另一张表单。</div>
             </section>
 
             <!-- ===========================================
                  SLIDE 06 — EVOLUTION
                  =========================================== -->
             <section class="slide paper evolution">
-                <div class="grid-paper"></div><div class="eyebrow reveal" data-editable>05 / how it changed</div><div class="page-no reveal">06 / 10</div>
-                <div class="heading"><div class="mono reveal">不是一次设计完成的产品</div><h2 class="reveal delay-1" data-editable>它是在使用中<br>一点点长出来的。</h2></div>
-                <div class="timeline"><article class="milestone reveal delay-1"><div class="dot"></div><div class="year">01 / FIRST</div><h3 data-editable>先把网页接住</h3><p data-editable>最小版本：收藏整页和链接。</p></article><article class="milestone reveal delay-2"><div class="dot"></div><div class="year">02 / SORT</div><h3 data-editable>把噪音分开</h3><p data-editable>文字链接、素材和全部内容分层。</p></article><article class="milestone reveal delay-3"><div class="dot"></div><div class="year">03 / TOUCH</div><h3 data-editable>减少操作摩擦</h3><p data-editable>选区按钮、图片入口、提示和撤销。</p></article><article class="milestone reveal delay-4"><div class="dot"></div><div class="year">04 / NOW</div><h3 data-editable>更像一个入口</h3><p data-editable>多平台图片适配，连接更可靠。</p></article></div>
+                <div class="grid-paper"></div><div class="eyebrow reveal" data-editable>07 / images & video</div><div class="page-no reveal">08 / 12</div>
+                <div class="heading"><div class="mono reveal">图片入口，不能只为一个网站服务</div><h2 class="reveal delay-1" data-editable>从小红书，<br>走向更多网页。</h2></div>
+                <div class="timeline"><article class="milestone reveal delay-1"><div class="dot"></div><div class="year">01 / XHS</div><h3 data-editable>先适配小红书</h3><p data-editable>图片和视频封面都能被接住。</p></article><article class="milestone reveal delay-2"><div class="dot"></div><div class="year">02 / RIGHT CLICK</div><h3 data-editable>统一右键入口</h3><p data-editable>不用记四种文案，只说“加入 Later Space”。</p></article><article class="milestone reveal delay-3"><div class="dot"></div><div class="year">03 / MORE WEB</div><h3 data-editable>扩展到 X 与搜索</h3><p data-editable>图片收藏从单点适配变成通用能力。</p></article><article class="milestone reveal delay-4"><div class="dot"></div><div class="year">04 / NOW</div><h3 data-editable>视频保存封面</h3><p data-editable>保留来源线索，避免把收藏做得太重。</p></article></div>
             </section>
 
             <!-- ===========================================
                  SLIDE 07 — PRINCIPLES
                  =========================================== -->
             <section class="slide coral principles">
-                <div class="grain"></div><div class="eyebrow reveal" data-editable>06 / design principles</div><div class="page-no reveal">07 / 10</div>
-                <div class="heading"><div class="mono reveal">每一次改动，都在回答同一个问题：</div><h2 class="reveal delay-1" data-editable>怎样更轻<br>一点？</h2></div>
-                <div class="principle-list"><article class="principle reveal delay-1"><div class="index">01</div><div><h3 data-editable>先接住，再整理</h3><p data-editable>收藏时不要让用户先填写一张表。</p></div></article><article class="principle reveal delay-2"><div class="index">02</div><div><h3 data-editable>提示要让人安心</h3><p data-editable>加入后能看到、能定位，也能撤销。</p></div></article><article class="principle reveal delay-3"><div class="index">03</div><div><h3 data-editable>视觉不要抢内容</h3><p data-editable>按钮若隐若现，出现有条件，离开有秩序。</p></div></article><article class="principle reveal delay-4"><div class="index">04</div><div><h3 data-editable>把复杂度留给系统</h3><p data-editable>用户只需要说：加入 Later Space。</p></div></article></div>
-                <div class="stamp reveal delay-2">LOW<br>FRICTION<br>BY DEFAULT</div>
+                <div class="grain"></div><div class="eyebrow reveal" data-editable>08 / after you click</div><div class="page-no reveal">09 / 12</div>
+                <div class="heading"><div class="mono reveal">加入成功之后，不应该再猜</div><h2 class="reveal delay-1" data-editable>看见结果，<br>才算完成。</h2></div>
+                <div class="principle-list"><article class="principle reveal delay-1"><div class="index">01</div><div><h3 data-editable>右上角轻提示</h3><p data-editable>文案统一为“已加入 Later Space”。</p></div></article><article class="principle reveal delay-2"><div class="index">02</div><div><h3 data-editable>最近收藏可见</h3><p data-editable>再次点开插件，先看到刚刚那条内容。</p></div></article><article class="principle reveal delay-3"><div class="index">03</div><div><h3 data-editable>查看直接定位</h3><p data-editable>打开线上画布，并高亮刚刚加入的卡片。</p></div></article><article class="principle reveal delay-4"><div class="index">04</div><div><h3 data-editable>误触可以撤销</h3><p data-editable>给用户一个短暂、明确的回退入口。</p></div></article></div>
+                <div class="stamp reveal delay-2">SEE<br>IT<br>RETURN</div>
             </section>
 
             <!-- ===========================================
                  SLIDE 08 — PRODUCT THINKING
                  =========================================== -->
             <section class="slide paper thinking">
-                <div class="grid-paper"></div><div class="eyebrow reveal" data-editable>07 / a product decision</div><div class="page-no reveal">08 / 10</div>
-                <div class="left"><div class="mono reveal">关于 AI，我选择先不急着加。</div><h2 class="reveal delay-1" data-editable>先解决卡片，<br>再谈智能。</h2><p class="body reveal delay-2" data-editable>长文字先自动截取临时标题，做成统一卡片。第一期不依赖 API key，不制造等待，也不把收藏变成一个 AI 表单。</p></div>
-                <div class="note reveal delay-2"><div data-editable>PRODUCT NOTE / 01</div><blockquote data-editable>好的自动化，应该先让人感觉不到它。</blockquote><cite data-editable>— Later Space 的第一期长文字策略</cite></div>
-                <div class="bottom-line reveal delay-3" data-editable>当基础体验足够轻，AI 才值得在下一层出现。</div>
+                <div class="grid-paper"></div><div class="eyebrow reveal" data-editable>09 / how it evolved</div><div class="page-no reveal">10 / 12</div>
+                <div class="left"><div class="mono reveal">每一版，都来自一个具体的不顺手。</div><h2 class="reveal delay-1" data-editable>从“能收藏”，<br>走到“敢收藏”。</h2><p class="body reveal delay-2" data-editable>先解决保存，再解决确认；先减少入口摩擦，再补上图片、选区、定位和撤销。功能不是一次加满，而是一层层把不安拿掉。</p></div>
+                <div class="note reveal delay-2"><div data-editable>PRODUCT NOTE / 02</div><blockquote data-editable>好的插件，不应该让用户离开正在做的事。</blockquote><cite data-editable>— Later Space Collector 的迭代方向</cite></div>
+                <div class="bottom-line reveal delay-3" data-editable>把复杂度留给系统，把确定感还给用户。</div>
             </section>
 
             <!-- ===========================================
                  SLIDE 09 — BUILD IN PUBLIC
                  =========================================== -->
             <section class="slide mint public">
-                <div class="grain"></div><div class="eyebrow reveal" data-editable>08 / building in public</div><div class="page-no reveal">09 / 10</div>
-                <div class="heading"><div class="mono reveal">它不是闭门造出来的</div><h2 class="reveal delay-1" data-editable>每一次“不顺手”，<br>都是下一版的入口。</h2></div>
-                <div class="conversation"><article class="bubble reveal delay-1"><div class="who">使用反馈 / 01</div><p data-editable>“我收藏成功了，但不知道它去了哪里。”</p></article><article class="bubble reveal delay-2"><div class="who">产品回应 / 02</div><p data-editable>加入成功后，直接定位并高亮刚刚的卡片。</p></article><article class="bubble reveal delay-3"><div class="who">继续追问 / 03</div><p data-editable>“那图片和文字，能不能更自然地收藏？”</p></article></div>
-                <div class="side-note reveal delay-4"><strong data-editable>产品不是一次性答案。</strong><p class="body" data-editable>它更像一场持续的对话：用户说出摩擦，设计把摩擦变成更短的路径。</p></div>
+                <div class="grain"></div><div class="eyebrow reveal" data-editable>10 / build in public</div><div class="page-no reveal">11 / 12</div>
+                <div class="heading"><div class="mono reveal">用户反馈，直接改变下一版</div><h2 class="reveal delay-1" data-editable>每一个“不顺手”，<br>都是设计线索。</h2></div>
+                <div class="conversation"><article class="bubble reveal delay-1"><div class="who">反馈 / 01</div><p data-editable>“收藏成功了，但我不知道它去了哪里。”</p></article><article class="bubble reveal delay-2"><div class="who">回应 / 02</div><p data-editable>加入后显示最近内容，查看直接定位。</p></article><article class="bubble reveal delay-3"><div class="who">反馈 / 03</div><p data-editable>“选中文字时，图标怎么总是挡住内容？”</p></article></div>
+                <div class="side-note reveal delay-4"><strong data-editable>于是我们延迟出现、只出现一个。</strong><p class="body" data-editable>这就是插件现在的样子：不是更吵，而是更懂什么时候应该安静。</p></div>
             </section>
 
             <!-- ===========================================
                  SLIDE 10 — CLOSE
                  =========================================== -->
             <section class="slide dark close-slide">
-                <div class="grain"></div><div class="orb a"></div><div class="eyebrow reveal" data-editable>09 / take it with you</div><div class="page-no reveal">10 / 10</div>
-                <div class="close-wrap"><h2 class="reveal" data-editable>看到。<br>接住。<br>回来使用。</h2><p class="closing reveal delay-1" data-editable>Later Space 想做的，只是在信息洪流里，给每个人留一块可以稍后回来的地方。</p><div class="url reveal delay-2" data-editable>wangranm-a11y.github.io/later-space/</div></div><div class="mark reveal delay-2"></div><div class="tiny reveal delay-3" data-editable>Later Space / 2026</div>
+                <div class="grain"></div><div class="orb a"></div><div class="eyebrow reveal" data-editable>11 / take it with you</div><div class="page-no reveal">12 / 12</div>
+                <div class="close-wrap"><h2 class="reveal" data-editable>看到。<br>接住。<br>回来使用。</h2><p class="closing reveal delay-1" data-editable>打开浏览器里的 Later Space Collector，把下一段值得回来的内容先接住。</p><div class="url reveal delay-2" data-editable>wangranm-a11y.github.io/later-space/</div></div><div class="mark reveal delay-2"></div><div class="tiny reveal delay-3" data-editable>Later Space / 2026</div>
             </section>
         </main>
     </div>
-    <div class="progress" id="progress">01 / 10</div>
+    <div class="progress" id="progress">01 / 12</div>
     <div class="edit-hotzone" id="editHotzone"></div><button class="edit-toggle" id="editToggle" title="Edit mode (E)">✎ 编辑</button>
     <script>
         /* ===========================================
@@ -433,7 +477,7 @@
             }
             setupStageScale() {
                 const scale = () => {
-                    const factor = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+                    const factor = Math.max(window.innerWidth / 1920, window.innerHeight / 1080);
                     const x = (window.innerWidth - 1920 * factor) / 2;
                     const y = (window.innerHeight - 1080 * factor) / 2;
                     this.stage.style.transform = `translate(${x}px, ${y}px) scale(${factor})`;
