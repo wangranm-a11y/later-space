@@ -4,9 +4,10 @@ try { globalThis.__laterSpacePageBridgeCleanup?.(); } catch {}
 const pageOrigin = "https://wangranm-a11y.github.io";
 
 function receiveCapture(message, _sender, sendResponse) {
-  if (message.type !== "later-space-capture") return undefined;
+  if (!["later-space-capture", "later-space-auth"].includes(message.type)) return undefined;
   const requestId = crypto.randomUUID();
   let retryTimer;
+  const type = message.type === "later-space-auth" ? "auth" : "capture";
   const postCapture = () => window.postMessage({ source: "later-space-extension", type, requestId, capture: message.capture }, pageOrigin);
   const timeout = setTimeout(() => {
     clearInterval(retryTimer);
@@ -22,9 +23,16 @@ function receiveCapture(message, _sender, sendResponse) {
     sendResponse(event.data.result);
   }
   window.addEventListener("message", receiveResult);
-  const type = ["status", "undo", "view"].includes(message.capture?.type) ? message.capture.type : "capture";
-  postCapture();
-  retryTimer = setInterval(postCapture, 250);
+  if (message.type === "later-space-auth") {
+    postCapture();
+    retryTimer = setInterval(postCapture, 250);
+    return true;
+  }
+  const bridgeType = ["status", "undo", "view"].includes(message.capture?.type) ? message.capture.type : "capture";
+  // Keep the legacy command envelope for capture/status/undo/view.
+  function postLegacy() { window.postMessage({ source: "later-space-extension", type: bridgeType, requestId, capture: message.capture }, pageOrigin); }
+  postLegacy();
+  retryTimer = setInterval(postLegacy, 250);
   return true;
 }
 

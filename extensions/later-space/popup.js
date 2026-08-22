@@ -9,6 +9,7 @@ const recent = document.querySelector("#recent");
 const recentView = document.querySelector("#recentView");
 const recentKind = document.querySelector("#recentKind");
 const recentTitle = document.querySelector("#recentTitle");
+const connect = document.querySelector("#connect");
 let undoToken = "";
 let recordIds = [];
 let currentTabId = null;
@@ -36,6 +37,20 @@ chrome.tabs.query({ active: true, currentWindow: true }).then(([tab]) => {
 
 chrome.runtime.sendMessage({ type: "destination-status" }).then((result) => {
   if (result?.label) destination.textContent = result.label;
+  connect.hidden = Boolean(result?.synced);
+});
+
+connect.addEventListener("click", async () => {
+  connect.disabled = true;
+  connect.textContent = "正在连接…";
+  const result = await chrome.runtime.sendMessage({ type: "connect-auth" }).catch(() => null);
+  if (result?.state === "connected") {
+    destination.textContent = `${result.email || "Later Space"} · 云端同步已开启`;
+    connect.hidden = true;
+  } else {
+    connect.textContent = "请在打开的页面登录一次";
+    setTimeout(() => { connect.textContent = "连接 Later Space"; connect.disabled = false; }, 2400);
+  }
 });
 
 chrome.runtime.sendMessage({ type: "recent-capture" }).then(renderRecent).catch(() => {});

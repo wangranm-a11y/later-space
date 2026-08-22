@@ -2469,12 +2469,22 @@ async function undoExtensionCapture(recordIds) {
 function bindExtensionBridge() {
   window.addEventListener("message", async (event) => {
     if (event.source !== window || event.origin !== location.origin) return;
-    if (event.data?.source !== "later-space-extension" || !["capture", "status", "undo", "view"].includes(event.data?.type)) return;
+    if (event.data?.source !== "later-space-extension" || !["capture", "status", "undo", "view", "auth"].includes(event.data?.type)) return;
     const user = state.cloudSession?.user;
     const localOnly = user && localStorage.getItem(`later-space-cloud-merged-${user.id}`) === "no";
     const destination = user
       ? { label: `${user.email} · ${localOnly ? "仅保存在当前浏览器" : "云端同步已开启"}`, email: user.email, synced: !localOnly }
       : { label: "当前浏览器 · 本地保存", email: null, synced: false };
+    if (event.data.type === "auth") {
+      window.postMessage({
+        source: "later-space-page",
+        requestId: event.data.requestId,
+        result: state.cloudSession?.access_token
+          ? { state: "auth", session: state.cloudSession }
+          : { state: "unauthenticated" },
+      }, location.origin);
+      return;
+    }
     if (event.data.type === "status") {
       window.postMessage({ source: "later-space-page", requestId: event.data.requestId, result: { state: "ready", destination } }, location.origin);
       return;

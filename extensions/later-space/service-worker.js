@@ -1,8 +1,73 @@
 const APP_URL = "https://wangranm-a11y.github.io/later-space/";
+const SUPABASE_URL = "https://hesftvntzoawxryhadcw.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_LXghe2HYouHlFBgi_9NWPw_LZ3B7j_d";
+const CLOUD_SESSION_KEY = "laterSpaceCloudSession";
 const QUEUE_KEY = "laterSpaceCaptureQueue";
 const UNDO_KEY = "laterSpaceUndoCaptures";
 const LAST_CAPTURE_KEY = "laterSpaceLastCapture";
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
+
+async function getCloudSession() {
+  const stored = await chrome.storage.local.get({ [CLOUD_SESSION_KEY]: null });
+  const session = stored[CLOUD_SESSION_KEY];
+  if (!session?.access_token) return null;
+  if (Number(session.expires_at || 0) * 1000 > Date.now() + 60_000) return session;
+  if (!session.refresh_token) return null;
+  const response = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`, {
+    method: "POST",
+    headers: { apikey: SUPABASE_ANON_KEY, "Content-Type": "application/json" },
+    body: JSON.stringify({ refresh_token: session.refresh_token }),
+  });
+  if (!response.ok) return null;
+  const next = await response.json();
+  const refreshed = { ...session, ...next, expires_at: Math.floor(Date.now() / 1000) + Number(next.expires_in || 3600) };
+  await chrome.storage.local.set({ [CLOUD_SESSION_KEY]: refreshed });
+  return refreshed;
+}
+
+async function cloudRequest(path, options = {}) {
+  const session = await getCloudSession();
+  if (!session?.access_token || !session.user?.id) return null;
+  const response = await fetch(`${SUPABASE_URL}${path}`, {
+    ...options,
+    headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${session.access_token}`, ...(options.headers || {}) },
+  });
+  return { response, session };
+}
+
+function dataUrlToBlob(dataUrl) {
+  const [header, encoded] = String(dataUrl || "").split(",");
+  const mimeType = header.match(/data:([^;]+)/)?.[1] || "image/jpeg";
+  const binary = atob(encoded || "");
+  const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
+  return new Blob([bytes], { type: mimeType });
+}
+
+function cloudRecordData(capture, now) {
+  const base = { status: "inbox", tags: [], note: "", source: "chrome-extension", createdAt: now, updatedAt: now, canvasX: 0, canvasY: 0, zIndex: now };
+  if (capture.kind === "text") return { ...base, kind: "text", text: capture.text || "", name: (capture.text || "收藏的文字").slice(0, 32), textTheme: "paper", canvasWidth: 300, textHeight: 375, textScale: 1 };
+  if (capture.kind === "link") return { ...base, kind: "link", url: capture.url || capture.pageUrl || "", canonicalUrl: capture.url || capture.pageUrl || "", name: capture.title || capture.url || "收藏的链接", title: capture.title || capture.url || "收藏的链接", shareTitle: capture.title || "", customTitle: false, description: "", previewImage: "", previewState: "loading", coverIndex: 0, fontIndex: 0, coverMode: "editorial", canvasWidth: 300 };
+  return { ...base, kind: capture.kind || "image", name: capture.name || "收藏的图片", type: capture.mimeType || "image/jpeg", size: capture.imageData ? dataUrlToBlob(capture.imageData).size : 0, width: 960, height: 720, fingerprint: "", canvasWidth: 300 };
+}
+
+async function directCloudCapture(capture) {
+  const now = Number(capture.createdAt || Date.now());
+  const session = await getCloudSession();
+  const cloud = session?.user?.id ? { session } : null;
+  if (!cloud) return null;
+  const id = capture.id || captureId();
+  let assetPath = null;
+  if (capture.kind === "image" && capture.imageData) {
+    const blob = dataUrlToBlob(capture.imageData);
+    assetPath = `${cloud.session.user.id}/${id}/${now}.jpg`;
+    const asset = await cloudRequest(`/storage/v1/object/later-space-media/${assetPath}`, { method: "POST", headers: { "Content-Type": blob.type, "x-upsert": "true" }, body: blob });
+    if (!asset?.response.ok) throw new Error("cloud asset upload failed");
+  }
+  const row = { id, user_id: cloud.session.user.id, kind: capture.kind || "link", data: cloudRecordData(capture, now), asset_path: assetPath, source_device_id: `extension-${chrome.runtime.id}`, client_updated_at: now, deleted_at: null };
+  const result = await cloudRequest("/rest/v1/later_space_items?on_conflict=id", { method: "POST", headers: { "Content-Type": "application/json", Prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify([row]) });
+  if (!result?.response.ok) throw new Error(await result?.response.text());
+  return { state: "saved", recordIds: [id], windowId: capture.windowId, capture: captureSummary(capture), destination: { label: `${cloud.session.user.email || "Later Space"} · 云端同步已开启`, email: cloud.session.user.email, synced: true } };
+}
 
 function captureId() {
   return crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -67,6 +132,11 @@ async function saveCapture(capture) {
   const normalized = { id: capture.id || captureId(), createdAt: capture.createdAt || Date.now(), source: "chrome-extension", ...capture };
   await queueCapture(normalized);
   try {
+    const direct = await directCloudCapture(normalized);
+    if (direct) {
+      await removeQueued(normalized.id);
+      return direct;
+    }
     return await sendCapture(normalized);
   } catch {
     return { state: "queued", windowId: normalized.windowId, capture: captureSummary(normalized) };
@@ -121,6 +191,22 @@ async function undoCapture(token) {
   const undo = stored[UNDO_KEY][token];
   if (undo && Date.now() - undo.createdAt >= 60000) return { state: "expired" };
   if (!undo) return { state: "unavailable" };
+  const session = await getCloudSession();
+  if (session?.user?.id) {
+    const filter = encodeURIComponent(`(${undo.recordIds.join(",")})`);
+    const cloud = await cloudRequest(`/rest/v1/later_space_items?id=in.${filter}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Prefer: "return=minimal" },
+      body: JSON.stringify({ deleted_at: Date.now() }),
+    });
+    if (cloud?.response.ok) {
+      delete stored[UNDO_KEY][token];
+      await chrome.storage.session.set({ [UNDO_KEY]: stored[UNDO_KEY] });
+      const recent = await chrome.storage.local.get({ [LAST_CAPTURE_KEY]: null });
+      if (recent[LAST_CAPTURE_KEY]?.undoToken === token) await chrome.storage.local.remove(LAST_CAPTURE_KEY);
+      return { state: "undone" };
+    }
+  }
   let tab = await laterSpaceTab(undo.windowId);
   let temporaryTab = false;
   if (!tab) {
@@ -185,14 +271,45 @@ async function viewCapture(recordIds, windowId) {
 }
 
 async function destinationStatus() {
-  const [tab] = await chrome.tabs.query({ url: `${APP_URL}*` });
-  if (!tab) return { label: "当前浏览器 · 加入后确认保存位置" };
-  try {
-    const result = await deliverToTab(tab.id, { type: "status" });
-    return result?.destination || { label: "当前浏览器 · 保存位置未确认" };
-  } catch {
-    return { label: "当前浏览器 · 保存位置未确认" };
+  const session = await getCloudSession();
+  if (session?.user?.id) {
+    return { label: `${session.user.email || "Later Space"} · 云端同步已开启`, email: session.user.email, synced: true };
   }
+  return { label: "未连接 · 点击连接 Later Space", synced: false };
+}
+
+async function requestAuthFromTab(tabId) {
+  if (!tabId) return { state: "unauthenticated" };
+  await chrome.scripting.executeScript({ target: { tabId }, files: ["page-bridge.js"] }).catch(() => {});
+  try {
+    const result = await chrome.tabs.sendMessage(tabId, { type: "later-space-auth" });
+    if (result?.state === "auth" && result.session?.access_token) {
+      await chrome.storage.local.set({ [CLOUD_SESSION_KEY]: result.session });
+      return result;
+    }
+  } catch {
+    await chrome.scripting.executeScript({ target: { tabId }, files: ["page-bridge.js"] }).catch(() => {});
+    try {
+      const result = await chrome.tabs.sendMessage(tabId, { type: "later-space-auth" });
+      if (result?.state === "auth" && result.session?.access_token) {
+        await chrome.storage.local.set({ [CLOUD_SESSION_KEY]: result.session });
+        return result;
+      }
+    } catch {}
+  }
+  return { state: "unauthenticated" };
+}
+
+async function connectAuth() {
+  const existing = await getCloudSession();
+  if (existing?.user?.id) return { state: "connected", email: existing.user.email };
+  const tab = await laterSpaceTab();
+  if (tab) {
+    const result = await requestAuthFromTab(tab.id);
+    if (result.state === "auth") return { state: "connected", email: result.session.user?.email };
+  }
+  const created = await chrome.tabs.create({ url: `${APP_URL}?extension=connect`, active: true });
+  return { state: "needs-login", tabId: created.id, url: APP_URL };
 }
 
 async function retryQueue() {
@@ -344,7 +461,11 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     return true;
   }
   if (message.type === "destination-status") {
-    destinationStatus().then(sendResponse);
+    destinationStatus().then(sendResponse).catch(() => sendResponse({ label: "当前浏览器 · 保存位置未确认", synced: false }));
+    return true;
+  }
+  if (message.type === "connect-auth") {
+    connectAuth().then(sendResponse).catch(() => sendResponse({ state: "unavailable" }));
     return true;
   }
   if (message.type === "undo-capture") {
