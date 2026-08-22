@@ -381,6 +381,34 @@
         .thinking .heading h2 { margin-top: 25px; }
 
         /* ===========================================
+           SECTION THREE — CLOUD CONNECTION
+           =========================================== */
+        .cloud-flow .cloud-heading { position: absolute; left: 110px; top: 145px; width: 760px; }
+        .cloud-flow .cloud-heading h2 { margin-top: 24px; }
+        .cloud-flow .cloud-copy { position: absolute; left: 110px; top: 485px; width: 560px; font: 400 22px/1.48 var(--body); color: #c3bfb5; }
+        .cloud-flow .cloud-diagram { position: absolute; right: 110px; top: 215px; width: 840px; height: 570px; }
+        .cloud-flow .cloud-node { position: absolute; display: grid; align-content: center; gap: 10px; padding: 28px; border-radius: 16px; box-shadow: 0 18px 38px rgba(23,23,23,.13); }
+        .cloud-flow .cloud-node small { font: 500 15px var(--mono); opacity: .58; }
+        .cloud-flow .cloud-node strong { font: 600 29px/1.12 var(--body); }
+        .cloud-flow .cloud-node span { font: 400 17px/1.38 var(--body); opacity: .7; }
+        .cloud-flow .browser-node { left: 0; top: 75px; width: 285px; height: 220px; background: var(--white); color: var(--ink); }
+        .cloud-flow .supabase-node { right: 0; top: 0; width: 300px; height: 240px; background: var(--mint); color: var(--ink); }
+        .cloud-flow .space-node { right: 35px; bottom: 0; width: 330px; height: 220px; background: var(--lavender); color: var(--ink); }
+        .cloud-flow .cloud-arrow { position: absolute; height: 2px; background: var(--mint); transform-origin: left center; opacity: .86; }
+        .cloud-flow .arrow-one { left: 282px; top: 168px; width: 255px; transform: rotate(-23deg); }
+        .cloud-flow .arrow-two { left: 535px; top: 230px; width: 225px; transform: rotate(67deg); background: var(--coral); }
+        .cloud-flow .arrow-one::after, .cloud-flow .arrow-two::after { content: ""; position: absolute; right: -2px; top: -5px; width: 10px; height: 10px; border-top: 2px solid currentColor; border-right: 2px solid currentColor; transform: rotate(45deg); }
+        .cloud-flow .cloud-note { position: absolute; left: 0; bottom: 25px; width: 270px; padding: 16px 18px; border: 1px dashed rgba(255,255,255,.38); border-radius: 9px; color: #d8d2c8; font: 400 16px/1.4 var(--body); }
+        .cloud-proof .proof-heading { position: absolute; left: 110px; top: 145px; width: 680px; }
+        .cloud-proof .proof-heading h2 { margin-top: 24px; }
+        .cloud-proof .proof-copy { position: absolute; left: 110px; top: 395px; width: 610px; font: 400 24px/1.48 var(--body); color: #6c675f; }
+        .cloud-proof .proof-list { position: absolute; right: 120px; top: 210px; width: 640px; display: grid; gap: 18px; }
+        .cloud-proof .proof-item { display: grid; grid-template-columns: 54px 1fr; gap: 18px; align-items: start; padding: 22px 0; border-bottom: 1px solid rgba(23,23,23,.16); }
+        .cloud-proof .proof-item .num { width: 40px; height: 40px; display: grid; place-items: center; border-radius: 50%; background: var(--ink); color: var(--mint); font: 500 16px var(--mono); }
+        .cloud-proof .proof-item strong { font: 600 26px var(--body); }
+        .cloud-proof .proof-item span { display: block; margin-top: 5px; font: 400 18px/1.4 var(--body); color: #777269; }
+
+        /* ===========================================
            OUTSIDE-STAGE CONTROLS + INLINE EDITING
            =========================================== */
         .progress { position: fixed; left: 24px; bottom: 24px; z-index: 1000; color: rgba(255,255,255,.5); font: 13px var(--mono); }
@@ -398,82 +426,101 @@
                  =========================================== -->
             <section class="slide dark title-slide active visible">
                 <div class="grain"></div><div class="orb a"></div><div class="orb b"></div>
-                <div class="eyebrow reveal" data-editable>Later Space / public share</div><div class="page-no reveal">01 / 12</div>
+                <div class="eyebrow reveal" data-editable>Later Space / public share</div><div class="page-no reveal">01 / 15</div>
                 <div class="title-wrap"><div class="kicker reveal" data-editable>真实场景、真实操作、真实反馈</div><h1 class="reveal delay-1" data-editable>Later<br>Space<br><span style="font-size:.52em;color:var(--mint)">Collector</span></h1><p class="subtitle reveal delay-2" data-editable>一个浏览器插件的使用场景<br>以及它为什么这样设计。</p><div class="url reveal delay-3" data-editable>wangranm-a11y.github.io/later-space/</div></div>
                 <div class="canvas-sketch reveal delay-2"><div class="sheet"></div><div class="mini-card one"><div class="label">PAGE / SAVE</div><div class="line"></div><div class="line"></div><div class="line short"></div></div><div class="mini-card two"><div class="label">TEXT / SELECT</div><div class="line"></div><div class="line short"></div></div><div class="mini-card three"><div class="label">IMAGE / KEEP</div><div class="line"></div><div class="line short"></div></div></div>
             </section>
 
             <section class="slide paper agenda-slide">
-                <div class="grid-paper"></div><div class="grain"></div><div class="eyebrow reveal" data-editable>01 / what we will see</div><div class="page-no reveal">02 / 12</div>
+                <div class="grid-paper"></div><div class="grain"></div><div class="eyebrow reveal" data-editable>01 / what we will see</div><div class="page-no reveal">02 / 15</div>
                 <div class="agenda-intro"><div class="mono reveal">接下来将要介绍的两个方面</div><h2 class="reveal delay-1" data-editable>从产品本身，<br>到浏览器入口。</h2><p class="body reveal delay-2" data-editable>先看 Later Space 最近做的几处小优化，再用真实案例演示我做的插件如何收藏网页、文字、图片和视频。</p></div>
                 <div class="agenda-grid"><article class="agenda-card reveal delay-2"><div class="index">01 / LATER SPACE UPDATE</div><h3 data-editable>Later Space 本身的优化</h3><p data-editable>默认分层、长文字卡片化，以及资讯和视觉素材的不同入口。</p></article><article class="agenda-card reveal delay-3"><div class="index">02 / BROWSER PLUGIN</div><h3 data-editable>我做的 Later Space 插件</h3><p data-editable>从正在浏览的网页里，直接收藏整页、选区、图片或视频。</p></article></div>
             </section>
 
             <section class="slide mint section-break">
-                <div class="grain"></div><div class="eyebrow reveal" data-editable>02 / section one</div><div class="page-no reveal">03 / 12</div>
+                <div class="grain"></div><div class="eyebrow reveal" data-editable>02 / section one</div><div class="page-no reveal">03 / 15</div>
                 <div class="section-number reveal">01</div><div class="section-title reveal delay-1" data-editable>Later Space<br>本身的优化</div><p class="section-note reveal delay-2" data-editable>不是增加更多功能，而是让最常用的资讯先被看见，让素材在需要的时候再出现。</p>
             </section>
 
             <section class="slide paper case">
-                <div class="grid-paper"></div><div class="eyebrow reveal" data-editable>03 / use case — default view</div><div class="page-no reveal">04 / 12</div>
+                <div class="grid-paper"></div><div class="eyebrow reveal" data-editable>03 / use case — default view</div><div class="page-no reveal">04 / 15</div>
                 <div class="case-kicker reveal">我只想找刚刚收藏的资讯</div><div class="case-rule"></div><div class="case-title reveal delay-1" data-editable>先看到链接和文字，<br>再去找素材。</div><p class="case-copy reveal delay-2" data-editable>默认入口不再把图片、视频和资讯全部混在一起。最常用的阅读内容先出现，视觉素材留在 Visual Space。</p>
                 <div class="case-screen reveal delay-2"><img src="assets/later-space-canvas.png" alt="Later Space 线上画布截图"><div class="screen-caption">线上画布 / 默认入口 + Visual Space + 全部</div></div>
                 <div class="case-points"><div class="case-point reveal delay-3"><div class="n">1</div><div><strong>链接与文字优先</strong><span>先处理稍后阅读的内容。</span></div></div><div class="case-point reveal delay-4"><div class="n">2</div><div><strong>素材单独放置</strong><span>图片和视频进入 Visual Space。</span></div></div></div>
             </section>
 
             <section class="slide paper case">
-                <div class="grid-paper"></div><div class="eyebrow reveal" data-editable>04 / use case — long text</div><div class="page-no reveal">05 / 12</div>
+                <div class="grid-paper"></div><div class="eyebrow reveal" data-editable>04 / use case — long text</div><div class="page-no reveal">05 / 15</div>
                 <div class="case-kicker reveal">我复制了一大段文字，但不想看到文字墙</div><div class="case-rule"></div><div class="case-title reveal delay-1" data-editable>先变成卡片，<br>再决定什么时候读。</div><p class="case-copy reveal delay-2" data-editable>长文字先自动截取临时标题，和链接一样成为一个清楚的信息源。第一期不依赖 AI，也不需要 API key。</p>
                 <div class="browser-mock reveal delay-2"><div class="mock-bar"><i class="mock-dot"></i><i class="mock-dot"></i><i class="mock-dot"></i><span class="mock-url"></span></div><div class="mock-page"><h3>一张文字卡片</h3><p>从复制粘贴开始，Later Space 先帮你把它变成一个可以辨认的入口。</p></div></div>
                 <div class="case-points"><div class="case-point reveal delay-3"><div class="n">1</div><div><strong>截取临时标题</strong><span>不用等待 AI 生成。</span></div></div><div class="case-point reveal delay-4"><div class="n">2</div><div><strong>点击查看全文</strong><span>卡片负责区分，正文负责阅读。</span></div></div></div>
             </section>
 
             <section class="slide dark section-break">
-                <div class="grain"></div><div class="eyebrow reveal" data-editable>05 / section two</div><div class="page-no reveal">06 / 12</div>
+                <div class="grain"></div><div class="eyebrow reveal" data-editable>05 / section two</div><div class="page-no reveal">06 / 15</div>
                 <div class="section-number reveal" style="color:var(--mint)">02</div><div class="section-title reveal delay-1" data-editable>我做的<br>Later Space 插件</div><p class="section-note reveal delay-2" data-editable style="color:#c3bfb5">收藏不必先离开内容。插件把动作放回网页、文字、图片和视频出现的地方。</p>
             </section>
 
             <section class="slide paper case">
-                <div class="grid-paper"></div><div class="eyebrow reveal" data-editable>06 / use case — whole page</div><div class="page-no reveal">07 / 12</div>
+                <div class="grid-paper"></div><div class="eyebrow reveal" data-editable>06 / use case — whole page</div><div class="page-no reveal">07 / 15</div>
                 <div class="case-kicker reveal">我想收藏整篇文章，稍后再读</div><div class="case-rule"></div><div class="case-title reveal delay-1" data-editable>点击一次，<br>网页就被接住。</div><p class="case-copy reveal delay-2" data-editable>不用复制网址，也不用先打开 Later Space。插件自动读取当前页面的标题和链接，保存后给出明确反馈。</p>
                 <div class="browser-mock reveal delay-2"><div class="mock-bar"><i class="mock-dot"></i><i class="mock-dot"></i><i class="mock-dot"></i><span class="mock-url"></span></div><div class="mock-page"><h3>一篇值得稍后再读的文章</h3><p>点击浏览器右上角的 Later Space 图标，保存当前页面。</p><div class="mock-selection">已加入 Later Space</div></div></div>
                 <div class="case-points"><div class="case-point reveal delay-3"><div class="n">1</div><div><strong>点击插件</strong><span>自动读取网页标题与链接。</span></div></div><div class="case-point reveal delay-4"><div class="n">2</div><div><strong>点击查看</strong><span>打开线上画布并定位最新内容。</span></div></div></div>
             </section>
 
             <section class="slide dark-case dark case">
-                <div class="grain"></div><div class="eyebrow reveal" data-editable>07 / use case — selected text</div><div class="page-no reveal">08 / 12</div>
+                <div class="grain"></div><div class="eyebrow reveal" data-editable>07 / use case — selected text</div><div class="page-no reveal">08 / 15</div>
                 <div class="case-kicker reveal">我只想留下网页里的某一段话</div><div class="case-rule"></div><div class="case-title reveal delay-1" data-editable>选中它，<br>它就变成卡片。</div><p class="case-copy reveal delay-2" data-editable>插件不要求你先判断“收藏文字”还是“收藏网页”。你只需要选中内容，完成选区后再点击一次。</p>
                 <div class="case-screen reveal delay-2"><img src="assets/qa-selected-text.png" alt="浏览器选中文字与 Later Space 浮动图标截图"><div class="screen-caption">真实截图 / 选区完成后出现一个图标</div></div>
                 <div class="case-points"><div class="case-point reveal delay-3"><div class="n">1</div><div><strong>选中文字</strong><span>选区完成前不出现按钮。</span></div></div><div class="case-point reveal delay-4"><div class="n">2</div><div><strong>点击浮动图标</strong><span>一段选区只出现一个，尽量不遮挡阅读。</span></div></div></div>
             </section>
 
             <section class="slide paper case">
-                <div class="grid-paper"></div><div class="eyebrow reveal" data-editable>08 / use case — image & video</div><div class="page-no reveal">09 / 12</div>
+                <div class="grid-paper"></div><div class="eyebrow reveal" data-editable>08 / use case — image & video</div><div class="page-no reveal">09 / 15</div>
                 <div class="case-kicker reveal">我只想收藏一张图片或一个视频封面</div><div class="case-rule"></div><div class="case-title reveal delay-1" data-editable>看到素材，<br>就地加入。</div><p class="case-copy reveal delay-2" data-editable>在小红书、X 或图片搜索里，不必先截图再粘贴。悬停图片或视频封面，或者右键使用统一入口。</p>
                 <div class="browser-mock reveal delay-2"><div class="mock-bar"><i class="mock-dot"></i><i class="mock-dot"></i><i class="mock-dot"></i><span class="mock-url"></span></div><div class="mock-page"><h3>图片 / 视频封面</h3><p>悬停素材，选择 <span class="mock-selection">加入 Later Space</span>。</p></div></div>
                 <div class="case-points"><div class="case-point reveal delay-3"><div class="n">1</div><div><strong>图片与视频都能接住</strong><span>视频当前保存封面并保留来源。</span></div></div><div class="case-point reveal delay-4"><div class="n">2</div><div><strong>右键入口统一</strong><span>只需要记住一句：“加入 Later Space”。</span></div></div></div>
             </section>
 
             <section class="slide coral case">
-                <div class="grain"></div><div class="eyebrow reveal" data-editable>09 / after you click</div><div class="page-no reveal">10 / 12</div>
+                <div class="grain"></div><div class="eyebrow reveal" data-editable>09 / after you click</div><div class="page-no reveal">10 / 15</div>
                 <div class="case-kicker reveal">收藏之后，我怎么知道它真的进去了？</div><div class="case-rule"></div><div class="case-title reveal delay-1" data-editable>确认结果，<br>动作才算完成。</div><p class="case-copy reveal delay-2" data-editable>收藏不是点击按钮就结束。用户需要看见最近内容、知道它在哪里，也需要在误触时能退回来。</p>
                 <div class="feedback-screen reveal delay-2"><div class="toast">已加入 Later Space<small>查看刚刚收藏的内容　撤销</small></div><div class="recent">最近收藏 / 刚刚加入：一段网页文字……</div></div>
                 <div class="case-points"><div class="case-point reveal delay-3"><div class="n">1</div><div><strong>右上角轻提示</strong><span>告诉用户发生了什么。</span></div></div><div class="case-point reveal delay-4"><div class="n">2</div><div><strong>查看、最近收藏、撤销</strong><span>把不确定感变成可操作的下一步。</span></div></div></div>
             </section>
 
+            <section class="slide dark section-break">
+                <div class="grain"></div><div class="eyebrow reveal" data-editable>10 / section three</div><div class="page-no reveal">11 / 15</div>
+                <div class="section-number reveal" style="color:var(--mint)">03</div><div class="section-title reveal delay-1" data-editable>让插件<br>自己连上云端</div><p class="section-note reveal delay-2" data-editable style="color:#c3bfb5">如果收藏还要先打开 Later Space，插件就失去了“顺手接住”的意义。现在，插件可以直接把内容写入 Supabase。</p>
+            </section>
+
+            <section class="slide dark cloud-flow">
+                <div class="grain"></div><div class="eyebrow reveal" data-editable>11 / architecture — direct sync</div><div class="page-no reveal">12 / 15</div>
+                <div class="cloud-heading"><div class="mono reveal" style="color:var(--mint)">从“等待页面响应”到“后台直接保存”</div><h2 class="reveal delay-1" data-editable>收藏动作，<br>不再依赖一个打开的网页。</h2></div>
+                <p class="cloud-copy reveal delay-2" data-editable>第一次连接时登录一次，插件保存会话。之后无论 Later Space 页面是否打开，网页、选区、图片和视频都可以直接进入同一个 Supabase 账户。</p>
+                <div class="cloud-diagram reveal delay-2"><div class="cloud-node browser-node"><small>01 / BROWSER</small><strong>正在浏览的网页</strong><span>点击插件、右键或选中文字</span></div><div class="cloud-node supabase-node"><small>02 / CLOUD</small><strong>Supabase</strong><span>按用户账号隔离，自动同步</span></div><div class="cloud-node space-node"><small>03 / LATER SPACE</small><strong>需要时再打开</strong><span>查看、整理、定位刚刚收藏的内容</span></div><div class="cloud-arrow arrow-one"></div><div class="cloud-arrow arrow-two"></div><div class="cloud-note">网络暂时不可用？先放入本地队列，恢复后自动补发。</div></div>
+            </section>
+
+            <section class="slide paper cloud-proof">
+                <div class="grid-paper"></div><div class="eyebrow reveal" data-editable>12 / product decision</div><div class="page-no reveal">13 / 15</div>
+                <div class="proof-heading"><div class="mono reveal">这次更新解决的不是“多一个按钮”</div><h2 class="reveal delay-1" data-editable>而是减少一次<br>不必要的离开。</h2></div>
+                <p class="proof-copy reveal delay-2" data-editable>插件的价值，是让收藏发生在内容出现的地方。Later Space 负责之后的查看和整理，而不是成为每次收藏前必须打开的门。</p>
+                <div class="proof-list"><div class="proof-item reveal delay-2"><div class="num">01</div><div><strong>一次连接，之后直连</strong><span>用户不需要每次重新登录，也不用保持 Later Space 页面常驻。</span></div></div><div class="proof-item reveal delay-3"><div class="num">02</div><div><strong>云端与本地都有退路</strong><span>云端保存用于跨设备同步，本地队列用于网络不稳定时兜底。</span></div></div><div class="proof-item reveal delay-4"><div class="num">03</div><div><strong>查看仍然回到 Later Space</strong><span>收藏动作变轻，但完整画布依然是整理和阅读的地方。</span></div></div></div>
+            </section>
+
             <section class="slide paper thinking">
-                <div class="grid-paper"></div><div class="eyebrow reveal" data-editable>10 / design decisions</div><div class="page-no reveal">11 / 12</div>
+                <div class="grid-paper"></div><div class="eyebrow reveal" data-editable>13 / design decisions</div><div class="page-no reveal">14 / 15</div>
                 <div class="heading"><div class="mono reveal">每一个细节，都来自一个具体的不顺手</div><h2 class="reveal delay-1" data-editable>问题变成改动。</h2></div>
                 <div class="decision-grid"><div class="decision-row reveal delay-1"><div class="problem-label">收藏之后不知道去哪了</div><div class="solution-label">最近收藏 + 查看定位</div></div><div class="decision-row reveal delay-2"><div class="problem-label">选区按钮挡住正文</div><div class="solution-label">延迟出现 + 只出现一个</div></div><div class="decision-row reveal delay-3"><div class="problem-label">右键菜单太复杂</div><div class="solution-label">统一叫“加入 Later Space”</div></div><div class="decision-row reveal delay-4"><div class="problem-label">误收藏无法回退</div><div class="solution-label">增加撤销入口</div></div><div class="decision-row reveal delay-3"><div class="problem-label">长文字铺成一面墙</div><div class="solution-label">先卡片化，再查看全文</div></div><div class="decision-row reveal delay-4"><div class="problem-label">图片入口只适配一个平台</div><div class="solution-label">扩展到更多网页场景</div></div></div>
             </section>
 
             <section class="slide dark close-slide">
-                <div class="grain"></div><div class="orb a"></div><div class="eyebrow reveal" data-editable>11 / take it with you</div><div class="page-no reveal">12 / 12</div>
+                <div class="grain"></div><div class="orb a"></div><div class="eyebrow reveal" data-editable>14 / take it with you</div><div class="page-no reveal">15 / 15</div>
                 <div class="close-wrap"><h2 class="reveal" data-editable>看到。<br>接住。<br>回来使用。</h2><p class="closing reveal delay-1" data-editable>Later Space Collector 想做的，不是增加一个收藏工具，而是让“稍后再看”发生得更自然。</p><div class="url reveal delay-2" data-editable>wangranm-a11y.github.io/later-space/</div></div><div class="mark reveal delay-2"></div><div class="tiny reveal delay-3" data-editable>Later Space / 2026</div>
             </section>
         </main>
     </div>
-    <div class="progress" id="progress">01 / 12</div>
+    <div class="progress" id="progress">01 / 15</div>
     <div class="edit-hotzone" id="editHotzone"></div><button class="edit-toggle" id="editToggle" title="Edit mode (E)">✎ 编辑</button>
     <script>
         /* ===========================================
