@@ -3047,6 +3047,9 @@ async function init() {
     await loadImages();
     bindExtensionBridge();
     await initializeCloud();
+    if (new URLSearchParams(location.search).get("extension") === "connect") {
+      openSyncPanel();
+    }
     if (!STATIC_DEPLOYMENT) {
       await importExternalInbox();
       state.externalInboxTimer = window.setInterval(importExternalInbox, 20000);

@@ -48,8 +48,8 @@ connect.addEventListener("click", async () => {
     destination.textContent = `${result.email || "Later Space"} · 云端同步已开启`;
     connect.hidden = true;
   } else {
-    connect.textContent = "请在打开的页面登录一次";
-    setTimeout(() => { connect.textContent = "连接 Later Space"; connect.disabled = false; }, 2400);
+    connect.textContent = "已打开同步中心，请完成登录";
+    setTimeout(() => { connect.textContent = "连接 Later Space"; connect.disabled = false; }, 5000);
   }
 });
 

@@ -302,11 +302,17 @@ async function requestAuthFromTab(tabId) {
 
 async function connectAuth() {
   const existing = await getCloudSession();
-  if (existing?.user?.id) return { state: "connected", email: existing.user.email };
+  if (existing?.user?.id) {
+    await retryQueue();
+    return { state: "connected", email: existing.user.email };
+  }
   const tab = await laterSpaceTab();
   if (tab) {
     const result = await requestAuthFromTab(tab.id);
-    if (result.state === "auth") return { state: "connected", email: result.session.user?.email };
+    if (result.state === "auth") {
+      await retryQueue();
+      return { state: "connected", email: result.session.user?.email };
+    }
   }
   const created = await chrome.tabs.create({ url: `${APP_URL}?extension=connect`, active: true });
   return { state: "needs-login", tabId: created.id, url: APP_URL };
