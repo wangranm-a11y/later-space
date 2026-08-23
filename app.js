@@ -2202,7 +2202,9 @@ async function requestMagicLink(event) {
   const email = elements.syncEmailInput.value.trim();
   if (!email) return;
   elements.syncStatusDetail.textContent = "正在发送登录邮件…";
-  const redirectTo = `${location.origin}${location.pathname}`;
+  const redirectUrl = new URL(location.href);
+  redirectUrl.hash = "";
+  const redirectTo = redirectUrl.toString();
   const response = await fetch(`${cloudConfig().supabaseUrl}/auth/v1/otp?redirect_to=${encodeURIComponent(redirectTo)}`, {
     method: "POST",
     headers: { apikey: cloudConfig().supabaseAnonKey, "Content-Type": "application/json" },
