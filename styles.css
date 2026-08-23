@@ -315,6 +315,8 @@ kbd { min-width: 26px; height: 24px; display: grid; place-items: center; padding
 .sync-login label { display: grid; gap: 5px; color: var(--muted); font-size: 10px; }
 .sync-login input { width: 100%; min-width: 0; height: 38px; padding: 0 10px; border: 1px solid var(--hairline); border-radius: 8px; background: white; color: var(--ink); font: inherit; }
 .sync-login button { align-self: end; min-height: 38px; padding-inline: 12px; font-size: 11px; }
+.sync-mail-link { display: inline-flex; margin-top: 10px; color: var(--ink); font-size: 11px; text-decoration: underline; }
+.sync-mail-link[hidden] { display: none; }
 .sync-divider { height: 1px; margin: 18px 0; background: var(--hairline); }
 .sync-entry { display: grid; grid-template-columns: 1fr auto; gap: 3px 12px; padding: 10px 0; }
 .sync-entry strong { font-size: 12px; }

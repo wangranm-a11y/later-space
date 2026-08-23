@@ -174,6 +174,7 @@ const elements = {
   syncStatusDetail: document.querySelector("#syncStatusDetail"),
   syncLoginForm: document.querySelector("#syncLoginForm"),
   syncEmailInput: document.querySelector("#syncEmailInput"),
+  syncMailLink: document.querySelector("#syncMailLink"),
   syncActions: document.querySelector("#syncActions"),
   signOutButton: document.querySelector("#signOutButton"),
   syncNowButton: document.querySelector("#syncNowButton"),
@@ -2213,6 +2214,7 @@ async function requestMagicLink(event) {
   if (response.ok) {
     elements.syncStatusTitle.textContent = "登录链接已发送";
     elements.syncStatusDetail.textContent = "打开邮件中的链接，即可回到 Later Space 完成登录";
+    if (elements.syncMailLink) elements.syncMailLink.hidden = false;
   } else {
     elements.syncStatus.classList.add("is-error");
     elements.syncStatusDetail.textContent = "邮件发送失败，请稍后重试";
@@ -2382,6 +2384,7 @@ async function openSyncPanel() {
   }
   const user = state.cloudSession?.user;
   elements.syncLoginForm.hidden = Boolean(user);
+  if (elements.syncMailLink) elements.syncMailLink.hidden = true;
   elements.syncActions.hidden = !user;
   elements.syncStatus.classList.toggle("is-ready", Boolean(user));
   const localOnly = user && localStorage.getItem(`later-space-cloud-merged-${user.id}`) === "no";
