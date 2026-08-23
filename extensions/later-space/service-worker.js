@@ -275,7 +275,32 @@ async function destinationStatus() {
   if (session?.user?.id) {
     return { label: `${session.user.email || "Later Space"} · 云端同步已开启`, email: session.user.email, synced: true };
   }
+  const tab = await queryLaterSpaceTab(800);
+  if (tab) {
+    requestAuthFromTab(tab.id).then((result) => {
+      if (result.state === "auth") return retryQueue();
+      return null;
+    }).catch(() => {});
+  }
   return { label: "未连接 · 点击连接 Later Space", synced: false };
+}
+
+function queryLaterSpaceTab(timeoutMs = 800) {
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = (value) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolve(value || null);
+    };
+    const timer = setTimeout(() => finish(null), timeoutMs);
+    try {
+      chrome.tabs.query({ url: `${APP_URL}*` }, (tabs) => finish(tabs?.[0]));
+    } catch {
+      finish(null);
+    }
+  });
 }
 
 async function requestAuthFromTab(tabId) {
