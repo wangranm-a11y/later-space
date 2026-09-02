@@ -711,9 +711,8 @@ function textCard(record, expanded) {
   if (expanded) return `<div class="text-block long-text-full" tabindex="0"><button class="long-text-collapse" type="button" data-toggle-long-text>收起</button><div>${escapeHtml(record.text)}</div></div>`;
   return `<div class="long-text-card">
     <span class="long-text-type">文字</span>
-    <h2>${escapeHtml(longTextTitle(record.text))}</h2>
+    <h2><button class="long-text-open" type="button" data-open-long-text>${escapeHtml(longTextTitle(record.text))}</button></h2>
     <p>${escapeHtml(longTextPreview(record.text))}</p>
-    <button class="long-text-footer" type="button" data-toggle-long-text>阅读全文</button>
   </div>`;
 }
 
@@ -2958,6 +2957,12 @@ function bindEvents() {
   elements.canvas.addEventListener("pointerup", endPointer);
   elements.canvas.addEventListener("pointercancel", endPointer);
   elements.canvas.addEventListener("click", (event) => {
+    const open = event.target.closest("[data-open-long-text]");
+    if (open) {
+      const record = state.images.find((entry) => entry.id === open.closest(".canvas-item")?.dataset.id);
+      if (record && !state.expandedTextIds.has(record.id)) toggleTextCard(record);
+      return;
+    }
     const toggle = event.target.closest("[data-toggle-long-text]");
     if (toggle) {
       const record = state.images.find((entry) => entry.id === toggle.closest(".canvas-item")?.dataset.id);
@@ -2966,10 +2971,12 @@ function bindEvents() {
     }
   });
   elements.canvas.addEventListener("dblclick", (event) => {
-    if (event.target.closest("button, a, input, textarea, select, label, .text-card-item.is-expanded .long-text-full")) return;
-    const item = event.target.closest(".text-card-item");
-    const record = state.images.find((entry) => entry.id === item?.dataset.id);
-    if (record) toggleTextCard(record);
+    if (event.target.closest(".canvas-item, button, a, input, textarea, select, label")) return;
+    if (!state.expandedTextIds.size) return;
+    state.expandedTextIds.clear();
+    state.selectedId = null;
+    state.selectedIds.clear();
+    render();
   });
   elements.canvas.addEventListener("wheel", (event) => {
     if (event.target.closest(".text-card-item.is-expanded .long-text-full")) return;
