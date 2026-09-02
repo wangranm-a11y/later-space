@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>开始使用 Later Space</title>
+  <link rel="stylesheet" href="welcome.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="https://wangranm-a11y.github.io/later-space/" target="_blank"><i></i><strong>Later Space</strong></a>
+    <div class="progress" aria-label="引导进度"><span id="progressBar"></span></div>
+    <button id="skip" class="text-button" type="button">稍后再说</button>
+  </header>
+
+  <main>
+    <section class="step is-active" data-step="1">
+      <div class="copy"><span class="eyebrow">01 · 收藏文字</span><h1>现在，试着收藏这句话</h1><p>拖动鼠标选中绿色文字。松开后，Later Space 图标会出现在最后一行右下角。</p><p id="textStatus" class="status">还没有选中文字</p></div>
+      <article class="browser-card">
+        <div class="browser-bar"><i></i><i></i><i></i><span>一篇稍后想读的文章</span></div>
+        <div class="article-body"><small>创作笔记 · 08:42</small><h2>信息不是越多越好</h2><p>真正重要的不是当下读完所有东西，而是在需要的时候还能找回来。</p><p id="practiceText" class="practice-text">我想晚一点回来，认真读完这段关于创作与注意力的文字。</p><p>好的收藏工具应该留在思考的边缘，而不是成为新的任务。</p></div>
+      </article>
+    </section>
+
+    <section class="step" data-step="2">
+      <div class="copy"><span class="eyebrow">02 · 收藏图片</span><h1>图片也可以随手留下</h1><p>把鼠标移到图片上，图标会安静地出现在右上角。点击后，它会真实加入你的 Later Space。</p><p id="imageStatus" class="status">把鼠标移到图片上试试</p></div>
+      <div id="practiceImage" class="practice-image" role="img" aria-label="Later Space 新手练习图片" style="aspect-ratio:1.5">
+        <div class="image-index">图片收藏练习</div><blockquote>Save the thought,<br>not the interruption.</blockquote><div class="image-footer"><span>LATER SPACE</span><span>新手练习</span></div>
+        <button id="imageCapture" class="float-capture" type="button" aria-label="收藏这张练习图片"><span></span></button>
+      </div>
+    </section>
+
+    <section class="step" data-step="3">
+      <div class="copy"><span class="eyebrow">03 · 收藏网页与同步</span><h1>整个网页，点一下插件就好</h1><p>想保存当前网页时，点击浏览器工具栏里的 Later Space，再选择“加入当前网页”。</p></div>
+      <div class="explain-grid">
+        <div class="toolbar-demo"><div class="address">later-space.example/article</div><div class="toolbar-icon"><i></i></div><div class="popup-demo"><b>Later Space</b><span>当前网页</span><button>加入当前网页</button></div></div>
+        <div class="login-card"><span class="eyebrow">登录不是门槛</span><h2>现在就能用，需要时再同步</h2><div class="login-row"><b>不登录</b><p>内容保存在当前浏览器。</p></div><div class="login-row"><b>登录后</b><p>Chrome、Edge 和其他设备汇合到同一账号。</p></div><p id="destination" class="destination">正在读取当前保存位置…</p><div class="button-row"><button id="connect" class="primary" type="button">连接 Later Space</button><button id="continueWithoutLogin" class="secondary" type="button">暂不登录</button></div></div>
+      </div>
+    </section>
+
+    <section class="step complete" data-step="4" style="gap:14px">
+      <div class="complete-mark"><i></i><i></i></div><span class="eyebrow">准备好了</span><h1>以后，看到想留的东西就顺手收进来。</h1><p>练习内容已经进入 Later Space。你可以留下它，也可以现在清理干净。</p><p id="cleanupStatus" class="status"></p><div class="complete-actions"><button id="viewPractice" class="primary" type="button">查看练习内容</button><button id="deletePractice" class="secondary" type="button">删除练习内容</button><button id="keepPractice" class="text-button" type="button">保留并完成</button></div>
+    </section>
+  </main>
+
+  <footer><span>以后可以在插件弹窗里重新打开使用指南</span><span id="stepLabel">第 1 步，共 3 步</span></footer>
+  <script src="feedback-sound.js"></script>
+  <script src="welcome.js"></script>
+</body>
+</html>

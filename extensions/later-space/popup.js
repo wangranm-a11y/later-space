@@ -10,6 +10,8 @@ const recentView = document.querySelector("#recentView");
 const recentKind = document.querySelector("#recentKind");
 const recentTitle = document.querySelector("#recentTitle");
 const connect = document.querySelector("#connect");
+const guide = document.querySelector("#guide");
+const settings = document.querySelector("#settings");
 let undoToken = "";
 let recordIds = [];
 let currentTabId = null;
@@ -40,6 +42,13 @@ chrome.runtime.sendMessage({ type: "destination-status" }).then((result) => {
   connect.hidden = Boolean(result?.synced);
 });
 
+chrome.runtime.sendMessage({ type: "onboarding-status" }).then((result) => {
+  guide.textContent = result?.onboarding?.completed ? "使用指南" : "继续新手引导";
+}).catch(() => {});
+
+guide.addEventListener("click", () => chrome.tabs.create({ url: chrome.runtime.getURL("welcome.html") }));
+settings.addEventListener("click", () => chrome.runtime.openOptionsPage());
+
 connect.addEventListener("click", async () => {
   connect.disabled = true;
   connect.textContent = "正在连接…";
@@ -56,6 +65,7 @@ connect.addEventListener("click", async () => {
 chrome.runtime.sendMessage({ type: "recent-capture" }).then(renderRecent).catch(() => {});
 
 save.addEventListener("click", async () => {
+  globalThis.laterSpaceSound?.prepare();
   save.disabled = true;
   status.textContent = "正在加入…";
   document.body.classList.remove("is-saved", "is-duplicate", "is-queued");
@@ -69,6 +79,7 @@ save.addEventListener("click", async () => {
     unavailable: "Later Space 暂时无法连接，请稍后重试",
   };
   status.textContent = messages[result?.state] || messages.queued;
+  globalThis.laterSpaceSound?.play(result?.state);
   document.body.classList.add(`is-${result?.state || "queued"}`);
   if (result?.destination?.label) destination.textContent = result.destination.label;
   const buttonLabels = { saved: "已加入", duplicate: "已加入", queued: "等待发送", unavailable: "加入失败" };

@@ -17,7 +17,7 @@ class ExtensionSelectionAffordanceTests(unittest.TestCase):
         self.assertIn("}, SELECTION_BUTTON_DELAY_MS);", FEEDBACK)
 
     def test_extension_version_is_bumped(self):
-        self.assertIn('"version": "1.8.6"', MANIFEST)
+        self.assertIn('"version": "1.9.0"', MANIFEST)
 
 
 if __name__ == "__main__":

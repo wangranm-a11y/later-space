@@ -95,8 +95,10 @@ function floatingButton(label) {
   button.setAttribute("aria-label", label);
   button.innerHTML = `<svg viewBox="0 0 24 24" width="19" height="19" aria-hidden="true"><rect x="3" y="3" width="11" height="11" rx="2.5" fill="#1d1d1f"/><rect x="10" y="10" width="11" height="11" rx="2.5" fill="#a7add8"/></svg>`;
   button.style.cssText = "position:fixed;z-index:2147483646;width:30px;height:30px;display:grid;place-items:center;padding:0;border:1px solid rgba(93,95,119,.1);border-radius:8px;background:rgba(235,235,242,.46);backdrop-filter:blur(8px);box-shadow:0 5px 16px rgba(37,38,49,.06);opacity:.72;cursor:pointer;transition:transform .14s ease,background .14s ease,box-shadow .14s ease,opacity .14s ease";
-  button.addEventListener("mouseenter", () => { button.style.transform = "translateY(-1px)"; button.style.background = "rgba(229,230,240,.68)"; button.style.boxShadow = "0 7px 20px rgba(37,38,49,.1)"; button.style.opacity = ".94"; });
+  button.addEventListener("mouseenter", () => { button.style.transform = "translateY(-1px)"; button.style.background = "rgba(229,230,240,.96)"; button.style.boxShadow = "0 7px 20px rgba(37,38,49,.12)"; button.style.opacity = "1"; });
   button.addEventListener("mouseleave", () => { button.style.transform = ""; button.style.background = "rgba(235,235,242,.46)"; button.style.boxShadow = "0 5px 16px rgba(37,38,49,.06)"; button.style.opacity = ".72"; });
+  button.addEventListener("pointerdown", () => { globalThis.laterSpaceSound?.prepare(); button.style.transform = "translateY(-1px) scale(.96)"; });
+  button.addEventListener("pointerup", () => { button.style.transform = "translateY(-1px)"; });
   document.documentElement.append(button);
   floatingButtonElement = button;
   return button;
@@ -206,6 +208,7 @@ document.addEventListener("pointermove", (event) => {
 }, { passive: true, capture: true, signal: listenerController.signal });
 
 function showFeedback(message) {
+  if (message.playSound !== false) globalThis.laterSpaceSound?.play(message.state);
   document.querySelector("#later-space-feedback")?.remove();
   const toast = document.createElement("div");
   toast.id = "later-space-feedback";

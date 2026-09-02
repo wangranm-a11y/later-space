@@ -5,7 +5,24 @@ const CLOUD_SESSION_KEY = "laterSpaceCloudSession";
 const QUEUE_KEY = "laterSpaceCaptureQueue";
 const UNDO_KEY = "laterSpaceUndoCaptures";
 const LAST_CAPTURE_KEY = "laterSpaceLastCapture";
+const ONBOARDING_STATE_KEY = "laterSpaceOnboardingState";
+const ONBOARDING_VERSION = 1;
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
+
+function defaultOnboardingState() {
+  return { version: ONBOARDING_VERSION, step: 1, completed: false, sessionId: captureId(), recordIds: [], queuedCaptureIds: [], keepPractice: false };
+}
+
+async function onboardingState() {
+  const stored = await chrome.storage.local.get({ [ONBOARDING_STATE_KEY]: null });
+  return stored[ONBOARDING_STATE_KEY] || defaultOnboardingState();
+}
+
+async function updateOnboardingState(patch = {}) {
+  const next = { ...(await onboardingState()), ...patch, version: ONBOARDING_VERSION };
+  await chrome.storage.local.set({ [ONBOARDING_STATE_KEY]: next });
+  return next;
+}
 
 async function getCloudSession() {
   const stored = await chrome.storage.local.get({ [CLOUD_SESSION_KEY]: null });
@@ -44,7 +61,8 @@ function dataUrlToBlob(dataUrl) {
 }
 
 function cloudRecordData(capture, now) {
-  const base = { status: "inbox", tags: [], note: "", source: "chrome-extension", createdAt: now, updatedAt: now, canvasX: 0, canvasY: 0, zIndex: now };
+  const onboarding = capture.onboarding ? { onboarding: true, onboardingSessionId: capture.onboardingSessionId || "" } : {};
+  const base = { status: "inbox", tags: [], note: "", source: "chrome-extension", createdAt: now, updatedAt: now, canvasX: 0, canvasY: 0, zIndex: now, ...onboarding };
   if (capture.kind === "text") return { ...base, kind: "text", text: capture.text || "", name: (capture.text || "收藏的文字").slice(0, 32), textTheme: "paper", canvasWidth: 300, textHeight: 375, textScale: 1 };
   if (capture.kind === "link") return { ...base, kind: "link", url: capture.url || capture.pageUrl || "", canonicalUrl: capture.url || capture.pageUrl || "", name: capture.title || capture.url || "收藏的链接", title: capture.title || capture.url || "收藏的链接", shareTitle: capture.title || "", customTitle: false, description: "", previewImage: "", previewState: "loading", coverIndex: 0, fontIndex: 0, coverMode: "editorial", canvasWidth: 300 };
   return { ...base, kind: capture.kind || "image", name: capture.name || "收藏的图片", type: capture.mimeType || "image/jpeg", size: capture.imageData ? dataUrlToBlob(capture.imageData).size : 0, width: 960, height: 720, fingerprint: "", canvasWidth: 300 };
@@ -85,6 +103,14 @@ async function queueCapture(capture) {
 async function removeQueued(id) {
   const stored = await chrome.storage.local.get({ [QUEUE_KEY]: [] });
   const queue = stored[QUEUE_KEY].filter((item) => item.id !== id);
+  await chrome.storage.local.set({ [QUEUE_KEY]: queue });
+  await chrome.action.setBadgeText({ text: queue.length ? String(Math.min(queue.length, 99)) : "" });
+}
+
+async function removeQueuedCaptures(ids) {
+  const targets = new Set(ids || []);
+  const stored = await chrome.storage.local.get({ [QUEUE_KEY]: [] });
+  const queue = stored[QUEUE_KEY].filter((item) => !targets.has(item.id));
   await chrome.storage.local.set({ [QUEUE_KEY]: queue });
   await chrome.action.setBadgeText({ text: queue.length ? String(Math.min(queue.length, 99)) : "" });
 }
@@ -227,10 +253,12 @@ async function undoCapture(token) {
   }
 }
 
-async function notifySourceTab(tabId, result) {
+async function notifySourceTab(tabId, result, options = {}) {
   if (!tabId) return false;
   const message = {
     type: "later-space-feedback",
+    state: result.state,
+    playSound: options.playSound !== false,
     text: feedbackText(result.state),
     recordIds: result.recordIds || [],
     undoToken: result.undoToken || "",
@@ -240,7 +268,7 @@ async function notifySourceTab(tabId, result) {
     return true;
   } catch {
     try {
-      await chrome.scripting.executeScript({ target: { tabId }, files: ["page-feedback.js"] });
+      await chrome.scripting.executeScript({ target: { tabId }, files: ["feedback-sound.js", "page-feedback.js"] });
       await chrome.tabs.sendMessage(tabId, message);
       return true;
     } catch {
@@ -343,10 +371,70 @@ async function connectAuth() {
   return { state: "needs-login", tabId: created.id, url: APP_URL };
 }
 
+async function saveOnboardingCapture(payload = {}) {
+  const state = await onboardingState();
+  const capture = { ...payload, id: captureId(), onboarding: true, onboardingSessionId: state.sessionId };
+  const result = await rememberCapture(await saveCapture(capture));
+  const createdIds = result?.state === "saved" ? result.recordIds || [] : [];
+  return {
+    ...result,
+    onboarding: await updateOnboardingState({
+      step: Math.max(state.step || 1, Number(payload.nextStep || state.step || 1)),
+      recordIds: [...new Set([...(state.recordIds || []), ...createdIds])],
+      queuedCaptureIds: result?.state === "queued"
+        ? [...new Set([...(state.queuedCaptureIds || []), capture.id])]
+        : state.queuedCaptureIds || [],
+    }),
+  };
+}
+
+async function cleanupOnboardingPractice() {
+  const state = await onboardingState();
+  const recordIds = [...new Set(state.recordIds || [])];
+  await removeQueuedCaptures(state.queuedCaptureIds || []);
+  if (!recordIds.length) return { state: "cleaned", onboarding: await updateOnboardingState({ recordIds: [], queuedCaptureIds: [] }) };
+
+  let removed = false;
+  const session = await getCloudSession();
+  if (session?.user?.id) {
+    const filter = encodeURIComponent(`(${recordIds.join(",")})`);
+    const cloud = await cloudRequest(`/rest/v1/later_space_items?id=in.${filter}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Prefer: "return=minimal" },
+      body: JSON.stringify({ deleted_at: new Date().toISOString() }),
+    });
+    removed = Boolean(cloud?.response.ok);
+  } else {
+    let tab = await laterSpaceTab();
+    let temporaryTab = false;
+    if (!tab) {
+      tab = await chrome.tabs.create({ url: `${APP_URL}?undo=onboarding`, active: false });
+      temporaryTab = true;
+    }
+    try {
+      const result = await deliverToTab(tab.id, { type: "undo", recordIds });
+      removed = result?.state === "undone";
+    } finally {
+      if (temporaryTab) await chrome.tabs.remove(tab.id).catch(() => {});
+    }
+  }
+  if (!removed) return { state: "partial", remainingIds: recordIds, onboarding: state };
+  return { state: "cleaned", onboarding: await updateOnboardingState({ recordIds: [], queuedCaptureIds: [] }) };
+}
+
 async function retryQueue() {
   const stored = await chrome.storage.local.get({ [QUEUE_KEY]: [] });
   for (const capture of stored[QUEUE_KEY]) {
-    try { await sendCapture(capture); } catch { break; }
+    try {
+      const result = await sendCapture(capture);
+      if (capture.onboarding && result?.recordIds?.length) {
+        const state = await onboardingState();
+        await updateOnboardingState({
+          recordIds: [...new Set([...(state.recordIds || []), ...result.recordIds])],
+          queuedCaptureIds: (state.queuedCaptureIds || []).filter((id) => id !== capture.id),
+        });
+      }
+    } catch { break; }
   }
 }
 
@@ -407,12 +495,16 @@ function pageCapture(tab) {
   return saveCapture({ kind: "link", url: tab?.url || "", title: tab?.title || "", windowId: tab?.windowId });
 }
 
-chrome.runtime.onInstalled.addListener(() => {
+chrome.runtime.onInstalled.addListener((details) => {
   chrome.contextMenus.removeAll(() => {
     chrome.contextMenus.create({ id: "later-add", title: "加入 Later Space", contexts: ["page", "link", "image", "selection"] });
   });
   chrome.alarms.create("retry-captures", { periodInMinutes: 1 });
   retryQueue();
+  if (details.reason === "install") {
+    chrome.storage.local.set({ [ONBOARDING_STATE_KEY]: defaultOnboardingState() });
+    chrome.tabs.create({ url: chrome.runtime.getURL("welcome.html") });
+  }
 });
 
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
@@ -454,7 +546,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       : chrome.tabs.query({ active: true, lastFocusedWindow: true }).then(([tab]) => tab);
     activeTab.then(async (tab) => {
       const result = await rememberCapture(await registerUndo(await pageCapture(tab)));
-      await notifySourceTab(tab?.id, result);
+      await notifySourceTab(tab?.id, result, { playSound: false });
       return result;
     }).then(sendResponse);
     return true;
@@ -497,6 +589,22 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   }
   if (message.type === "connect-auth") {
     connectAuth().then(sendResponse).catch(() => sendResponse({ state: "unavailable" }));
+    return true;
+  }
+  if (message.type === "onboarding-status") {
+    Promise.all([onboardingState(), destinationStatus()]).then(([onboarding, destination]) => sendResponse({ onboarding, destination }));
+    return true;
+  }
+  if (message.type === "onboarding-progress") {
+    updateOnboardingState(message.patch || {}).then(sendResponse);
+    return true;
+  }
+  if (message.type === "onboarding-capture") {
+    saveOnboardingCapture(message.capture || {}).then(sendResponse).catch(() => sendResponse({ state: "unavailable" }));
+    return true;
+  }
+  if (message.type === "onboarding-cleanup") {
+    cleanupOnboardingPractice().then(sendResponse).catch(() => sendResponse({ state: "partial" }));
     return true;
   }
   if (message.type === "undo-capture") {
