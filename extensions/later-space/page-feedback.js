@@ -7,6 +7,10 @@ let imageButton = null;
 let floatingButtonElement = null;
 let selectionTimer = null;
 let selectingWithPointer = false;
+const SELECTION_BUTTON_DELAY_MS = 10;
+const FLOATING_BUTTON_SIZE = 30;
+const FLOATING_BUTTON_GAP = 6;
+const VIEWPORT_GUTTER = 8;
 const IMAGE_HOVER_HOSTS = /(^|\.)((xiaohongshu\.com)|(x\.com)|(twitter\.com)|(google\.[a-z.]+)|(bing\.com)|(pinterest\.(com|co\.[a-z]+))|(reddit\.com))$/i;
 const listenerController = new AbortController();
 const listenerOptions = { signal: listenerController.signal };
@@ -111,6 +115,24 @@ function removeSelectionButton() {
   removeFloatingButton(selectionButton);
 }
 
+function lastVisibleSelectionRect(range) {
+  const rects = Array.from(range.getClientRects()).filter((rect) => rect.width || rect.height);
+  return rects.at(-1) || range.getBoundingClientRect();
+}
+
+function positionSelectionButton(button, rect) {
+  const preferredLeft = rect.right + FLOATING_BUTTON_GAP;
+  const preferredTop = rect.bottom + FLOATING_BUTTON_GAP;
+  const left = preferredLeft + FLOATING_BUTTON_SIZE <= innerWidth - VIEWPORT_GUTTER
+    ? preferredLeft
+    : Math.max(VIEWPORT_GUTTER, rect.right - FLOATING_BUTTON_SIZE);
+  const top = preferredTop + FLOATING_BUTTON_SIZE <= innerHeight - VIEWPORT_GUTTER
+    ? preferredTop
+    : Math.max(VIEWPORT_GUTTER, rect.top - FLOATING_BUTTON_SIZE - FLOATING_BUTTON_GAP);
+  button.style.left = `${left}px`;
+  button.style.top = `${top}px`;
+}
+
 function scheduleSelectionButton() {
   clearTimeout(selectionTimer);
   if (getSelection()?.toString().trim()) {
@@ -121,14 +143,13 @@ function scheduleSelectionButton() {
     const selection = getSelection();
     const text = selection?.toString().trim();
     if (!text || selection.rangeCount !== 1 || selection.isCollapsed) return removeSelectionButton();
-    const rect = selection.getRangeAt(0).getBoundingClientRect();
+    const rect = lastVisibleSelectionRect(selection.getRangeAt(0));
     if (!rect.width && !rect.height) return removeSelectionButton();
     removeSelectionButton();
     removeFloatingButton(imageButton);
     selectionButton = floatingButton("加入 Later Space");
     selectionButton.dataset.laterSpaceKind = "selection";
-    selectionButton.style.left = `${Math.min(innerWidth - 38, Math.max(8, rect.right + 10))}px`;
-    selectionButton.style.top = `${Math.min(innerHeight - 38, Math.max(8, rect.bottom + 8))}px`;
+    positionSelectionButton(selectionButton, rect);
     selectionButton.addEventListener("mousedown", (event) => event.preventDefault());
     selectionButton.addEventListener("click", async () => {
       selectionButton.disabled = true;
@@ -136,7 +157,7 @@ function scheduleSelectionButton() {
       removeSelectionButton();
       selection.removeAllRanges();
     });
-  }, 380);
+  }, SELECTION_BUTTON_DELAY_MS);
 }
 
 document.addEventListener("pointerdown", (event) => {
