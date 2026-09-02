@@ -495,17 +495,29 @@ function pageCapture(tab) {
   return saveCapture({ kind: "link", url: tab?.url || "", title: tab?.title || "", windowId: tab?.windowId });
 }
 
+async function refreshOpenWebTabs() {
+  const tabs = await chrome.tabs.query({ url: ["http://*/*", "https://*/*"] });
+  await Promise.allSettled(tabs.map((tab) => chrome.scripting.executeScript({
+    target: { tabId: tab.id },
+    files: ["feedback-sound.js", "page-feedback.js"],
+  })));
+}
+
 chrome.runtime.onInstalled.addListener((details) => {
   chrome.contextMenus.removeAll(() => {
     chrome.contextMenus.create({ id: "later-add", title: "加入 Later Space", contexts: ["page", "link", "image", "selection"] });
   });
   chrome.alarms.create("retry-captures", { periodInMinutes: 1 });
   retryQueue();
+  refreshOpenWebTabs();
   if (details.reason === "install") {
     chrome.storage.local.set({ [ONBOARDING_STATE_KEY]: defaultOnboardingState() });
     chrome.tabs.create({ url: chrome.runtime.getURL("welcome.html") });
   }
 });
+
+chrome.runtime.onStartup.addListener(() => refreshOpenWebTabs());
+refreshOpenWebTabs();
 
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   let result;

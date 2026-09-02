@@ -1,0 +1,11 @@
+.brand-icon { width: 24px; height: 24px; display: block; flex: none; }
+.brand img { width: 26px; height: 26px; display: block; }
+.connect, .options .secondary, .secondary { background: #fff; }
+.save, .connect, .retry, .options button, .recent-card, .primary, .secondary, .popup-demo button { transition: transform .14s ease, box-shadow .14s ease, background .14s ease; }
+.save:hover, .connect:hover, .retry:hover, .options button:hover, .recent-card:hover, .primary:hover, .secondary:hover, .popup-demo button:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(32, 33, 36, .1); }
+.save:active, .connect:active, .retry:active, .options button:active, .recent-card:active, .primary:active, .secondary:active, .popup-demo button:active { transform: scale(.98); }
+.float-capture { border-color: #d8d8d2; background: #f8f7f2; backdrop-filter: none; opacity: 1; box-shadow: 0 5px 14px rgba(37, 38, 49, .11); }
+.float-capture:hover { background: #fff; box-shadow: 0 7px 18px rgba(37, 38, 49, .15); }
+.float-capture img, .toolbar-icon img { width: 22px; height: 22px; display: block; }
+.toolbar-icon { display: grid; place-items: center; background: #f8f7f2; }
+.complete-mark { width: 58px; height: 58px; display: block; }

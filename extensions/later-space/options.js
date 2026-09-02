@@ -1,3 +1,8 @@
+const brandStylesheet = document.createElement("link");
+brandStylesheet.rel = "stylesheet";
+brandStylesheet.href = "brand.css";
+document.head.append(brandStylesheet);
+
 const APP_URL = "https://wangranm-a11y.github.io/later-space/";
 const status = document.querySelector("#status");
 const soundEnabled = document.querySelector("#soundEnabled");

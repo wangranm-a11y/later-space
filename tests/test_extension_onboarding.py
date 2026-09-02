@@ -36,8 +36,16 @@ class ExtensionOnboardingContractTests(unittest.TestCase):
         self.assertIn('"feedback-sound.js", "page-feedback.js"', MANIFEST)
 
     def test_floating_icon_has_hover_and_pressed_states(self):
-        self.assertIn('button.style.opacity = "1"', FEEDBACK)
+        self.assertIn('button.style.background = "#ffffff"', FEEDBACK)
         self.assertIn('button.style.transform = "translateY(-1px) scale(.96)"', FEEDBACK)
+        self.assertNotIn("backdrop-filter", FEEDBACK)
+
+    def test_reload_refreshes_feedback_script_in_open_web_tabs(self):
+        self.assertIn("async function refreshOpenWebTabs()", WORKER)
+        self.assertIn('chrome.tabs.query({ url: ["http://*/*", "https://*/*"] })', WORKER)
+        self.assertIn('files: ["feedback-sound.js", "page-feedback.js"]', WORKER)
+        self.assertIn("refreshOpenWebTabs();", WORKER)
+        self.assertIn("chrome.runtime.onStartup.addListener", WORKER)
 
     def test_welcome_files_and_user_entry_points_exist(self):
         for name in ("welcome.html", "welcome.css", "welcome.js", "feedback-sound.js"):

@@ -1,3 +1,8 @@
+const brandStylesheet = document.createElement("link");
+brandStylesheet.rel = "stylesheet";
+brandStylesheet.href = "brand.css";
+document.head.append(brandStylesheet);
+
 const status = document.querySelector("#status");
 const title = document.querySelector("#pageTitle");
 const retry = document.querySelector("#retry");

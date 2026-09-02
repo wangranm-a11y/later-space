@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Later Space · Icon Playground</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --paper: #f4f3ef;
+      --ink: #1b1b1d;
+      --muted: #77746d;
+      --line: rgba(27, 27, 29, .14);
+      --green: #a8c49a;
+      --pink: #d6a5ad;
+      --yellow: #e5c86f;
+      --blue: #a8afd7;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--paper);
+      color: var(--ink);
+      font-family: Inter, "SF Pro Display", "PingFang SC", sans-serif;
+      letter-spacing: 0;
+    }
+
+    button { font: inherit; }
+    .page { min-height: 100vh; padding: 30px clamp(18px, 4vw, 62px) 54px; }
+    .topbar { display: flex; align-items: center; justify-content: space-between; gap: 18px; }
+    .brand { display: flex; align-items: center; gap: 10px; font-size: 13px; font-weight: 700; }
+    .brand-mark { width: 10px; height: 10px; background: var(--green); }
+    .mode-toggle {
+      display: flex;
+      gap: 3px;
+      padding: 3px;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,.48);
+    }
+    .mode-toggle button { padding: 7px 10px; border: 0; background: transparent; color: var(--muted); cursor: pointer; }
+    .mode-toggle button[aria-pressed="true"] { background: var(--ink); color: white; }
+
+    .intro { max-width: 860px; margin: 72px 0 46px; }
+    .eyebrow { margin: 0 0 14px; color: var(--muted); font-size: 11px; text-transform: uppercase; }
+    h1 { max-width: 760px; margin: 0; font-family: "Songti SC", Georgia, serif; font-size: clamp(42px, 7vw, 88px); font-weight: 500; line-height: .98; }
+    .intro p { max-width: 620px; margin: 24px 0 0; color: var(--muted); font-size: 15px; line-height: 1.7; }
+
+    .toolbar-stage {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 24px;
+      min-height: 116px;
+      margin-bottom: 28px;
+      padding: 22px 24px;
+      border-top: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+      transition: background 160ms ease, color 160ms ease;
+    }
+    .toolbar-stage.dark { background: #29292c; color: #f8f7f1; }
+    .toolbar-copy strong { display: block; margin-bottom: 7px; font-size: 13px; }
+    .toolbar-copy span { color: var(--muted); font-size: 11px; }
+    .toolbar-stage.dark .toolbar-copy span { color: rgba(255,255,255,.54); }
+    .browser-toolbar {
+      display: flex;
+      align-items: center;
+      gap: 13px;
+      height: 48px;
+      padding: 0 16px;
+      border: 1px solid rgba(27,27,29,.12);
+      border-radius: 9px;
+      background: rgba(255,255,255,.92);
+      box-shadow: 0 10px 28px rgba(20,20,22,.08);
+    }
+    .dark .browser-toolbar { border-color: rgba(255,255,255,.12); background: #3b3b3f; box-shadow: 0 10px 32px rgba(0,0,0,.24); }
+    .toolbar-dot { width: 9px; height: 9px; border-radius: 50%; background: #d8d7d2; }
+    .toolbar-rule { width: 1px; height: 20px; background: rgba(27,27,29,.12); }
+    .dark .toolbar-rule { background: rgba(255,255,255,.14); }
+    .toolbar-icon { width: 18px; height: 18px; display: block; }
+    .toolbar-icon.is-current { outline: 2px solid var(--yellow); outline-offset: 4px; }
+
+    .section-label { display: flex; justify-content: space-between; gap: 18px; margin: 34px 0 16px; }
+    .section-label h2 { margin: 0; font-size: 13px; }
+    .section-label p { margin: 0; color: var(--muted); font-size: 11px; }
+    .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+    .option {
+      position: relative;
+      min-width: 0;
+      padding: 16px;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,.35);
+      text-align: left;
+      cursor: pointer;
+      transition: transform 140ms ease, border-color 140ms ease, background 140ms ease;
+    }
+    .option:hover { transform: translateY(-2px); border-color: rgba(27,27,29,.4); }
+    .option[aria-pressed="true"] { border-color: var(--ink); background: rgba(255,255,255,.76); }
+    .option[aria-pressed="true"]::after { content: "正在比较"; position: absolute; top: 15px; right: 15px; font-size: 9px; color: var(--muted); }
+    .icon-field { display: grid; place-items: center; min-height: 202px; border-bottom: 1px solid var(--line); }
+    .icon-main { width: 128px; height: 128px; filter: drop-shadow(0 13px 18px rgba(28,28,30,.11)); }
+    .option-meta { padding-top: 15px; }
+    .option-meta strong { display: block; margin-bottom: 6px; font-family: "Songti SC", Georgia, serif; font-size: 20px; font-weight: 600; }
+    .option-meta span { display: block; min-height: 38px; color: var(--muted); font-size: 11px; line-height: 1.6; }
+    .sizes { display: flex; align-items: center; gap: 13px; margin-top: 15px; }
+    .sizes svg:nth-child(1) { width: 16px; height: 16px; }
+    .sizes svg:nth-child(2) { width: 24px; height: 24px; }
+    .sizes svg:nth-child(3) { width: 40px; height: 40px; }
+    .sizes small { margin-left: auto; color: var(--muted); font-size: 9px; }
+
+    .note { display: flex; justify-content: space-between; gap: 24px; margin-top: 44px; padding-top: 20px; border-top: 1px solid var(--line); color: var(--muted); font-size: 11px; line-height: 1.6; }
+    .note strong { color: var(--ink); }
+
+    @media (max-width: 860px) {
+      .intro { margin-top: 52px; }
+      .toolbar-stage { grid-template-columns: 1fr; }
+      .browser-toolbar { width: fit-content; max-width: 100%; overflow: hidden; }
+      .grid { grid-template-columns: 1fr; }
+      .icon-field { min-height: 184px; }
+      .section-label, .note { flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+  <svg width="0" height="0" aria-hidden="true" style="position:absolute">
+    <defs>
+      <symbol id="catch-green" viewBox="0 0 128 128">
+        <rect width="128" height="128" rx="25" fill="#f8f7f2"/>
+        <path d="M28 37v54c0 7 5 12 12 12h54" fill="none" stroke="#1c1c1e" stroke-width="15" stroke-linecap="square"/>
+        <rect x="62" y="24" width="39" height="45" rx="7" fill="#a8c49a" transform="rotate(7 81.5 46.5)"/>
+      </symbol>
+      <symbol id="catch-pink" viewBox="0 0 128 128">
+        <rect width="128" height="128" rx="25" fill="#202022"/>
+        <path d="M28 37v54c0 7 5 12 12 12h54" fill="none" stroke="#f7f4ed" stroke-width="15" stroke-linecap="square"/>
+        <rect x="61" y="23" width="41" height="47" rx="7" fill="#d6a5ad" transform="rotate(-6 81.5 46.5)"/>
+      </symbol>
+      <symbol id="fusion-yellow" viewBox="0 0 128 128">
+        <rect width="128" height="128" rx="25" fill="#e5c86f"/>
+        <path d="M28 37v54c0 7 5 12 12 12h54" fill="none" stroke="#1c1c1e" stroke-width="15" stroke-linecap="square"/>
+        <rect x="62" y="23" width="40" height="46" rx="7" fill="#f8f7f2" transform="rotate(7 82 46)"/>
+      </symbol>
+      <symbol id="fusion-blue" viewBox="0 0 128 128">
+        <rect width="128" height="128" rx="25" fill="#f8f7f2"/>
+        <path d="M28 37v54c0 7 5 12 12 12h54" fill="none" stroke="#1c1c1e" stroke-width="15" stroke-linecap="square"/>
+        <rect x="62" y="23" width="40" height="46" rx="7" fill="#a8afd7" transform="rotate(7 82 46)"/>
+      </symbol>
+      <symbol id="portal-yellow" viewBox="0 0 128 128">
+        <rect width="128" height="128" rx="25" fill="#e5c86f"/>
+        <path d="M37 29v69h54" fill="none" stroke="#1c1c1e" stroke-width="17" stroke-linecap="square" stroke-linejoin="miter"/>
+        <rect x="72" y="36" width="26" height="26" fill="#f8f7f2"/>
+      </symbol>
+      <symbol id="portal-blue" viewBox="0 0 128 128">
+        <rect width="128" height="128" rx="25" fill="#f8f7f2"/>
+        <path d="M34 27v73h58" fill="none" stroke="#1c1c1e" stroke-width="18" stroke-linecap="square"/>
+        <path d="M69 27h29v35H69z" fill="#a8afd7"/>
+        <path d="M79 44h19" stroke="#f8f7f2" stroke-width="7"/>
+      </symbol>
+      <symbol id="space-green" viewBox="0 0 128 128">
+        <rect width="128" height="128" rx="25" fill="#f8f7f2"/>
+        <path d="M28 28h20M28 28v20M100 80v20H80" fill="none" stroke="#1c1c1e" stroke-width="10"/>
+        <rect x="48" y="48" width="38" height="38" rx="4" fill="#a8c49a"/>
+        <circle cx="95" cy="34" r="7" fill="#1c1c1e"/>
+      </symbol>
+      <symbol id="space-pink" viewBox="0 0 128 128">
+        <rect width="128" height="128" rx="25" fill="#f8f7f2"/>
+        <path d="M25 46V25h21M82 103h21V82" fill="none" stroke="#1c1c1e" stroke-width="10"/>
+        <rect x="47" y="42" width="44" height="49" rx="5" fill="#d6a5ad" transform="rotate(-8 69 66.5)"/>
+        <circle cx="31" cy="95" r="6" fill="#e5c86f"/>
+      </symbol>
+    </defs>
+  </svg>
+
+  <main class="page">
+    <header class="topbar">
+      <div class="brand"><span class="brand-mark"></span>Later Space / Icon Lab</div>
+      <div class="mode-toggle" aria-label="工具栏背景">
+        <button type="button" data-mode="light" aria-pressed="true">浅色</button>
+        <button type="button" data-mode="dark" aria-pressed="false">深色</button>
+      </div>
+    </header>
+
+    <section class="intro">
+      <p class="eyebrow">A recognizable place for things worth returning to</p>
+      <h1>先让图标被记住，<br>再让内容被接住。</h1>
+      <p>六个候选不只是换颜色，而是测试三种不同的记忆方式：动作、字母与空间。点击候选图标，它会进入下方浏览器工具栏的真实尺寸中。</p>
+    </section>
+
+    <section class="toolbar-stage" id="toolbarStage">
+      <div class="toolbar-copy">
+        <strong>浏览器工具栏 · 18px 实景</strong>
+        <span>黄色细框仅用于标出当前候选，正式图标不会包含。</span>
+      </div>
+      <div class="browser-toolbar" aria-label="浏览器工具栏模拟">
+        <span class="toolbar-dot"></span><span class="toolbar-dot"></span><span class="toolbar-rule"></span>
+        <svg class="toolbar-icon"><use href="#portal-blue"></use></svg>
+        <svg class="toolbar-icon is-current" id="currentToolbarIcon"><use href="#fusion-yellow"></use></svg>
+        <svg class="toolbar-icon"><use href="#space-pink"></use></svg>
+        <span class="toolbar-rule"></span><span class="toolbar-dot"></span>
+      </div>
+    </section>
+
+    <div class="section-label">
+      <h2>融合候选 · 01 的形状 × 02 的配色</h2>
+      <p>把动作记忆与高辨识色放在一起</p>
+    </div>
+    <section class="grid">
+      <button class="option" type="button" data-icon="fusion-yellow" aria-pressed="true">
+        <div class="icon-field"><svg class="icon-main"><use href="#fusion-yellow"></use></svg></div>
+        <div class="option-meta"><strong>接住 · 明黄</strong><span>黄色底带来 02 的记忆点，黑色托架保留 01 的接住动作；缩小后依然有清楚的剪影。</span><div class="sizes"><svg><use href="#fusion-yellow"></use></svg><svg><use href="#fusion-yellow"></use></svg><svg><use href="#fusion-yellow"></use></svg><small>16 / 24 / 40</small></div></div>
+      </button>
+      <button class="option" type="button" data-icon="fusion-blue" aria-pressed="false">
+        <div class="icon-field"><svg class="icon-main"><use href="#fusion-blue"></use></svg></div>
+        <div class="option-meta"><strong>接住 · 灰蓝</strong><span>米白底更克制，灰蓝纸片延续 Later Space 现有气质，适合更安静的品牌方向。</span><div class="sizes"><svg><use href="#fusion-blue"></use></svg><svg><use href="#fusion-blue"></use></svg><svg><use href="#fusion-blue"></use></svg><small>16 / 24 / 40</small></div></div>
+      </button>
+    </section>
+
+    <div class="section-label">
+      <h2>01 · 接住 / 原始方向</h2>
+      <p>强调内容落进暂存空间的瞬间</p>
+    </div>
+    <section class="grid">
+      <button class="option" type="button" data-icon="catch-green" aria-pressed="false">
+        <div class="icon-field"><svg class="icon-main"><use href="#catch-green"></use></svg></div>
+        <div class="option-meta"><strong>接住 · 青苔</strong><span>开放的黑色托架接住一张倾斜纸片，动作最直观，也是我最推荐的主方向。</span><div class="sizes"><svg><use href="#catch-green"></use></svg><svg><use href="#catch-green"></use></svg><svg><use href="#catch-green"></use></svg><small>16 / 24 / 40</small></div></div>
+      </button>
+      <button class="option" type="button" data-icon="catch-pink" aria-pressed="false">
+        <div class="icon-field"><svg class="icon-main"><use href="#catch-pink"></use></svg></div>
+        <div class="option-meta"><strong>接住 · 夜粉</strong><span>同一动作换成深色底，在工具栏上更突出，带一点内容创作工具的个性。</span><div class="sizes"><svg><use href="#catch-pink"></use></svg><svg><use href="#catch-pink"></use></svg><svg><use href="#catch-pink"></use></svg><small>16 / 24 / 40</small></div></div>
+      </button>
+    </section>
+
+    <div class="section-label">
+      <h2>02 · 暂存门 / 原始配色</h2>
+      <p>让 Later 的 L 成为视觉识别</p>
+    </div>
+    <section class="grid">
+      <button class="option" type="button" data-icon="portal-yellow" aria-pressed="false">
+        <div class="icon-field"><svg class="icon-main"><use href="#portal-yellow"></use></svg></div>
+        <div class="option-meta"><strong>入口 · 黄</strong><span>粗黑 L 同时像一道入口，黄色辨识度最高，更偏大胆、年轻的产品气质。</span><div class="sizes"><svg><use href="#portal-yellow"></use></svg><svg><use href="#portal-yellow"></use></svg><svg><use href="#portal-yellow"></use></svg><small>16 / 24 / 40</small></div></div>
+      </button>
+      <button class="option" type="button" data-icon="portal-blue" aria-pressed="false">
+        <div class="icon-field"><svg class="icon-main"><use href="#portal-blue"></use></svg></div>
+        <div class="option-meta"><strong>入口 · 蓝</strong><span>保留现在的灰蓝品牌基因，但把普通叠放改成明确的 L 和进入动作。</span><div class="sizes"><svg><use href="#portal-blue"></use></svg><svg><use href="#portal-blue"></use></svg><svg><use href="#portal-blue"></use></svg><small>16 / 24 / 40</small></div></div>
+      </button>
+    </section>
+
+    <div class="section-label">
+      <h2>03 · 空间坐标 / 画布记忆</h2>
+      <p>强调内容落在无限画布上的位置</p>
+    </div>
+    <section class="grid">
+      <button class="option" type="button" data-icon="space-green" aria-pressed="false">
+        <div class="icon-field"><svg class="icon-main"><use href="#space-green"></use></svg></div>
+        <div class="option-meta"><strong>坐标 · 绿</strong><span>四角框出一块开放空间，中间是一条被收藏的内容，理性但仍有活力。</span><div class="sizes"><svg><use href="#space-green"></use></svg><svg><use href="#space-green"></use></svg><svg><use href="#space-green"></use></svg><small>16 / 24 / 40</small></div></div>
+      </button>
+      <button class="option" type="button" data-icon="space-pink" aria-pressed="false">
+        <div class="icon-field"><svg class="icon-main"><use href="#space-pink"></use></svg></div>
+        <div class="option-meta"><strong>坐标 · 粉</strong><span>内容轻微旋转，像刚被扔进画布；最松弛，也最接近 P 人的随手收藏。</span><div class="sizes"><svg><use href="#space-pink"></use></svg><svg><use href="#space-pink"></use></svg><svg><use href="#space-pink"></use></svg><small>16 / 24 / 40</small></div></div>
+      </button>
+    </section>
+
+    <footer class="note">
+      <span><strong>我的判断：</strong>融合后的“接住 · 明黄”同时拥有最贴合产品的动作和最强的工具栏记忆点。</span>
+      <span>选定方向后再微调线宽、倾斜角与正式品牌色，并导出插件需要的 16 / 48 / 128px PNG。</span>
+    </footer>
+  </main>
+
+  <script>
+    const options = [...document.querySelectorAll('.option')];
+    const toolbarUse = document.querySelector('#currentToolbarIcon use');
+    const modeButtons = [...document.querySelectorAll('[data-mode]')];
+    const stage = document.querySelector('#toolbarStage');
+
+    options.forEach((option) => option.addEventListener('click', () => {
+      options.forEach((item) => item.setAttribute('aria-pressed', String(item === option)));
+      toolbarUse.setAttribute('href', `#${option.dataset.icon}`);
+      stage.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }));
+
+    modeButtons.forEach((button) => button.addEventListener('click', () => {
+      modeButtons.forEach((item) => item.setAttribute('aria-pressed', String(item === button)));
+      stage.classList.toggle('dark', button.dataset.mode === 'dark');
+    }));
+  </script>
+</body>
+</html>

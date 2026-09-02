@@ -5,10 +5,11 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>开始使用 Later Space</title>
   <link rel="stylesheet" href="welcome.css">
+  <link rel="stylesheet" href="brand.css">
 </head>
 <body>
   <header class="topbar">
-    <a class="brand" href="https://wangranm-a11y.github.io/later-space/" target="_blank"><i></i><strong>Later Space</strong></a>
+    <a class="brand" href="https://wangranm-a11y.github.io/later-space/" target="_blank"><img src="icon.svg" alt=""><strong>Later Space</strong></a>
     <div class="progress" aria-label="引导进度"><span id="progressBar"></span></div>
     <button id="skip" class="text-button" type="button">稍后再说</button>
   </header>
@@ -26,20 +27,20 @@
       <div class="copy"><span class="eyebrow">02 · 收藏图片</span><h1>图片也可以随手留下</h1><p>把鼠标移到图片上，图标会安静地出现在右上角。点击后，它会真实加入你的 Later Space。</p><p id="imageStatus" class="status">把鼠标移到图片上试试</p></div>
       <div id="practiceImage" class="practice-image" role="img" aria-label="Later Space 新手练习图片" style="aspect-ratio:1.5">
         <div class="image-index">图片收藏练习</div><blockquote>Save the thought,<br>not the interruption.</blockquote><div class="image-footer"><span>LATER SPACE</span><span>新手练习</span></div>
-        <button id="imageCapture" class="float-capture" type="button" aria-label="收藏这张练习图片"><span></span></button>
+        <button id="imageCapture" class="float-capture" type="button" aria-label="收藏这张练习图片"><img src="icon.svg" alt=""></button>
       </div>
     </section>
 
     <section class="step" data-step="3">
       <div class="copy"><span class="eyebrow">03 · 收藏网页与同步</span><h1>整个网页，点一下插件就好</h1><p>想保存当前网页时，点击浏览器工具栏里的 Later Space，再选择“加入当前网页”。</p></div>
       <div class="explain-grid">
-        <div class="toolbar-demo"><div class="address">later-space.example/article</div><div class="toolbar-icon"><i></i></div><div class="popup-demo"><b>Later Space</b><span>当前网页</span><button>加入当前网页</button></div></div>
+        <div class="toolbar-demo"><div class="address">later-space.example/article</div><div class="toolbar-icon"><img src="icon.svg" alt=""></div><div class="popup-demo"><b>Later Space</b><span>当前网页</span><button>加入当前网页</button></div></div>
         <div class="login-card"><span class="eyebrow">登录不是门槛</span><h2>现在就能用，需要时再同步</h2><div class="login-row"><b>不登录</b><p>内容保存在当前浏览器。</p></div><div class="login-row"><b>登录后</b><p>Chrome、Edge 和其他设备汇合到同一账号。</p></div><p id="destination" class="destination">正在读取当前保存位置…</p><div class="button-row"><button id="connect" class="primary" type="button">连接 Later Space</button><button id="continueWithoutLogin" class="secondary" type="button">暂不登录</button></div></div>
       </div>
     </section>
 
     <section class="step complete" data-step="4" style="gap:14px">
-      <div class="complete-mark"><i></i><i></i></div><span class="eyebrow">准备好了</span><h1>以后，看到想留的东西就顺手收进来。</h1><p>练习内容已经进入 Later Space。你可以留下它，也可以现在清理干净。</p><p id="cleanupStatus" class="status"></p><div class="complete-actions"><button id="viewPractice" class="primary" type="button">查看练习内容</button><button id="deletePractice" class="secondary" type="button">删除练习内容</button><button id="keepPractice" class="text-button" type="button">保留并完成</button></div>
+      <img class="complete-mark" src="icon.svg" alt=""><span class="eyebrow">准备好了</span><h1>以后，看到想留的东西就顺手收进来。</h1><p>练习内容已经进入 Later Space。你可以留下它，也可以现在清理干净。</p><p id="cleanupStatus" class="status"></p><div class="complete-actions"><button id="viewPractice" class="primary" type="button">查看练习内容</button><button id="deletePractice" class="secondary" type="button">删除练习内容</button><button id="keepPractice" class="text-button" type="button">保留并完成</button></div>
     </section>
   </main>
 
