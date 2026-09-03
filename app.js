@@ -1,15 +1,19 @@
 const DB_NAME = "later-space-image-inbox";
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 const STORE_NAME = "images";
 const ASSET_STORE_NAME = "image-assets";
+const GUEST_WORKSPACE_KEY = "later-space-guest-workspace-v1";
+const CLOUD_MIGRATION_KEY = "later-space-cloud-migration-v1";
+const WELCOME_COMPLETED_KEY = "later-space-welcome-completed-v1";
+const CANVAS_GUIDE_DISMISSED_KEY = "later-space-canvas-guide-dismissed-v2";
+const AUTH_RETURN_STATE_KEY = "later-space-auth-return-v1";
 const THUMBNAIL_VERSION = 5;
 const TEXT_CARD_WIDTH = 300;
 const TEXT_CARD_HEIGHT = 375;
 const EXPANDED_TEXT_WIDTH = 420;
 const EXPANDED_TEXT_HEIGHT = 520;
 const STATIC_DEPLOYMENT = location.protocol !== "file:" && !["localhost", "127.0.0.1", "::1"].includes(location.hostname);
-const ONBOARDING_DISMISSED_KEY = "later-space-onboarding-dismissed-v1";
-document.documentElement.dataset.appVersion = "71";
+document.documentElement.dataset.appVersion = "74";
 document.documentElement.dataset.deployment = STATIC_DEPLOYMENT ? "static" : "local";
 
 const state = {
@@ -58,6 +62,14 @@ const state = {
   cloudPollTimer: null,
   cloudSyncing: false,
   cloudLastSyncAt: 0,
+  cloudRealtime: null,
+  cloudAuthClient: null,
+  cloudUsage: null,
+  captureToken: null,
+  migrationCancelled: false,
+  workspaceId: null,
+  onboardingForced: new URLSearchParams(location.search).get("onboarding") === "1",
+  authReturnActive: false,
   globalCoverPreference: localStorage.getItem("later-space-global-cover-mode") || "editorial",
   globalTextPreference: localStorage.getItem("later-space-global-text-theme") || "paper",
 };
@@ -69,9 +81,22 @@ const elements = {
   imageCount: document.querySelector("#imageCount"),
   emptyTitle: document.querySelector("#emptyTitle"),
   emptyHint: document.querySelector("#emptyHint"),
-  onboardingCards: document.querySelector("#onboardingCards"),
-  onboardingStartButton: document.querySelector("#onboardingStartButton"),
-  onboardingDismissButton: document.querySelector("#onboardingDismissButton"),
+  canvasGuide: document.querySelector("#canvasGuide"),
+  closeCanvasGuideButton: document.querySelector("#closeCanvasGuideButton"),
+  welcomeScreen: document.querySelector("#welcomeScreen"),
+  welcomeLoginForm: document.querySelector("#welcomeLoginForm"),
+  welcomeEmailInput: document.querySelector("#welcomeEmailInput"),
+  welcomeMailLink: document.querySelector("#welcomeMailLink"),
+  welcomeGuestButton: document.querySelector("#welcomeGuestButton"),
+  authReturnScreen: document.querySelector("#authReturnScreen"),
+  authReturnMark: document.querySelector("#authReturnMark"),
+  authReturnTitle: document.querySelector("#authReturnTitle"),
+  authReturnDetail: document.querySelector("#authReturnDetail"),
+  authReturnRetryButton: document.querySelector("#authReturnRetryButton"),
+  accountButton: document.querySelector("#accountButton"),
+  accountAvatar: document.querySelector("#accountAvatar"),
+  accountName: document.querySelector("#accountName"),
+  accountStatus: document.querySelector("#accountStatus"),
   searchInput: document.querySelector("#searchInput"),
   filterToggleButton: document.querySelector("#filterToggleButton"),
   filterCount: document.querySelector("#filterCount"),
@@ -169,6 +194,9 @@ const elements = {
   syncButton: document.querySelector("#syncButton"),
   syncPanel: document.querySelector("#syncPanel"),
   closeSyncButton: document.querySelector("#closeSyncButton"),
+  accountProfile: document.querySelector("#accountProfile"),
+  accountPanelAvatar: document.querySelector("#accountPanelAvatar"),
+  accountNameInput: document.querySelector("#accountNameInput"),
   syncStatus: document.querySelector(".sync-status"),
   syncStatusTitle: document.querySelector("#syncStatusTitle"),
   syncStatusDetail: document.querySelector("#syncStatusDetail"),
@@ -178,17 +206,86 @@ const elements = {
   syncActions: document.querySelector("#syncActions"),
   signOutButton: document.querySelector("#signOutButton"),
   syncNowButton: document.querySelector("#syncNowButton"),
+  undoMigrationButton: document.querySelector("#undoMigrationButton"),
+  accountMigration: document.querySelector("#accountMigration"),
+  accountMigrationTitle: document.querySelector("#accountMigrationTitle"),
+  accountMigrationDetail: document.querySelector("#accountMigrationDetail"),
+  accountMigrationButton: document.querySelector("#accountMigrationButton"),
+  migrationBackdrop: document.querySelector("#migrationBackdrop"),
+  migrationDialog: document.querySelector("#migrationDialog"),
+  closeMigrationButton: document.querySelector("#closeMigrationButton"),
+  migrationTitle: document.querySelector("#migrationTitle"),
+  migrationSummary: document.querySelector("#migrationSummary"),
+  migrationTotal: document.querySelector("#migrationTotal"),
+  migrationMedia: document.querySelector("#migrationMedia"),
+  migrationReading: document.querySelector("#migrationReading"),
+  startMigrationButton: document.querySelector("#startMigrationButton"),
+  deferMigrationButton: document.querySelector("#deferMigrationButton"),
+  cloudUsage: document.querySelector("#cloudUsage"),
+  cloudUsageTitle: document.querySelector("#cloudUsageTitle"),
+  cloudUsageValue: document.querySelector("#cloudUsageValue"),
+  cloudUsageMeter: document.querySelector("#cloudUsageMeter"),
+  cloudUsageHint: document.querySelector("#cloudUsageHint"),
+  captureTokenStatus: document.querySelector("#captureTokenStatus"),
+  captureTokenActions: document.querySelector("#captureTokenActions"),
+  createCaptureTokenButton: document.querySelector("#createCaptureTokenButton"),
+  copyCaptureUrlButton: document.querySelector("#copyCaptureUrlButton"),
+  revokeCaptureTokenButton: document.querySelector("#revokeCaptureTokenButton"),
+  createAgentTokenButton: document.querySelector("#createAgentTokenButton"),
+  agentTokenStatus: document.querySelector("#agentTokenStatus"),
+  mobileInbox: document.querySelector("#mobileInbox"),
+  mobileInboxList: document.querySelector("#mobileInboxList"),
+  mobileInboxEmpty: document.querySelector("#mobileInboxEmpty"),
+  mobileInboxCount: document.querySelector("#mobileInboxCount"),
+  mobileInboxUnsorted: document.querySelector("#mobileInboxUnsorted"),
+  mobileAddButton: document.querySelector("#mobileAddButton"),
+  mobileCanvasButton: document.querySelector("#mobileCanvasButton"),
+  mobileSyncButton: document.querySelector("#mobileSyncButton"),
 };
 
 const WORKFLOW_STATUSES = new Set(["inbox", "unread", "inspired", "action", "read"]);
+
+function guestWorkspaceId() {
+  let id = localStorage.getItem(GUEST_WORKSPACE_KEY);
+  if (!id) {
+    id = `guest:${makeId()}`;
+    localStorage.setItem(GUEST_WORKSPACE_KEY, id);
+  }
+  return id;
+}
+
+function userWorkspaceId(userId) {
+  return `user:${userId}`;
+}
+
+function activeWorkspaceId() {
+  return state.workspaceId || guestWorkspaceId();
+}
 
 function openDatabase() {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION);
     request.onupgradeneeded = () => {
       const db = request.result;
-      if (!db.objectStoreNames.contains(STORE_NAME)) db.createObjectStore(STORE_NAME, { keyPath: "id" });
-      if (!db.objectStoreNames.contains(ASSET_STORE_NAME)) db.createObjectStore(ASSET_STORE_NAME, { keyPath: "id" });
+      const transaction = request.transaction;
+      const recordStore = db.objectStoreNames.contains(STORE_NAME)
+        ? transaction.objectStore(STORE_NAME)
+        : db.createObjectStore(STORE_NAME, { keyPath: "id" });
+      const assetStore = db.objectStoreNames.contains(ASSET_STORE_NAME)
+        ? transaction.objectStore(ASSET_STORE_NAME)
+        : db.createObjectStore(ASSET_STORE_NAME, { keyPath: "id" });
+      if (!recordStore.indexNames.contains("workspaceId")) recordStore.createIndex("workspaceId", "workspaceId", { unique: false });
+      if (!assetStore.indexNames.contains("workspaceId")) assetStore.createIndex("workspaceId", "workspaceId", { unique: false });
+      const guestId = guestWorkspaceId();
+      [recordStore, assetStore].forEach((store) => {
+        const cursorRequest = store.openCursor();
+        cursorRequest.onsuccess = () => {
+          const cursor = cursorRequest.result;
+          if (!cursor) return;
+          if (!cursor.value.workspaceId) cursor.update({ ...cursor.value, workspaceId: guestId });
+          cursor.continue();
+        };
+      });
     };
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error);
@@ -221,7 +318,7 @@ function sumOriginalAssetBytes() {
     request.onsuccess = () => {
       const cursor = request.result;
       if (!cursor) return resolve(total);
-      total += cursor.value?.blob?.size || 0;
+      if ((cursor.value?.workspaceId || guestWorkspaceId()) === activeWorkspaceId()) total += cursor.value?.blob?.size || 0;
       cursor.continue();
     };
     request.onerror = () => reject(request.error);
@@ -281,6 +378,33 @@ async function createThumbnail(blob, maximumSide = 960) {
   ));
 }
 
+async function optimizeImageFile(file, maximumSide = 1920) {
+  if (!file?.type?.startsWith("image/")) return file;
+  let image;
+  try {
+    image = await createImageBitmap(file);
+  } catch {
+    if (file.size <= 5 * 1024 * 1024 && ["image/jpeg", "image/png", "image/webp"].includes(file.type)) return file;
+    throw new Error("图片无法处理");
+  }
+  const scale = Math.min(1, maximumSide / Math.max(image.width, image.height));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(image.width * scale));
+  canvas.height = Math.max(1, Math.round(image.height * scale));
+  const context = canvas.getContext("2d", { alpha: true });
+  context.drawImage(image, 0, 0, canvas.width, canvas.height);
+  image.close();
+
+  const encode = (type, quality) => new Promise((resolve) => canvas.toBlob(resolve, type, quality));
+  let blob = await encode("image/webp", .84);
+  if (!blob) blob = await encode("image/jpeg", .84);
+  if (blob?.size > 5 * 1024 * 1024) blob = await encode(blob.type || "image/jpeg", .72);
+  if (!blob || blob.size > 5 * 1024 * 1024) throw new Error("图片优化后仍然超过 5 MB");
+  const extension = blob.type === "image/webp" ? "webp" : "jpg";
+  const name = `${(file.name || "Later Space").replace(/\.[^.]+$/, "")}.${extension}`;
+  return new File([blob], name, { type: blob.type, lastModified: Date.now() });
+}
+
 async function originalBlob(record) {
   if (record.kind === "text" || record.kind === "link") return null;
   const asset = await transactAsset("readonly", (store) => store.get(record.id));
@@ -288,7 +412,7 @@ async function originalBlob(record) {
 }
 
 async function storeImageAsset(record, blob) {
-  await transactAsset("readwrite", (store) => store.put({ id: record.id, blob }));
+  await transactAsset("readwrite", (store) => store.put({ id: record.id, workspaceId: record.workspaceId || activeWorkspaceId(), blob }));
 }
 
 async function backupImageAssets() {
@@ -765,13 +889,26 @@ function defaultPlacement(index, width, height) {
   };
 }
 
-async function loadImages() {
+async function recordsForWorkspace(workspaceId = activeWorkspaceId(), { includeHidden = false } = {}) {
   const records = await transact("readonly", (store) => store.getAll());
+  return records.filter((record) => (
+    (record.workspaceId || guestWorkspaceId()) === workspaceId
+    && (includeHidden || !record.hiddenByMigration)
+  ));
+}
+
+async function loadImages(workspaceId = activeWorkspaceId()) {
+  state.workspaceId = workspaceId;
+  const records = await recordsForWorkspace(workspaceId);
   records.sort((a, b) => a.createdAt - b.createdAt);
   let migrated = false;
   const needsAssetRecovery = records.some((record) => isMediaRecord(record) && record.thumbnailVersion !== THUMBNAIL_VERSION);
   const recoveredAssets = needsAssetRecovery ? await backupImageAssets() : new Map();
   state.images = records.map((record, index) => {
+    if (!record.workspaceId) {
+      record.workspaceId = workspaceId;
+      migrated = true;
+    }
     if (!WORKFLOW_STATUSES.has(record.status)) {
       record.status = "unread";
       migrated = true;
@@ -835,6 +972,111 @@ async function loadImages() {
   render();
 }
 
+async function clearWorkspace(workspaceId) {
+  const records = await transact("readonly", (store) => store.getAll());
+  const targets = records.filter((record) => (record.workspaceId || guestWorkspaceId()) === workspaceId);
+  for (const record of targets) {
+    await transact("readwrite", (store) => store.delete(record.id));
+    await transactAsset("readwrite", (store) => store.delete(record.id));
+  }
+}
+
+async function switchWorkspace(workspaceId) {
+  state.objectUrls.forEach((url) => URL.revokeObjectURL(url));
+  state.objectUrls.clear();
+  state.assetUrls.forEach((url) => URL.revokeObjectURL(url));
+  state.assetUrls.clear();
+  state.selectedId = null;
+  state.selectedIds.clear();
+  await loadImages(workspaceId);
+}
+
+function showWelcomeScreen() {
+  elements.welcomeScreen.hidden = false;
+  requestAnimationFrame(() => elements.welcomeEmailInput.focus());
+}
+
+function closeWelcomeScreen() {
+  localStorage.setItem(WELCOME_COMPLETED_KEY, "true");
+  elements.welcomeScreen.hidden = true;
+  showCanvasGuide();
+}
+
+function showInitialWelcome() {
+  if (state.authReturnActive) return;
+  if (state.onboardingForced) return showWelcomeScreen();
+  if (state.cloudSession?.user || state.images.length || localStorage.getItem(WELCOME_COMPLETED_KEY) === "true") return showCanvasGuide();
+  showWelcomeScreen();
+}
+
+function showAuthReturnScreen(status = "pending", detail = "正在确认你的邮箱，并带你回到刚才的画布。") {
+  state.authReturnActive = true;
+  elements.welcomeScreen.hidden = true;
+  elements.authReturnScreen.hidden = false;
+  elements.authReturnScreen.dataset.status = status;
+  elements.authReturnTitle.textContent = status === "error" ? "登录没有完成" : "正在完成登录";
+  elements.authReturnDetail.textContent = detail;
+  elements.authReturnRetryButton.hidden = status !== "error";
+}
+
+function saveAuthReturnState() {
+  localStorage.setItem(AUTH_RETURN_STATE_KEY, JSON.stringify({
+    view: state.view,
+    savedAt: Date.now(),
+  }));
+}
+
+function restoreAuthReturnState() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(AUTH_RETURN_STATE_KEY));
+    if (saved?.view && Date.now() - Number(saved.savedAt || 0) < 24 * 60 * 60 * 1000) {
+      state.view = { ...state.view, ...saved.view };
+      updateView();
+    }
+  } catch {
+  }
+  localStorage.removeItem(AUTH_RETURN_STATE_KEY);
+}
+
+function closeWelcomeAfterAuthentication() {
+  localStorage.setItem(WELCOME_COMPLETED_KEY, "true");
+  elements.welcomeScreen.hidden = true;
+  elements.authReturnScreen.hidden = true;
+  state.authReturnActive = false;
+  restoreAuthReturnState();
+  renderAccountEntry();
+  showToast("登录成功，内容已开始同步");
+  showCanvasGuide();
+}
+
+function showCanvasGuide() {
+  const forced = new URLSearchParams(location.search).get("guide") === "1";
+  elements.canvasGuide.hidden = !forced && localStorage.getItem(CANVAS_GUIDE_DISMISSED_KEY) === "true";
+}
+
+function finishCanvasGuide() {
+  localStorage.setItem(CANVAS_GUIDE_DISMISSED_KEY, "true");
+  elements.canvasGuide.hidden = true;
+}
+
+function accountDisplayName(user = state.cloudSession?.user) {
+  return user?.user_metadata?.display_name || user?.email?.split("@")[0] || "我的";
+}
+
+function renderAccountEntry() {
+  const user = state.cloudSession?.user;
+  const name = accountDisplayName(user);
+  elements.accountAvatar.textContent = user ? name.trim().slice(0, 1).toUpperCase() : "L";
+  elements.accountName.textContent = user ? name : "登录";
+  elements.accountStatus.textContent = user ? (state.cloudLastSyncAt ? "已同步" : "同步中") : "开启同步";
+  elements.accountButton.classList.toggle("is-signed-in", Boolean(user));
+  elements.accountProfile.hidden = !user;
+  if (user) {
+    elements.accountPanelAvatar.textContent = name.trim().slice(0, 1).toUpperCase();
+    if (document.activeElement !== elements.accountNameInput) elements.accountNameInput.value = name;
+  }
+}
+
 function render() {
   const filteredRecords = visibleRecords();
   const renderedRecords = recordsNearViewport(filteredRecords);
@@ -853,11 +1095,8 @@ function render() {
   elements.imageCount.textContent = filtersAreActive() || showsSubset ? `${filteredRecords.length}/${state.images.length}` : state.images.length;
   elements.emptyCue.hidden = filteredRecords.length > 0;
   elements.emptyCue.setAttribute("aria-hidden", filteredRecords.length > 0 ? "true" : "false");
-  elements.emptyTitle.textContent = state.images.length ? "没有找到匹配内容" : "粘贴图片、视频、链接或文字";
+  elements.emptyTitle.textContent = state.images.length ? "没有找到匹配内容" : "粘贴图片、链接或文字";
   elements.emptyHint.innerHTML = state.images.length ? "换个关键词，或者重置筛选" : "<kbd>⌘</kbd><kbd>V</kbd>";
-  const showOnboarding = !state.images.length && localStorage.getItem(ONBOARDING_DISMISSED_KEY) !== "true";
-  elements.onboardingCards.hidden = !showOnboarding;
-  elements.onboardingCards.setAttribute("aria-hidden", showOnboarding ? "false" : "true");
   if (state.selectedId && !filteredRecords.some((record) => record.id === state.selectedId)) state.selectedId = null;
   const filteredIds = new Set(filteredRecords.map((record) => record.id));
   state.selectedIds.forEach((id) => { if (!filteredIds.has(id)) state.selectedIds.delete(id); });
@@ -890,6 +1129,34 @@ function render() {
   renderSelection();
   renderGlobalCoverMode();
   renderGlobalTextTheme();
+  renderMobileInbox();
+  renderAccountEntry();
+}
+
+function mobileRecordTitle(record) {
+  if (record.kind === "link") return displayLinkTitle(record.title || record.url || "收藏的链接");
+  if (record.kind === "text") return longTextTitle(record.text || "文字收藏");
+  return record.name || (record.kind === "video" ? "收藏的视频" : "收藏的图片");
+}
+
+function mobileRecordMeta(record) {
+  const kind = record.kind === "link" ? "链接" : record.kind === "text" ? "文字" : record.kind === "video" ? "视频" : "图片";
+  const status = (record.tags || []).length ? `#${record.tags[0]}` : "未整理";
+  return `${kind} · ${status}`;
+}
+
+function renderMobileInbox() {
+  if (!elements.mobileInboxList) return;
+  const records = [...state.images].sort((left, right) => Number(right.createdAt || 0) - Number(left.createdAt || 0));
+  const recent = records.slice(0, 40);
+  elements.mobileInboxCount.textContent = `${records.length} 条收藏`;
+  elements.mobileInboxUnsorted.textContent = `${records.filter((record) => !(record.tags || []).length).length} 条未整理`;
+  elements.mobileInboxEmpty.hidden = recent.length > 0;
+  elements.mobileInboxList.innerHTML = recent.map((record) => {
+    const media = isMediaRecord(record) && record.kind !== "video" ? `<img src="${escapeHtml(imageUrl(record))}" alt="" />` : "";
+    const icon = record.kind === "link" ? "↗" : record.kind === "text" ? "✎" : record.kind === "video" ? "▶" : "▧";
+    return `<button class="mobile-inbox-item" type="button" data-mobile-record-id="${escapeHtml(record.id)}"><span class="mobile-inbox-thumb">${media || icon}</span><span class="mobile-inbox-meta"><strong>${escapeHtml(mobileRecordTitle(record))}</strong><span>${escapeHtml(mobileRecordMeta(record))}</span></span><span class="mobile-inbox-arrow" aria-hidden="true">›</span></button>`;
+  }).join("");
 }
 
 function renderGlobalCoverMode() {
@@ -984,7 +1251,7 @@ async function openStoragePanel() {
     : "尚无备份";
   elements.storageHint.textContent = ratio > .8
     ? "本地空间已接近浏览器配额，建议立即导出或启用云端同步。"
-    : "原图按需加载，画布只使用缩略图；云端同步上线后，本地可进一步改为缓存模式。";
+    : "Later Space 保存清晰优化版；导出时也是优化版。登录后还会同步到云端。";
 }
 
 function openBatchEditor() {
@@ -1312,14 +1579,26 @@ function createVideoThumbnail(blob) {
 }
 
 async function saveFiles(fileList, source, screenPoint, purpose = "", tags = [], confirmDuplicates = true) {
-  const files = Array.from(fileList).filter((file) => file?.type?.startsWith("image/") || file?.type?.startsWith("video/"));
-  if (!files.length) return showToast("没有找到图片或视频");
+  const files = Array.from(fileList).filter((file) => file?.type?.startsWith("image/"));
+  if (!files.length) return showToast("第一版暂时只支持图片");
+  if (state.cloudSession?.user && files.some((file) => file.type.startsWith("image/")) && cloudUsageRatio() >= .85) {
+    return showToast("图片空间已满，请先删除一些图片；文字和链接仍可收藏");
+  }
   const center = screenPoint ? screenToWorld(screenPoint.x, screenPoint.y) : worldCenter();
   const baseOffset = state.pasteOffset;
   const savedRecords = [];
-  for (const [index, file] of files.entries()) {
-    const fingerprint = await blobFingerprint(file);
+  for (const [index, sourceFile] of files.entries()) {
+    let file = sourceFile;
     const isVideo = file.type.startsWith("video/");
+    if (!isVideo) {
+      try {
+        file = await optimizeImageFile(file);
+      } catch (error) {
+        showToast(error.message || "图片无法处理");
+        continue;
+      }
+    }
+    const fingerprint = await blobFingerprint(file);
     const duplicate = state.images.find((record) => isMediaRecord(record) && record.fingerprint === fingerprint);
     if (duplicate && (!confirmDuplicates || !await confirmDuplicateUpload(isVideo ? "这个视频" : "这张图片", duplicate))) continue;
     const dimensions = isVideo ? await getVideoInfo(file) : await getDimensions(file);
@@ -1329,7 +1608,7 @@ async function saveFiles(fileList, source, screenPoint, purpose = "", tags = [],
     const placement = openPlacement(center, canvasWidth, canvasWidth * ratio);
     const now = Date.now() + index;
     const record = {
-      id: makeId(), ...(isVideo ? { kind: "video" } : {}), thumbnail, thumbnailVersion: THUMBNAIL_VERSION, name: file.name || `${isVideo ? "粘贴视频" : "粘贴图片"} ${new Date(now).toLocaleTimeString("zh-CN")}`,
+      id: makeId(), workspaceId: activeWorkspaceId(), ...(isVideo ? { kind: "video" } : {}), thumbnail, thumbnailVersion: THUMBNAIL_VERSION, name: file.name || `${isVideo ? "粘贴视频" : "粘贴图片"} ${new Date(now).toLocaleTimeString("zh-CN")}`,
       type: file.type, size: file.size, width: dimensions.width, height: dimensions.height, duration: dimensions.duration || 0, fingerprint,
       status: "inbox", tags: [...tags], note: purpose, source, createdAt: now, updatedAt: now,
       canvasX: placement.x,
@@ -1360,7 +1639,7 @@ async function saveText(text, arrivalOrigin = screenCenter(), tags = [], confirm
   const placement = openPlacement(center, size.width, size.height);
   const now = Date.now();
   const record = {
-    id: makeId(), kind: "text", text, name: text.slice(0, 32),
+    id: makeId(), workspaceId: activeWorkspaceId(), kind: "text", text, name: text.slice(0, 32),
     textTheme: state.globalTextPreference,
     status: "inbox", tags: [...tags], note: "", source: "compose", createdAt: now, updatedAt: now,
     canvasX: placement.x, canvasY: placement.y, canvasWidth: size.width, textHeight: size.height, textScale: 1,
@@ -1594,7 +1873,7 @@ async function saveLinks(urls, sourceText = "", purpose = "", customTitle = "", 
     const now = Date.now() + index;
     const shareTitle = titleFromShareText(sourceText, value);
     const record = {
-      id: makeId(), kind: "link", url: normalized, canonicalUrl: canonical, name: linkHostname(normalized),
+      id: makeId(), workspaceId: activeWorkspaceId(), kind: "link", url: normalized, canonicalUrl: canonical, name: linkHostname(normalized),
       title: customTitle || shareTitle, shareTitle, customTitle: Boolean(customTitle), description: "", previewImage: "", previewState: "loading",
       purpose,
       coverIndex: randomIndex(LINK_COVERS.length), fontIndex: 0, coverMode: state.globalCoverPreference,
@@ -1638,9 +1917,10 @@ async function enrichLink(record) {
 
 async function persistRecord(record) {
   record.updatedAt = Date.now();
+  record.workspaceId = record.workspaceId || activeWorkspaceId();
   await transact("readwrite", (store) => store.put(record));
-  scheduleBackup();
-}
+    scheduleBackup();
+  }
 
 async function shuffleSelectedCover() {
   const record = state.images.find((item) => item.id === state.selectedId);
@@ -2019,11 +2299,10 @@ function scheduleBackup() {
 
 async function restorePayload(payload) {
   if (!payload || payload.app !== "Later Space" || !Array.isArray(payload.images)) throw new Error("invalid backup");
-  await transact("readwrite", (store) => store.clear());
-  await transactAsset("readwrite", (store) => store.clear());
+  await clearWorkspace(activeWorkspaceId());
   const records = [];
   for (const record of payload.images) {
-    const restored = { ...record };
+    const restored = { ...record, workspaceId: activeWorkspaceId() };
     if (restored.dataUrl) {
       const blob = dataUrlToBlob(restored.dataUrl);
       await storeImageAsset(restored, blob);
@@ -2100,6 +2379,205 @@ function cloudConfigured() {
   return Boolean(config.supabaseUrl && config.supabaseAnonKey);
 }
 
+async function loadCloudUsage() {
+  const user = state.cloudSession?.user;
+  if (!user) {
+    state.cloudUsage = null;
+    return null;
+  }
+  const response = await cloudRequest(`/rest/v1/later_space_usage?user_id=eq.${encodeURIComponent(user.id)}&select=used_bytes,quota_bytes`);
+  if (!response.ok) return state.cloudUsage;
+  const rows = await response.json();
+  state.cloudUsage = rows[0] || { used_bytes: 0, quota_bytes: 50 * 1024 * 1024 };
+  return state.cloudUsage;
+}
+
+function cloudUsageRatio() {
+  if (!state.cloudUsage?.quota_bytes) return 0;
+  return Number(state.cloudUsage.used_bytes || 0) / Number(state.cloudUsage.quota_bytes);
+}
+
+function renderCloudUsage() {
+  if (!elements.cloudUsage) return;
+  const user = state.cloudSession?.user;
+  elements.cloudUsage.hidden = !user;
+  if (!user) return;
+  const usage = state.cloudUsage || { used_bytes: 0, quota_bytes: 50 * 1024 * 1024 };
+  const ratio = Math.min(1, Number(usage.used_bytes || 0) / Number(usage.quota_bytes || 1));
+  elements.cloudUsageValue.textContent = `${formatBytes(Number(usage.used_bytes || 0))} / ${formatBytes(Number(usage.quota_bytes || 0))}`;
+  elements.cloudUsageMeter.style.width = `${ratio * 100}%`;
+  elements.cloudUsage.dataset.level = ratio >= .85 ? "blocked" : ratio >= .8 ? "urgent" : ratio >= .7 ? "warning" : "normal";
+  elements.cloudUsageTitle.textContent = ratio >= .85 ? "图片空间已满" : ratio >= .8 ? "图片空间快满了" : "图片空间";
+  elements.cloudUsageHint.textContent = ratio >= .85
+    ? "请先删除一些图片；文字和链接仍可继续收藏。"
+    : ratio >= .8
+      ? "建议现在清理图片，达到 85% 后会暂停新增图片。"
+      : ratio >= .7
+        ? "空间正在变满，可以开始整理不需要的图片。"
+        : "达到 85% 后暂停新增图片，文字和链接不受影响。";
+}
+
+function notifyCloudUsage() {
+  const user = state.cloudSession?.user;
+  if (!user) return;
+  const ratio = cloudUsageRatio();
+  const level = ratio >= .85 ? 3 : ratio >= .8 ? 2 : ratio >= .7 ? 1 : 0;
+  const key = `later-space-usage-notice-v1:${user.id}`;
+  const previous = Number(localStorage.getItem(key) || 0);
+  if (level === 0) {
+    localStorage.removeItem(key);
+    return;
+  }
+  if (level <= previous) return;
+  localStorage.setItem(key, String(level));
+  const message = level === 3
+    ? "图片空间已满，请先清理；文字和链接仍可收藏"
+    : level === 2
+      ? "图片空间已经使用 80%，建议现在清理"
+      : "图片空间已经使用 70%，可以开始整理了";
+  showToast(message, "查看空间", openSyncPanel);
+}
+
+function captureTokenLocalKey(userId) {
+  return `later-space-capture-token-v1:${userId}`;
+}
+
+async function hashText(value) {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
+  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+function newCaptureToken() {
+  const bytes = crypto.getRandomValues(new Uint8Array(32));
+  return [...bytes].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+function personalCaptureUrl(token = state.captureToken) {
+  if (!token) return "";
+  return `${cloudConfig().supabaseUrl}/functions/v1/mobile-inbox?token=${encodeURIComponent(token)}`;
+}
+
+async function loadCaptureTokenState() {
+  const user = state.cloudSession?.user;
+  state.captureToken = user ? localStorage.getItem(captureTokenLocalKey(user.id)) : null;
+  if (!user) return;
+  const response = await cloudRequest(`/rest/v1/later_space_capture_tokens?user_id=eq.${encodeURIComponent(user.id)}&revoked_at=is.null&select=id,token_hint,last_used_at&order=created_at.desc&limit=1`);
+  const rows = response.ok ? await response.json() : [];
+  const active = rows[0] || null;
+  elements.captureTokenActions.hidden = false;
+  elements.copyCaptureUrlButton.hidden = !state.captureToken;
+  elements.revokeCaptureTokenButton.hidden = !active;
+  elements.createCaptureTokenButton.textContent = active ? "重新生成地址" : "生成专属地址";
+  elements.captureTokenStatus.textContent = active
+    ? state.captureToken
+      ? `已连接 · 尾号 ${active.token_hint}${active.last_used_at ? ` · 最近使用 ${new Date(active.last_used_at).toLocaleDateString("zh-CN")}` : ""}`
+      : `这台设备没有保存地址 · 请重新生成（尾号 ${active.token_hint}）`
+    : "生成后只需在快捷指令里粘贴一次";
+}
+
+async function revokeActiveCaptureTokens() {
+  const user = state.cloudSession?.user;
+  if (!user) return;
+  await cloudRequest(`/rest/v1/later_space_capture_tokens?user_id=eq.${encodeURIComponent(user.id)}&revoked_at=is.null`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", Prefer: "return=minimal" },
+    body: JSON.stringify({ revoked_at: new Date().toISOString() }),
+  });
+  localStorage.removeItem(captureTokenLocalKey(user.id));
+  state.captureToken = null;
+}
+
+async function createCaptureToken() {
+  const user = state.cloudSession?.user;
+  if (!user) return;
+  elements.createCaptureTokenButton.disabled = true;
+  try {
+    await revokeActiveCaptureTokens();
+    const token = newCaptureToken();
+    const tokenHash = await hashText(token);
+    const response = await cloudRequest("/rest/v1/later_space_capture_tokens", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Prefer: "return=minimal" },
+      body: JSON.stringify({ user_id: user.id, token_hash: tokenHash, token_hint: token.slice(-6) }),
+    });
+    if (!response.ok) throw new Error(await response.text());
+    localStorage.setItem(captureTokenLocalKey(user.id), token);
+    state.captureToken = token;
+    await loadCaptureTokenState();
+    showToast("专属收件地址已生成", "复制", copyPersonalCaptureUrl);
+  } catch (error) {
+    console.error(error);
+    showToast("生成失败，请稍后重试");
+  } finally {
+    elements.createCaptureTokenButton.disabled = false;
+  }
+}
+
+async function createAgentToken() {
+  const user = state.cloudSession?.user;
+  if (!user || !elements.createAgentTokenButton) return;
+  elements.createAgentTokenButton.disabled = true;
+  try {
+    const response = await cloudRequest("/functions/v1/agent-read", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "Later Space Agent" }),
+    });
+    const result = await response.json();
+    if (!response.ok || !result.token) throw new Error(result.error || "token_create_failed");
+    await navigator.clipboard.writeText(result.token);
+    elements.agentTokenStatus.textContent = "Token 已复制；只显示这一次，请粘贴到 CLI 的 auth 命令";
+    elements.createAgentTokenButton.textContent = "重新生成";
+    showToast("Agent Token 已复制");
+  } catch (error) {
+    console.error(error);
+    showToast("Agent Token 生成失败，请先部署 agent-read 函数");
+  } finally {
+    elements.createAgentTokenButton.disabled = false;
+  }
+}
+
+async function copyPersonalCaptureUrl() {
+  const url = personalCaptureUrl();
+  if (!url) return showToast("请先生成专属收件地址");
+  try {
+    await navigator.clipboard.writeText(url);
+    showToast("收件地址已复制");
+  } catch {
+    window.prompt("长按复制这条收件地址", url);
+  }
+}
+
+async function stopCaptureToken() {
+  await revokeActiveCaptureTokens();
+  await loadCaptureTokenState();
+  showToast("手机快捷收件已停用");
+}
+
+async function subscribeCloudRealtime() {
+  unsubscribeCloudRealtime();
+  const user = state.cloudSession?.user;
+  if (!user || !window.supabase?.createClient) return;
+  const client = window.supabase.createClient(cloudConfig().supabaseUrl, cloudConfig().supabaseAnonKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+  await client.auth.setSession({
+    access_token: state.cloudSession.access_token,
+    refresh_token: state.cloudSession.refresh_token,
+  });
+  const channel = client
+    .channel(`later-space-items-${user.id}`)
+    .on("postgres_changes", { event: "*", schema: "public", table: "later_space_items", filter: `user_id=eq.${user.id}` }, () => syncCloud())
+    .subscribe();
+  state.cloudRealtime = { client, channel };
+}
+
+function unsubscribeCloudRealtime() {
+  if (!state.cloudRealtime) return;
+  state.cloudRealtime.client.removeChannel(state.cloudRealtime.channel);
+  state.cloudRealtime = null;
+}
+
 function cloudDeviceId() {
   let id = localStorage.getItem(CLOUD_DEVICE_KEY);
   if (!id) {
@@ -2110,18 +2588,226 @@ function cloudDeviceId() {
 }
 
 function cloudDeletionMap() {
-  try { return JSON.parse(localStorage.getItem(CLOUD_DELETIONS_KEY)) || {}; }
+  const owner = state.cloudSession?.user?.id || "guest";
+  try { return JSON.parse(localStorage.getItem(`${CLOUD_DELETIONS_KEY}:${owner}`)) || {}; }
   catch { return {}; }
 }
 
 function saveCloudDeletionMap(value) {
-  localStorage.setItem(CLOUD_DELETIONS_KEY, JSON.stringify(value));
+  const owner = state.cloudSession?.user?.id || "guest";
+  localStorage.setItem(`${CLOUD_DELETIONS_KEY}:${owner}`, JSON.stringify(value));
+}
+
+function cloudMigrationStorageKey(userId) {
+  return `${CLOUD_MIGRATION_KEY}:${userId}`;
+}
+
+function readCloudMigration(userId) {
+  try { return JSON.parse(localStorage.getItem(cloudMigrationStorageKey(userId))) || null; }
+  catch { return null; }
+}
+
+function saveCloudMigration(userId, value) {
+  if (value) localStorage.setItem(cloudMigrationStorageKey(userId), JSON.stringify(value));
+  else localStorage.removeItem(cloudMigrationStorageKey(userId));
+}
+
+function migrationCounts(records) {
+  const eligible = records.filter((record) => record.kind !== "video" && !record.hiddenByMigration);
+  return {
+    total: eligible.length,
+    media: eligible.filter((record) => isImageRecord(record)).length,
+    reading: eligible.filter((record) => record.kind === "link" || record.kind === "text").length,
+  };
+}
+
+function migrationFingerprint(record) {
+  if (record.kind === "link") return `link:${canonicalUrl(record.url || "")}`;
+  if (record.kind === "text") return `text:${normalizedTextFingerprint(record.text || "")}`;
+  if (isImageRecord(record)) return `image:${record.fingerprint || ""}`;
+  return "";
+}
+
+function migrationEligibleRecords(records) {
+  const existingFingerprints = new Set(state.images.map(migrationFingerprint).filter(Boolean));
+  return records.filter((record) => {
+    if (record.kind === "video" || record.hiddenByMigration) return false;
+    const fingerprint = migrationFingerprint(record);
+    if (fingerprint && existingFingerprints.has(fingerprint)) return false;
+    if (fingerprint) existingFingerprints.add(fingerprint);
+    return true;
+  });
+}
+
+function closeMigrationDialog() {
+  elements.migrationDialog.hidden = true;
+  elements.migrationBackdrop.hidden = true;
+}
+
+async function migrationGuestRecords() {
+  return recordsForWorkspace(guestWorkspaceId(), { includeHidden: true });
+}
+
+async function openMigrationDialog() {
+  const records = await migrationGuestRecords();
+  const counts = migrationCounts(records);
+  if (!counts.total) return showToast("这台设备没有待迁移的旧收藏");
+  elements.migrationTitle.textContent = `发现本机旧收藏 ${counts.total} 条`;
+  elements.migrationSummary.textContent = "可以把它们带入当前账号，在其他设备继续查看。";
+  elements.migrationTotal.textContent = counts.total;
+  elements.migrationMedia.textContent = counts.media;
+  elements.migrationReading.textContent = counts.reading;
+  elements.migrationBackdrop.hidden = false;
+  elements.migrationDialog.hidden = false;
+}
+
+async function deferGuestMigration() {
+  const user = state.cloudSession?.user;
+  if (!user) return;
+  const existing = readCloudMigration(user.id) || {};
+  saveCloudMigration(user.id, { ...existing, status: "deferred", deferredAt: Date.now() });
+  closeMigrationDialog();
+  await refreshMigrationOffer();
+  showToast("可以随时在「我的」里继续迁移");
+}
+
+async function refreshMigrationOffer({ prompt = false } = {}) {
+  const user = state.cloudSession?.user;
+  if (!user) {
+    elements.accountMigration.hidden = true;
+    return;
+  }
+  const records = await migrationGuestRecords();
+  const counts = migrationCounts(records);
+  const migration = readCloudMigration(user.id);
+  const canMigrate = counts.total > 0 && migration?.status !== "complete" && migration?.status !== "pending";
+  elements.accountMigration.hidden = !canMigrate;
+  if (canMigrate) {
+    elements.accountMigrationTitle.textContent = `发现本机旧收藏 ${counts.total} 条`;
+    elements.accountMigrationDetail.textContent = migration?.status === "deferred" ? "已暂缓，准备好时随时可以继续。" : "可以安全迁移到当前账号。";
+  }
+  if (prompt && canMigrate && migration?.status !== "deferred") {
+    saveCloudMigration(user.id, { ...(migration || {}), status: "available", detectedAt: migration?.detectedAt || Date.now() });
+    await openMigrationDialog();
+  }
+}
+
+async function deleteLocalRecords(ids) {
+  for (const id of ids) {
+    await transact("readwrite", (store) => store.delete(id));
+    await transactAsset("readwrite", (store) => store.delete(id));
+  }
+  const targets = new Set(ids);
+  state.images = state.images.filter((record) => !targets.has(record.id));
+}
+
+async function startGuestMigration(user, guestRecords) {
+  if (!guestRecords.length) return;
+  const existing = readCloudMigration(user.id);
+  if (existing?.status === "complete") return;
+  if (existing?.status === "pending") {
+    showToast(`还有 ${existing.pairs?.length || 0} 条本机内容等待同步`);
+    return;
+  }
+
+  const eligible = migrationEligibleRecords(guestRecords);
+  if (!eligible.length) {
+    showToast("本机收藏都已存在，无需重复迁移");
+    return;
+  }
+  const batchId = makeId();
+  const pairs = [];
+  state.migrationCancelled = false;
+  showToast(`正在带入 0 / ${eligible.length} 条`, "取消", () => { state.migrationCancelled = true; });
+
+  for (const [index, source] of eligible.entries()) {
+    if (state.migrationCancelled) break;
+    const copy = {
+      ...source,
+      id: makeId(),
+      workspaceId: userWorkspaceId(user.id),
+      migrationSourceId: source.id,
+      migrationBatchId: batchId,
+      updatedAt: Date.now() + index,
+    };
+    delete copy.hiddenByMigration;
+    const asset = isMediaRecord(source) ? await transactAsset("readonly", (store) => store.get(source.id)) : null;
+    if (asset?.blob) await storeImageAsset(copy, asset.blob);
+    await transact("readwrite", (store) => store.put(copy));
+    state.images.push(copy);
+    pairs.push({ sourceId: source.id, copyId: copy.id });
+    showToast(`正在带入 ${index + 1} / ${eligible.length} 条`, "取消", () => { state.migrationCancelled = true; });
+  }
+
+  if (state.migrationCancelled) {
+    await deleteLocalRecords(pairs.map((pair) => pair.copyId));
+    render();
+    showToast("已取消，本机内容仍然保留");
+    return;
+  }
+
+  saveCloudMigration(user.id, { status: "pending", batchId, pairs, startedAt: Date.now() });
+  render();
+}
+
+async function confirmGuestMigration() {
+  const user = state.cloudSession?.user;
+  if (!user) return showWelcomeScreen();
+  const records = await migrationGuestRecords();
+  closeMigrationDialog();
+  await startGuestMigration(user, records);
+  await refreshMigrationOffer();
+  scheduleCloudSync();
+}
+
+async function finalizePendingMigration(userId) {
+  const migration = readCloudMigration(userId);
+  if (migration?.status !== "pending") return;
+  const sources = await recordsForWorkspace(guestWorkspaceId(), { includeHidden: true });
+  const sourceById = new Map(sources.map((record) => [record.id, record]));
+  for (const pair of migration.pairs || []) {
+    const source = sourceById.get(pair.sourceId);
+    if (!source) continue;
+    source.hiddenByMigration = { userId, batchId: migration.batchId, hiddenAt: Date.now() };
+    await transact("readwrite", (store) => store.put(source));
+  }
+  saveCloudMigration(userId, { ...migration, status: "complete", completedAt: Date.now() });
+  showToast(`已带入 ${migration.pairs?.length || 0} 条本机内容`, "撤销", () => undoGuestMigration(userId));
+}
+
+async function undoGuestMigration(userId) {
+  const migration = readCloudMigration(userId);
+  if (!migration?.pairs?.length) return;
+  const copyIds = migration.pairs.map((pair) => pair.copyId);
+  const deletions = cloudDeletionMap();
+  copyIds.forEach((id, index) => { deletions[id] = Date.now() + index; });
+  saveCloudDeletionMap(deletions);
+  await deleteLocalRecords(copyIds);
+  const sources = await recordsForWorkspace(guestWorkspaceId(), { includeHidden: true });
+  const sourceIds = new Set(migration.pairs.map((pair) => pair.sourceId));
+  for (const source of sources.filter((record) => sourceIds.has(record.id))) {
+    delete source.hiddenByMigration;
+    await transact("readwrite", (store) => store.put(source));
+  }
+  saveCloudMigration(userId, null);
+  render();
+  scheduleCloudSync();
+  showToast("已撤销，原来的本机内容仍然保留");
 }
 
 function saveCloudSession(session) {
   state.cloudSession = session;
   if (session) localStorage.setItem(CLOUD_SESSION_KEY, JSON.stringify(session));
   else localStorage.removeItem(CLOUD_SESSION_KEY);
+}
+
+function cloudAuthClient() {
+  if (!state.cloudAuthClient && window.supabase?.createClient) {
+    state.cloudAuthClient = window.supabase.createClient(cloudConfig().supabaseUrl, cloudConfig().supabaseAnonKey, {
+      auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false, flowType: "pkce" },
+    });
+  }
+  return state.cloudAuthClient;
 }
 
 function cloudHeaders(extra = {}) {
@@ -2151,8 +2837,35 @@ async function refreshCloudSession() {
   saveCloudSession(await response.json());
 }
 
-function captureCloudSessionFromUrl() {
+function hasCloudAuthParameters() {
+  const searchParams = new URLSearchParams(location.search);
+  const hash = new URLSearchParams(location.hash.replace(/^#/, ""));
+  return Boolean(searchParams.get("code") || searchParams.get("error") || hash.get("access_token") || hash.get("error"));
+}
+
+function clearCloudAuthParameters() {
+  const clean = new URL(location.href);
+  ["code", "error", "error_code", "error_description", "type", "onboarding", "guide"].forEach((key) => clean.searchParams.delete(key));
+  clean.hash = "";
+  history.replaceState(null, "", `${clean.pathname}${clean.search}`);
+}
+
+async function exchangeCodeForSession(code) {
+  const client = cloudAuthClient();
+  if (!client) throw new Error("登录组件还没有准备好");
+  const { data, error } = await client.auth.exchangeCodeForSession(code);
+  if (error || !data?.session) throw error || new Error("登录链接无效");
+  saveCloudSession(data.session);
+  return true;
+}
+
+async function captureCloudSessionFromUrl() {
+  const searchParams = new URLSearchParams(location.search);
+  if (searchParams.get("error")) throw new Error(searchParams.get("error_description") || "登录链接已失效");
+  const code = searchParams.get("code");
+  if (code) return exchangeCodeForSession(code);
   const values = new URLSearchParams(location.hash.replace(/^#/, ""));
+  if (values.get("error")) throw new Error(values.get("error_description") || "登录链接已失效");
   if (!values.get("access_token")) return false;
   saveCloudSession({
     access_token: values.get("access_token"),
@@ -2160,8 +2873,22 @@ function captureCloudSessionFromUrl() {
     expires_at: Math.floor(Date.now() / 1000) + Number(values.get("expires_in") || 3600),
     user: null,
   });
-  history.replaceState(null, "", `${location.pathname}${location.search}`);
   return true;
+}
+
+async function completeCloudAuthReturn() {
+  const returningFromEmail = hasCloudAuthParameters();
+  if (!returningFromEmail) return { returningFromEmail: false, arrivedFromEmail: false };
+  showAuthReturnScreen();
+  try {
+    const arrivedFromEmail = await captureCloudSessionFromUrl();
+    if (arrivedFromEmail) clearCloudAuthParameters();
+    return { returningFromEmail: true, arrivedFromEmail };
+  } catch (error) {
+    clearCloudAuthParameters();
+    showAuthReturnScreen("error", error.message || "这个登录链接可能已经失效，请重新发送一封。");
+    return { returningFromEmail: true, arrivedFromEmail: false, failed: true };
+  }
 }
 
 async function loadCloudUser() {
@@ -2179,57 +2906,124 @@ async function loadCloudUser() {
 
 async function initializeCloud() {
   if (!cloudConfigured()) return;
-  const arrivedFromEmail = captureCloudSessionFromUrl();
+  const { returningFromEmail, arrivedFromEmail, failed } = await completeCloudAuthReturn();
+  if (failed) return;
   if (!state.cloudSession) {
     try { saveCloudSession(JSON.parse(localStorage.getItem(CLOUD_SESSION_KEY))); }
     catch { saveCloudSession(null); }
   }
   const user = await loadCloudUser();
-  if (!user) return;
+  if (!user) {
+    if (returningFromEmail) showAuthReturnScreen("error", "没有成功确认账号，请重新发送登录链接。");
+    return;
+  }
+  await switchWorkspace(userWorkspaceId(user.id));
+  if (arrivedFromEmail) closeWelcomeAfterAuthentication();
   clearInterval(state.cloudPollTimer);
   state.cloudPollTimer = window.setInterval(() => syncCloud(), 30000);
-  const mergeKey = `later-space-cloud-merged-${user.id}`;
-  if (!localStorage.getItem(mergeKey) && state.images.length) {
-    const shouldMerge = confirm(`这台设备有 ${state.images.length} 条本地收藏。是否合并到你的云端画布？\n\n选择“取消”会继续保留本地内容，但暂不上传。`);
-    localStorage.setItem(mergeKey, shouldMerge ? "yes" : "no");
-    if (!shouldMerge) return;
-  }
   await syncCloud({ notify: arrivedFromEmail });
+  await refreshMigrationOffer({ prompt: true });
+  await subscribeCloudRealtime();
+}
+
+function cleanAuthRedirectUrl() {
+  const redirectUrl = new URL(location.href);
+  redirectUrl.search = "";
+  redirectUrl.hash = "";
+  return redirectUrl.toString();
+}
+
+async function sendMagicLink(email, feedback = {}) {
+  if (!email) return;
+  if (feedback.pending) feedback.pending();
+  saveAuthReturnState();
+  const redirectTo = cleanAuthRedirectUrl();
+  const client = cloudAuthClient();
+  if (!client) {
+    if (feedback.failure) feedback.failure();
+    return;
+  }
+  const { error } = await client.auth.signInWithOtp({
+    email,
+    options: { emailRedirectTo: redirectTo, shouldCreateUser: true },
+  });
+  if (!error) {
+    if (feedback.success) feedback.success();
+  } else {
+    if (feedback.failure) feedback.failure();
+  }
 }
 
 async function requestMagicLink(event) {
   event.preventDefault();
   const email = elements.syncEmailInput.value.trim();
-  if (!email) return;
-  elements.syncStatusDetail.textContent = "正在发送登录邮件…";
-  const redirectUrl = new URL(location.href);
-  redirectUrl.hash = "";
-  const redirectTo = redirectUrl.toString();
-  const response = await fetch(`${cloudConfig().supabaseUrl}/auth/v1/otp?redirect_to=${encodeURIComponent(redirectTo)}`, {
-    method: "POST",
-    headers: { apikey: cloudConfig().supabaseAnonKey, "Content-Type": "application/json" },
-    body: JSON.stringify({ email, create_user: true }),
+  await sendMagicLink(email, {
+    pending: () => { elements.syncStatusDetail.textContent = "正在发送登录邮件…"; },
+    success: () => {
+      elements.syncStatusTitle.textContent = "登录链接已发送";
+      elements.syncStatusDetail.textContent = "打开邮件中的链接，即可回到 Later Space 完成登录";
+      if (elements.syncMailLink) elements.syncMailLink.hidden = false;
+    },
+    failure: () => {
+      elements.syncStatus.classList.add("is-error");
+      elements.syncStatusDetail.textContent = "邮件发送失败，请稍后重试";
+    },
   });
-  if (response.ok) {
-    elements.syncStatusTitle.textContent = "登录链接已发送";
-    elements.syncStatusDetail.textContent = "打开邮件中的链接，即可回到 Later Space 完成登录";
-    if (elements.syncMailLink) elements.syncMailLink.hidden = false;
-  } else {
-    elements.syncStatus.classList.add("is-error");
-    elements.syncStatusDetail.textContent = "邮件发送失败，请稍后重试";
-  }
+}
+
+async function requestWelcomeMagicLink(event) {
+  event.preventDefault();
+  const button = elements.welcomeLoginForm.querySelector("button");
+  await sendMagicLink(elements.welcomeEmailInput.value.trim(), {
+    pending: () => { button.disabled = true; button.textContent = "正在发送…"; },
+    success: () => {
+      button.disabled = false;
+      button.textContent = "重新发送";
+      elements.welcomeMailLink.hidden = false;
+    },
+    failure: () => {
+      button.disabled = false;
+      button.textContent = "登录 / 注册";
+      showToast("邮件发送失败，请稍后重试");
+    },
+  });
+}
+
+async function saveAccountProfile(event) {
+  event.preventDefault();
+  const name = elements.accountNameInput.value.trim();
+  if (!name || !state.cloudSession?.user) return;
+  const response = await cloudRequest("/auth/v1/user", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ data: { display_name: name } }),
+  });
+  if (!response.ok) return showToast("昵称保存失败，请稍后重试");
+  state.cloudSession.user = await response.json();
+  saveCloudSession(state.cloudSession);
+  renderAccountEntry();
+  showToast("昵称已更新");
 }
 
 async function signOutCloud() {
+  const user = state.cloudSession?.user;
+  if (user && !navigator.onLine) return showToast("请联网后再退出，避免未同步内容丢失");
+  if (user) {
+    const synced = await syncCloud();
+    if (!synced) return showToast("还有内容没有同步，请稍后再退出");
+  }
   if (state.cloudSession) await cloudRequest("/auth/v1/logout", { method: "POST" }).catch(() => {});
   saveCloudSession(null);
   clearTimeout(state.cloudSyncTimer);
   clearInterval(state.cloudPollTimer);
+  unsubscribeCloudRealtime();
+  if (user) await clearWorkspace(userWorkspaceId(user.id));
+  await switchWorkspace(guestWorkspaceId());
   openSyncPanel();
 }
 
 function cloudRecordData(record) {
-  const stored = { ...record, thumbnail: undefined, blob: undefined };
+  const stored = { ...record, thumbnail: undefined, blob: undefined, workspaceId: undefined, migrationSourceId: undefined, migrationBatchId: undefined, hiddenByMigration: undefined };
   delete stored.id;
   return stored;
 }
@@ -2238,24 +3032,45 @@ function cloudKind(record) {
   return record.kind || "image";
 }
 
-function cloudAssetPath(userId, record) {
-  const extension = (record.type || "application/octet-stream").split("/")[1]?.replace(/[^a-z0-9.+-]/gi, "") || "bin";
-  const version = Number(record.updatedAt || record.createdAt || Date.now());
-  return `${userId}/${record.id}/${version}.${extension}`;
+function cloudFunctionUrl(parameters = {}) {
+  const url = new URL(`${cloudConfig().supabaseUrl}/functions/v1/mobile-inbox`);
+  Object.entries(parameters).forEach(([key, value]) => url.searchParams.set(key, value));
+  return url;
 }
 
 async function uploadCloudAsset(userId, record) {
   if (!isMediaRecord(record)) return null;
-  const blob = await originalBlob(record);
+  if (record.kind === "video") throw new Error("第一版云端暂不支持视频");
+  let blob = await originalBlob(record);
   if (!blob) return null;
-  const path = cloudAssetPath(userId, record);
-  const response = await cloudRequest(`/storage/v1/object/later-space-media/${path}`, {
+  const input = new File([blob], record.name || "Later Space image", { type: blob.type || record.type || "image/jpeg" });
+  const optimized = await optimizeImageFile(input);
+  blob = optimized;
+  record.type = blob.type;
+  record.size = blob.size;
+  record.name = optimized.name;
+  await storeImageAsset(record, blob);
+  const response = await fetch(cloudFunctionUrl({ mode: "asset", record_id: record.id }), {
     method: "POST",
-    headers: { "Content-Type": blob.type || "application/octet-stream", "x-upsert": "true" },
+    headers: {
+      Authorization: `Bearer ${state.cloudSession.access_token}`,
+      "Content-Type": blob.type || "image/jpeg",
+      "X-Later-Space-Kind": "image",
+      "X-Later-Space-Name": record.name || "Later Space image",
+    },
     body: blob,
   });
-  if (!response.ok) throw new Error("asset upload failed");
-  return path;
+  if (!response.ok) throw new Error(await response.text() || "图片上传失败");
+  return response.json();
+}
+
+async function discardCloudAsset(assetPath, assetBytes) {
+  if (!assetPath || !assetBytes) return;
+  await fetch(cloudFunctionUrl({ mode: "discard" }), {
+    method: "POST",
+    headers: { Authorization: `Bearer ${state.cloudSession.access_token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ assetPath, assetBytes }),
+  });
 }
 
 async function downloadCloudAsset(path) {
@@ -2281,7 +3096,7 @@ async function fetchCloudRows() {
 }
 
 async function applyCloudRow(row) {
-  const record = { ...row.data, id: row.id, updatedAt: row.client_updated_at };
+  const record = { ...row.data, id: row.id, workspaceId: userWorkspaceId(row.user_id), updatedAt: row.client_updated_at };
   if (row.asset_path && isMediaRecord(record)) {
     const blob = await downloadCloudAsset(row.asset_path);
     await storeImageAsset(record, blob);
@@ -2294,30 +3109,53 @@ async function applyCloudRow(row) {
 
 async function syncCloud({ notify = false } = {}) {
   const user = state.cloudSession?.user;
-  if (!user || state.cloudSyncing || !navigator.onLine) return;
-  const mergeKey = `later-space-cloud-merged-${user.id}`;
-  if (localStorage.getItem(mergeKey) === "no") return;
+  if (!user || state.cloudSyncing || !navigator.onLine) return false;
   state.cloudSyncing = true;
   try {
     let remoteRows = await fetchCloudRows();
     const remoteById = new Map(remoteRows.map((row) => [row.id, row]));
     const deletions = cloudDeletionMap();
     const uploadRows = [];
+    const uploadedAssets = [];
+    const deletedAssets = [];
     for (const [id, deletedAt] of Object.entries(deletions)) {
       const remote = remoteById.get(id);
       if (!remote || deletedAt >= Number(remote.client_updated_at || 0)) {
-        uploadRows.push({ id, user_id: user.id, kind: remote?.kind || "text", data: remote?.data || {}, asset_path: remote?.asset_path || null, source_device_id: cloudDeviceId(), client_updated_at: deletedAt, deleted_at: new Date(deletedAt).toISOString() });
+        if (remote?.asset_path && remote?.asset_bytes) deletedAssets.push({ assetPath: remote.asset_path, assetBytes: remote.asset_bytes });
+        uploadRows.push({ id, user_id: user.id, kind: remote?.kind || "text", data: remote?.data || {}, asset_path: null, asset_bytes: 0, content_hash: null, source_device_id: cloudDeviceId(), client_updated_at: deletedAt, deleted_at: new Date(deletedAt).toISOString() });
       }
     }
     for (const record of state.images) {
       const remote = remoteById.get(record.id);
       const localUpdatedAt = Number(record.updatedAt || record.createdAt || 0);
       if (!remote || localUpdatedAt > Number(remote.client_updated_at || 0)) {
-        const assetPath = isMediaRecord(record) ? await uploadCloudAsset(user.id, record) : null;
-        uploadRows.push({ id: record.id, user_id: user.id, kind: cloudKind(record), data: cloudRecordData(record), asset_path: assetPath, source_device_id: cloudDeviceId(), client_updated_at: localUpdatedAt, deleted_at: null });
+        if (record.kind === "video") continue;
+        const asset = isMediaRecord(record) ? await uploadCloudAsset(user.id, record) : null;
+        if (asset) uploadedAssets.push({ current: asset, previous: remote ? { assetPath: remote.asset_path, assetBytes: remote.asset_bytes } : null });
+        uploadRows.push({
+          id: record.id,
+          user_id: user.id,
+          kind: cloudKind(record),
+          data: cloudRecordData(record),
+          asset_path: asset?.assetPath || null,
+          asset_bytes: asset?.assetBytes || 0,
+          content_hash: asset?.contentHash || null,
+          source_device_id: cloudDeviceId(),
+          client_updated_at: localUpdatedAt,
+          deleted_at: null,
+        });
       }
     }
-    await upsertCloudRows(uploadRows);
+    try {
+      await upsertCloudRows(uploadRows);
+    } catch (error) {
+      await Promise.all(uploadedAssets.map(({ current }) => discardCloudAsset(current.assetPath, current.assetBytes)));
+      throw error;
+    }
+    await Promise.all(uploadedAssets
+      .filter(({ current, previous }) => previous?.assetPath && previous.assetPath !== current.assetPath)
+      .map(({ previous }) => discardCloudAsset(previous.assetPath, previous.assetBytes)));
+    await Promise.all(deletedAssets.map(({ assetPath, assetBytes }) => discardCloudAsset(assetPath, assetBytes)));
     Object.keys(deletions).forEach((id) => {
       if (uploadRows.some((row) => row.id === id && row.deleted_at)) delete deletions[id];
     });
@@ -2339,11 +3177,17 @@ async function syncCloud({ notify = false } = {}) {
     }
     state.images = [...localById.values()].sort((left, right) => left.createdAt - right.createdAt);
     state.cloudLastSyncAt = Date.now();
+    await loadCloudUsage();
+    renderCloudUsage();
+    notifyCloudUsage();
+    await finalizePendingMigration(user.id);
     render();
     if (notify) showToast("多设备画布已同步");
+    return true;
   } catch (error) {
     console.warn("Cloud sync unavailable", error);
     if (notify) showToast("云端暂时不可用，本地收藏不受影响");
+    return false;
   } finally {
     state.cloudSyncing = false;
     if (!elements.syncPanel.hidden) openSyncPanel();
@@ -2353,11 +3197,6 @@ async function syncCloud({ notify = false } = {}) {
 async function syncNow() {
   const user = state.cloudSession?.user;
   if (!user) return;
-  const mergeKey = `later-space-cloud-merged-${user.id}`;
-  if (localStorage.getItem(mergeKey) === "no") {
-    if (!confirm("要把这台设备的本地收藏与云端画布合并吗？现有内容不会被整份覆盖。")) return;
-    localStorage.setItem(mergeKey, "yes");
-  }
   clearInterval(state.cloudPollTimer);
   state.cloudPollTimer = window.setInterval(() => syncCloud(), 30000);
   showToast("正在同步多设备画布…");
@@ -2382,15 +3221,29 @@ async function openSyncPanel() {
     return;
   }
   const user = state.cloudSession?.user;
-  elements.syncLoginForm.hidden = Boolean(user);
+  if (!user) {
+    elements.syncPanel.hidden = true;
+    showWelcomeScreen();
+    return;
+  }
+  if (user) {
+    await loadCloudUsage();
+    await loadCaptureTokenState();
+  } else {
+    state.captureToken = null;
+    elements.captureTokenActions.hidden = true;
+    elements.captureTokenStatus.textContent = "登录后生成你的专属收件地址";
+  }
+  renderCloudUsage();
+  const migration = user ? readCloudMigration(user.id) : null;
+  elements.undoMigrationButton.hidden = migration?.status !== "complete" || Date.now() - Number(migration.completedAt || 0) > 30 * 24 * 60 * 60 * 1000;
+  elements.syncLoginForm.hidden = true;
   if (elements.syncMailLink) elements.syncMailLink.hidden = true;
-  elements.syncActions.hidden = !user;
+  elements.syncActions.hidden = false;
   elements.syncStatus.classList.toggle("is-ready", Boolean(user));
-  const localOnly = user && localStorage.getItem(`later-space-cloud-merged-${user.id}`) === "no";
-  elements.syncStatusTitle.textContent = user ? (localOnly ? "已登录，当前设备尚未合并" : "多设备同步已开启") : "登录后汇合所有设备";
-  elements.syncStatusDetail.textContent = user
-    ? `${user.email} · ${localOnly ? "点击立即同步可选择合并" : state.cloudLastSyncAt ? `最近同步 ${new Date(state.cloudLastSyncAt).toLocaleTimeString("zh-CN")}` : "等待首次同步"}`
-    : "使用邮箱免密登录；未登录时内容仍只保存在当前浏览器";
+  elements.syncStatusTitle.textContent = "多设备同步已开启";
+  elements.syncStatusDetail.textContent = `${user.email} · ${state.cloudLastSyncAt ? `最近同步 ${new Date(state.cloudLastSyncAt).toLocaleTimeString("zh-CN")}` : "等待首次同步"}`;
+  await refreshMigrationOffer();
 }
 
 async function importExternalInbox() {
@@ -2475,9 +3328,8 @@ function bindExtensionBridge() {
     if (event.source !== window || event.origin !== location.origin) return;
     if (event.data?.source !== "later-space-extension" || !["capture", "status", "undo", "view", "auth"].includes(event.data?.type)) return;
     const user = state.cloudSession?.user;
-    const localOnly = user && localStorage.getItem(`later-space-cloud-merged-${user.id}`) === "no";
     const destination = user
-      ? { label: `${user.email} · ${localOnly ? "仅保存在当前浏览器" : "云端同步已开启"}`, email: user.email, synced: !localOnly }
+      ? { label: `${user.email} · 云端同步已开启`, email: user.email, synced: true }
       : { label: "当前浏览器 · 本地保存", email: null, synced: false };
     if (event.data.type === "auth") {
       window.postMessage({
@@ -2811,15 +3663,23 @@ function showToast(message, actionLabel = "", action = null) {
 }
 
 function bindEvents() {
-  elements.onboardingStartButton.addEventListener("click", () => {
-    localStorage.setItem(ONBOARDING_DISMISSED_KEY, "true");
-    elements.onboardingCards.hidden = true;
-    openCapture();
+  elements.welcomeLoginForm.addEventListener("submit", requestWelcomeMagicLink);
+  elements.welcomeGuestButton.addEventListener("click", closeWelcomeScreen);
+  elements.authReturnRetryButton.addEventListener("click", () => {
+    elements.authReturnScreen.hidden = true;
+    state.authReturnActive = false;
+    showWelcomeScreen();
   });
-  elements.onboardingDismissButton.addEventListener("click", () => {
-    localStorage.setItem(ONBOARDING_DISMISSED_KEY, "true");
-    elements.onboardingCards.hidden = true;
+  elements.closeCanvasGuideButton.addEventListener("click", finishCanvasGuide);
+  elements.accountButton.addEventListener("click", () => {
+    if (state.cloudSession?.user) openSyncPanel();
+    else showWelcomeScreen();
   });
+  elements.accountMigrationButton.addEventListener("click", openMigrationDialog);
+  elements.closeMigrationButton.addEventListener("click", closeMigrationDialog);
+  elements.migrationBackdrop.addEventListener("click", closeMigrationDialog);
+  elements.deferMigrationButton.addEventListener("click", deferGuestMigration);
+  elements.startMigrationButton.addEventListener("click", confirmGuestMigration);
   elements.searchInput.addEventListener("input", () => {
     state.filters.query = elements.searchInput.value;
     clearTimeout(state.searchTimer);
@@ -2892,8 +3752,38 @@ function bindEvents() {
   elements.syncButton.addEventListener("click", openSyncPanel);
   elements.closeSyncButton.addEventListener("click", () => { elements.syncPanel.hidden = true; });
   elements.syncLoginForm.addEventListener("submit", requestMagicLink);
+  elements.accountProfile.addEventListener("submit", saveAccountProfile);
   elements.signOutButton.addEventListener("click", signOutCloud);
   elements.syncNowButton.addEventListener("click", syncNow);
+  elements.undoMigrationButton?.addEventListener("click", () => {
+    const user = state.cloudSession?.user;
+    if (user) undoGuestMigration(user.id);
+  });
+  elements.createCaptureTokenButton?.addEventListener("click", createCaptureToken);
+  elements.createAgentTokenButton?.addEventListener("click", createAgentToken);
+  elements.copyCaptureUrlButton?.addEventListener("click", copyPersonalCaptureUrl);
+  elements.revokeCaptureTokenButton?.addEventListener("click", stopCaptureToken);
+  elements.mobileAddButton?.addEventListener("click", openCapture);
+  elements.mobileSyncButton?.addEventListener("click", openSyncPanel);
+  elements.mobileCanvasButton?.addEventListener("click", () => {
+    document.body.classList.toggle("mobile-show-canvas");
+    elements.mobileCanvasButton.textContent = document.body.classList.contains("mobile-show-canvas") ? "返回收件箱" : "打开画布";
+    if (document.body.classList.contains("mobile-show-canvas")) fitAll();
+  });
+  elements.mobileInboxList?.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-mobile-record-id]");
+    if (!button) return;
+    const record = state.images.find((entry) => entry.id === button.dataset.mobileRecordId);
+    if (!record) return;
+    if (record.kind === "link" && record.url) window.open(record.url, "_blank", "noopener,noreferrer");
+    else {
+      document.body.classList.add("mobile-show-canvas");
+      elements.mobileCanvasButton.textContent = "返回收件箱";
+      state.selectedId = record.id;
+      fitAll();
+      render();
+    }
+  });
   elements.copyImageButton.addEventListener("click", copySelectedImage);
   elements.cropImageButton.addEventListener("click", openCropEditor);
   elements.batchEditButton.addEventListener("click", openBatchEditor);
@@ -2990,7 +3880,7 @@ function bindEvents() {
   }, { passive: false });
   window.addEventListener("paste", (event) => {
     if (event.target.matches?.("input, textarea, [contenteditable='true']")) return;
-    const files = Array.from(event.clipboardData?.items || []).filter((item) => item.kind === "file" && (item.type.startsWith("image/") || item.type.startsWith("video/"))).map((item) => item.getAsFile()).filter(Boolean);
+    const files = Array.from(event.clipboardData?.items || []).filter((item) => item.kind === "file" && item.type.startsWith("image/")).map((item) => item.getAsFile()).filter(Boolean);
     const text = event.clipboardData?.getData("text/plain") || "";
     const urls = extractUrls(text);
     if (files.length) { event.preventDefault(); saveFiles(files, "paste", screenCenter(), "", currentCanvasTags()); }
@@ -3017,6 +3907,7 @@ function bindEvents() {
       elements.searchInput.select();
     }
     if (event.key === "Escape" && !elements.tagManageDialog.hidden) closeTagManager();
+    else if (event.key === "Escape" && !elements.migrationDialog.hidden) closeMigrationDialog();
     else if (event.key === "Escape" && !elements.batchDialog.hidden) closeBatchEditor();
     else if (event.key === "Escape" && !elements.duplicateDialog.hidden) closeDuplicatePrompt(false);
     else if (event.key === "Escape" && !elements.cropDialog.hidden) closeCropEditor();
@@ -3059,6 +3950,8 @@ async function init() {
     await loadImages();
     bindExtensionBridge();
     await initializeCloud();
+    showInitialWelcome();
+    renderAccountEntry();
     if (new URLSearchParams(location.search).get("extension") === "connect") {
       openSyncPanel();
     }
@@ -3073,6 +3966,10 @@ async function init() {
     const incompleteLinks = state.images.filter((record) => record.kind === "link" && isGenericTitle(record.title, record));
     incompleteLinks.forEach((record) => enrichLink(record));
     window.addEventListener("online", () => syncCloud());
+    window.addEventListener("focus", () => syncCloud());
+    document.addEventListener("visibilitychange", () => {
+      if (!document.hidden) syncCloud();
+    });
   } catch (error) {
     console.error(error);
     showToast("画布打开失败，请刷新重试");

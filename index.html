@@ -7,7 +7,7 @@
     <title>Later Space</title>
     <link rel="icon" href="assets/favicon.svg?v=2" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="assets/apple-touch-icon.png?v=2" />
-    <link rel="stylesheet" href="styles.css?v=71" />
+    <link rel="stylesheet" href="styles.css?v=74" />
   </head>
   <body>
     <main class="canvas" id="canvas" tabindex="0" aria-label="Later Space 无限内容画布">
@@ -17,34 +17,15 @@
         <span class="empty-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="m7 16 3.5-3.5 2.5 2.5 2-2 2 2"/><circle cx="15.5" cy="8.5" r="1"/></svg>
         </span>
-        <h1 id="emptyTitle">粘贴图片、视频、链接或文字</h1>
+        <h1 id="emptyTitle">粘贴图片、链接或文字</h1>
         <p id="emptyHint"><kbd>⌘</kbd><kbd>V</kbd></p>
       </div>
 
-      <section class="onboarding-cards" id="onboardingCards" aria-label="Later Space 使用指南" hidden>
-        <article class="onboarding-card onboarding-principle">
-          <span>01 · WHY</span>
-          <h2>先接住，<br />再慢慢整理。</h2>
-          <p>你不需要在灵感出现的那一刻，就承担整理它的责任。</p>
-        </article>
-        <article class="onboarding-card onboarding-how">
-          <span>02 · HOW</span>
-          <h2>复制，然后粘贴。</h2>
-          <ol><li>看到喜欢的内容</li><li>按下 <kbd>⌘</kbd><kbd>V</kbd></li><li>它会落到画布空白处</li></ol>
-        </article>
-        <article class="onboarding-card onboarding-later">
-          <span>03 · LATER</span>
-          <h2>这里不是永久仓库。</h2>
-          <p>回来浏览、拖动、裁剪或整理，然后使用、归档或删除。</p>
-        </article>
-        <article class="onboarding-card onboarding-start">
-          <span>READY</span>
-          <h2>放进第一条内容。</h2>
-          <button id="onboardingStartButton" type="button">现在试试</button>
-        </article>
-        <button class="onboarding-dismiss" id="onboardingDismissButton" type="button" aria-label="关闭使用指南" title="关闭使用指南">
-          <svg viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></svg>
-        </button>
+      <section class="canvas-guide" id="canvasGuide" aria-label="画布使用说明" hidden>
+        <button class="canvas-guide-close" id="closeCanvasGuideButton" type="button" aria-label="关闭使用说明">×</button>
+        <article class="canvas-guide-card guide-copy"><small>01</small><strong>复制喜欢的内容</strong><span>图片、链接或一段文字都可以。</span></article>
+        <article class="canvas-guide-card guide-paste"><small>02</small><strong>直接粘贴</strong><span><kbd>⌘</kbd><kbd>V</kbd>，先让 Later Space 接住。</span></article>
+        <article class="canvas-guide-card guide-return"><small>03</small><strong>有空再回来</strong><span>浏览、拖动、裁剪，或一键整理。</span></article>
       </section>
 
       <header class="floating brand-bar">
@@ -80,6 +61,10 @@
         <button class="view-button" type="button" data-view="media">素材</button>
         <button class="view-button" type="button" data-view="all">全部</button>
       </div>
+      <button class="floating account-button" id="accountButton" type="button" aria-label="打开我的 Later Space">
+        <span class="account-avatar" id="accountAvatar">L</span>
+        <span class="account-copy"><strong id="accountName">登录</strong><small id="accountStatus">开启同步</small></span>
+      </button>
       <div class="floating workflow-switcher" id="workflowSwitcher" role="group" aria-label="标签快捷筛选">
         <button type="button" class="workflow-button is-active" data-workflow="all">全部</button>
         <button type="button" class="workflow-button" data-workflow="inbox">未整理 <span data-workflow-count="inbox">0</span></button>
@@ -127,6 +112,20 @@
         </button>
       </nav>
 
+      <section class="mobile-inbox" id="mobileInbox" aria-label="手机收件箱">
+        <header class="mobile-inbox-header">
+          <div><span class="mobile-inbox-kicker">先接住，之后再回来</span><h1>Later Space</h1></div>
+          <button class="mobile-inbox-settings" id="mobileSyncButton" type="button" aria-label="打开同步中心">同步</button>
+        </header>
+        <div class="mobile-inbox-actions">
+          <button class="mobile-primary-action" id="mobileAddButton" type="button"><span>＋</span>添加内容</button>
+          <button class="mobile-secondary-action" id="mobileCanvasButton" type="button">打开画布</button>
+        </div>
+        <div class="mobile-inbox-summary"><strong id="mobileInboxCount">0 条收藏</strong><span id="mobileInboxUnsorted">0 条未整理</span></div>
+        <div class="mobile-inbox-list" id="mobileInboxList"></div>
+        <div class="mobile-inbox-empty" id="mobileInboxEmpty" hidden><span>🫳</span><strong>这里还没有内容</strong><p>去 Safari 或其他 App 点“分享”，选择 Later Space。</p></div>
+      </section>
+
       <div class="floating selection-bar" id="selectionBar" hidden>
         <span id="selectionName">图片</span>
         <span class="selection-size" id="selectionSize"></span>
@@ -171,34 +170,87 @@
         </button>
       </div>
 
-      <input id="fileInput" type="file" accept="image/*,video/*" multiple hidden />
+      <input id="fileInput" type="file" accept="image/*" multiple hidden />
       <input id="backupInput" type="file" accept="application/json,.json" hidden />
       <div class="drop-state" id="dropState" aria-hidden="true"><span>放到画布上</span></div>
       <div class="selection-marquee" id="selectionMarquee" hidden></div>
       <div class="toast" id="toast" role="status" aria-live="polite"><span id="toastMessage"></span><button id="toastAction" type="button" hidden></button></div>
     </main>
 
+    <section class="auth-return-screen" id="authReturnScreen" aria-live="polite" hidden>
+      <div class="auth-return-card">
+        <span class="auth-return-mark" id="authReturnMark" aria-hidden="true"></span>
+        <span class="auth-return-kicker">LATER SPACE ACCOUNT</span>
+        <h1 id="authReturnTitle">正在完成登录</h1>
+        <p id="authReturnDetail">正在确认你的邮箱，并带你回到刚才的画布。</p>
+        <button class="primary-button" id="authReturnRetryButton" type="button" hidden>重新登录</button>
+      </div>
+    </section>
+
+    <section class="welcome-screen" id="welcomeScreen" aria-labelledby="welcomeTitle" hidden>
+      <header class="welcome-header"><span class="mark" aria-hidden="true"></span><strong>Later Space</strong></header>
+      <div class="welcome-layout">
+        <div class="welcome-visual" aria-hidden="true">
+          <span class="welcome-paper welcome-paper-image"></span>
+          <span class="welcome-paper welcome-paper-link">Ideas<br />worth<br />returning to.</span>
+          <span class="welcome-paper welcome-paper-note">先接住</span>
+        </div>
+        <div class="welcome-copy">
+          <span class="welcome-kicker">YOUR TEMPORARY INSPIRATION SPACE</span>
+          <h1 id="welcomeTitle">看到喜欢的，<br />先放进来。</h1>
+          <p>图片、链接和文字，复制后直接粘贴。登录后可在不同设备查看，插件也无需重复登录。</p>
+          <form class="welcome-login-form" id="welcomeLoginForm">
+            <label for="welcomeEmailInput">邮箱</label>
+            <div><input id="welcomeEmailInput" type="email" autocomplete="email" placeholder="name@example.com" required /><button class="primary-button" type="submit">登录 / 注册</button></div>
+          </form>
+          <a class="welcome-mail-link" id="welcomeMailLink" href="https://mail.google.com/" target="_blank" rel="noreferrer" hidden>登录链接已发送，打开邮箱查看</a>
+          <button class="welcome-guest-button" id="welcomeGuestButton" type="button">先体验 Later Space</button>
+          <small>无需密码。先体验的内容保存在当前浏览器，之后登录仍可迁移。</small>
+        </div>
+      </div>
+    </section>
+
     <aside class="floating storage-panel" id="storagePanel" aria-labelledby="storageTitle" hidden>
       <header><div><span>数据状态</span><h2 id="storageTitle">容量与备份</h2></div><button class="tool-button" id="closeStorageButton" type="button" aria-label="关闭容量面板"><svg viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></svg></button></header>
       <div class="storage-meter"><i id="storageMeterFill"></i></div>
       <div class="storage-stats">
         <div><span>浏览器占用</span><strong id="browserStorageValue">计算中…</strong></div>
-        <div><span>原图资产</span><strong id="originalStorageValue">计算中…</strong></div>
+        <div><span>优化图片</span><strong id="originalStorageValue">计算中…</strong></div>
         <div><span>收藏内容</span><strong id="recordStorageValue">0 条</strong></div>
         <div><span>自动备份</span><strong id="backupStorageValue">检查中…</strong></div>
       </div>
-      <p id="storageHint">原图按需加载，画布只使用缩略图。</p>
+      <p id="storageHint">Later Space 保存清晰优化版；导出时也是优化版。</p>
     </aside>
 
-    <aside class="floating sync-panel" id="syncPanel" aria-labelledby="syncTitle" hidden>
-      <header><div><span>多设备与入口</span><h2 id="syncTitle">同步中心</h2></div><button class="tool-button" id="closeSyncButton" type="button" aria-label="关闭同步中心"><svg viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></svg></button></header>
+    <aside class="floating sync-panel account-panel" id="syncPanel" aria-labelledby="syncTitle" hidden>
+      <header><div><span>账户与空间</span><h2 id="syncTitle">我的 Later Space</h2></div><button class="tool-button" id="closeSyncButton" type="button" aria-label="关闭账户面板"><svg viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></svg></button></header>
+      <form class="account-profile" id="accountProfile" hidden><span class="account-profile-avatar" id="accountPanelAvatar">L</span><label for="accountNameInput">昵称<input id="accountNameInput" type="text" maxlength="32" autocomplete="nickname" /></label><button class="secondary-button" type="submit">保存</button></form>
       <div class="sync-status"><i id="syncStatusDot"></i><div><strong id="syncStatusTitle">检查中…</strong><span id="syncStatusDetail">正在检查云端配置</span></div></div>
       <form class="sync-login" id="syncLoginForm" hidden><label for="syncEmailInput">邮箱<input id="syncEmailInput" type="email" autocomplete="email" placeholder="name@example.com" required /></label><button class="primary-button" type="submit">发送登录链接</button></form><a class="sync-mail-link" id="syncMailLink" href="https://mail.google.com/" target="_blank" rel="noreferrer" hidden>打开邮箱查看</a>
-      <div class="sync-actions" id="syncActions" hidden><button class="secondary-button" id="signOutButton" type="button">退出登录</button><button class="primary-button" id="syncNowButton" type="button">立即同步</button></div>
+      <div class="sync-actions" id="syncActions" hidden><button class="secondary-button" id="signOutButton" type="button">退出登录</button><button class="primary-button" id="syncNowButton" type="button">立即同步</button><button class="secondary-button sync-undo-migration" id="undoMigrationButton" type="button" hidden>撤销本机内容导入</button></div>
+      <div class="cloud-usage" id="cloudUsage" hidden>
+        <div><strong id="cloudUsageTitle">图片空间</strong><span id="cloudUsageValue">0 MB / 50 MB</span></div>
+        <div class="cloud-usage-meter"><i id="cloudUsageMeter"></i></div>
+        <p id="cloudUsageHint">达到 85% 后暂停新增图片，文字和链接不受影响。</p>
+      </div>
+      <div class="account-migration" id="accountMigration" hidden><div><strong id="accountMigrationTitle">发现本机旧收藏</strong><span id="accountMigrationDetail">可以随时迁移到当前账号。</span></div><button class="secondary-button" id="accountMigrationButton" type="button">迁移本机收藏</button></div>
       <div class="sync-divider"></div>
       <div class="sync-entry"><strong>浏览器插件</strong><span>保存网页、图片和选中文字</span><a href="plugin-story.html" target="_blank">了解并安装</a></div>
-      <div class="sync-entry"><strong>iOS 快捷指令</strong><span>通过分享菜单发送链接或文字</span><a href="mobile/ios-shortcut.html" target="_blank">查看设置步骤</a></div>
+      <div class="sync-entry sync-entry-shortcut"><strong>手机分享入口</strong><span id="captureTokenStatus">登录后生成你的专属收件地址</span><a href="mobile/ios-shortcut-eli5.html" target="_blank">安装教程</a></div>
+      <div class="capture-token-actions" id="captureTokenActions" hidden><button class="primary-button" id="createCaptureTokenButton" type="button">生成专属地址</button><button class="secondary-button" id="copyCaptureUrlButton" type="button" hidden>复制收件地址</button><button class="text-button" id="revokeCaptureTokenButton" type="button" hidden>停用</button></div>
+      <div class="sync-entry"><strong>Agent 只读入口</strong><span id="agentTokenStatus">让 CLI / MCP 读取你的收藏</span><button class="secondary-button" id="createAgentTokenButton" type="button">生成 Token</button></div>
     </aside>
+
+    <div class="migration-backdrop" id="migrationBackdrop" hidden></div>
+    <section class="migration-dialog" id="migrationDialog" role="dialog" aria-modal="true" aria-labelledby="migrationTitle" hidden>
+      <button class="migration-close" id="closeMigrationButton" type="button" aria-label="关闭迁移提示">×</button>
+      <span class="migration-kicker">LOCAL COLLECTIONS</span>
+      <h2 id="migrationTitle">发现本机旧收藏</h2>
+      <p id="migrationSummary">可以把它们带入当前账号，在其他设备继续查看。</p>
+      <div class="migration-stats"><div><strong id="migrationTotal">0</strong><span>可迁移</span></div><div><strong id="migrationMedia">0</strong><span>图片</span></div><div><strong id="migrationReading">0</strong><span>链接与文字</span></div></div>
+      <p class="migration-safety">迁移时先复制并校验，本机原数据不会被删除。只要本机数据还在，之后随时可以继续迁移。</p>
+      <div class="migration-actions"><button class="primary-button" id="startMigrationButton" type="button">迁移到当前账号</button><button class="secondary-button" id="deferMigrationButton" type="button">暂时不迁移</button></div>
+    </section>
 
     <div class="capture-backdrop" id="captureBackdrop" hidden></div>
     <section class="capture-dialog" id="captureDialog" role="dialog" aria-modal="true" aria-labelledby="captureTitle" hidden>
@@ -282,7 +334,8 @@
       <p class="crop-hint">拖动框选择区域，拖动任意边缘或四角调整大小</p>
       <footer><button class="secondary-button" id="resetCropButton" type="button">重置</button><button class="primary-button" id="applyCropButton" type="button">完成裁剪</button></footer>
     </section>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" defer></script>
     <script src="cloud-config.js?v=1"></script>
-    <script src="app.js?v=71" defer></script>
+    <script src="app.js?v=74" defer></script>
   </body>
 </html>
