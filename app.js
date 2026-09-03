@@ -14,7 +14,7 @@ const TEXT_CARD_HEIGHT = 375;
 const EXPANDED_TEXT_WIDTH = 420;
 const EXPANDED_TEXT_HEIGHT = 520;
 const STATIC_DEPLOYMENT = location.protocol !== "file:" && !["localhost", "127.0.0.1", "::1"].includes(location.hostname);
-document.documentElement.dataset.appVersion = "77";
+document.documentElement.dataset.appVersion = "79";
 document.documentElement.dataset.deployment = STATIC_DEPLOYMENT ? "static" : "local";
 
 const state = {
@@ -92,6 +92,7 @@ const elements = {
   welcomeGoogleButton: document.querySelector("#welcomeGoogleButton"),
   welcomeMailLink: document.querySelector("#welcomeMailLink"),
   welcomeGuestButton: document.querySelector("#welcomeGuestButton"),
+  closeWelcomeButton: document.querySelector("#closeWelcomeButton"),
   authReturnScreen: document.querySelector("#authReturnScreen"),
   authReturnMark: document.querySelector("#authReturnMark"),
   authReturnTitle: document.querySelector("#authReturnTitle"),
@@ -1005,27 +1006,6 @@ function showWelcomeScreen() {
     elements.welcomeEmailInput.focus();
     showWelcomeEmailSuggestion();
   });
-}
-
-function bindWelcomeTilt() {
-  const card = document.querySelector(".welcome-copy");
-  const supportsTilt = typeof window.matchMedia === "function" && !window.matchMedia("(hover: none), (prefers-reduced-motion: reduce)").matches;
-  if (!card || !supportsTilt) return;
-  const reset = () => {
-    card.classList.remove("is-tilting");
-    card.style.setProperty("--tilt-x", "0deg");
-    card.style.setProperty("--tilt-y", "0deg");
-  };
-  card.addEventListener("pointermove", (event) => {
-    const rect = card.getBoundingClientRect();
-    const x = (event.clientX - rect.left) / rect.width - .5;
-    const y = (event.clientY - rect.top) / rect.height - .5;
-    card.classList.add("is-tilting");
-    card.style.setProperty("--tilt-x", `${(-y * 3.2).toFixed(2)}deg`);
-    card.style.setProperty("--tilt-y", `${(x * 3.2).toFixed(2)}deg`);
-  });
-  card.addEventListener("pointerleave", reset);
-  card.addEventListener("pointercancel", reset);
 }
 
 function rememberedLoginEmail() {
@@ -2997,13 +2977,16 @@ function cleanAuthRedirectUrl() {
 }
 
 async function sendMagicLink(email, feedback = {}) {
-  if (!email) return;
+  if (!email) {
+    if (feedback.failure) feedback.failure("请输入邮箱地址");
+    return;
+  }
   if (feedback.pending) feedback.pending();
   saveAuthReturnState();
   const redirectTo = cleanAuthRedirectUrl();
   const client = cloudAuthClient();
   if (!client) {
-    if (feedback.failure) feedback.failure();
+    if (feedback.failure) feedback.failure("登录服务暂时没有准备好，请刷新页面后重试");
     return;
   }
   const { error } = await client.auth.signInWithOtp({
@@ -3014,7 +2997,7 @@ async function sendMagicLink(email, feedback = {}) {
     rememberLoginEmail(email);
     if (feedback.success) feedback.success();
   } else {
-    if (feedback.failure) feedback.failure();
+    if (feedback.failure) feedback.failure("邮件发送失败，请稍后重试");
   }
 }
 
@@ -3052,7 +3035,7 @@ async function requestMagicLink(event) {
 
 async function requestWelcomeMagicLink(event) {
   event.preventDefault();
-  const button = elements.welcomeLoginForm.querySelector("button");
+  const button = elements.welcomeLoginForm.querySelector('button[type="submit"]');
   await sendMagicLink(elements.welcomeEmailInput.value.trim(), {
     pending: () => { button.disabled = true; button.textContent = "正在发送…"; },
     success: () => {
@@ -3060,10 +3043,10 @@ async function requestWelcomeMagicLink(event) {
       button.textContent = "重新发送";
       elements.welcomeMailLink.hidden = false;
     },
-    failure: () => {
+    failure: (message = "邮件发送失败，请稍后重试") => {
       button.disabled = false;
       button.textContent = "登录 / 注册";
-      showToast("邮件发送失败，请稍后重试");
+      showToast(message);
     },
   });
 }
@@ -3750,6 +3733,10 @@ function bindEvents() {
   elements.welcomeEmailSuggestion.addEventListener("mousedown", (event) => event.preventDefault());
   elements.welcomeEmailSuggestion.addEventListener("click", chooseWelcomeEmailSuggestion);
   elements.welcomeGuestButton.addEventListener("click", closeWelcomeScreen);
+  elements.closeWelcomeButton.addEventListener("click", closeWelcomeScreen);
+  elements.welcomeScreen.addEventListener("click", (event) => {
+    if (event.target === elements.welcomeScreen) closeWelcomeScreen();
+  });
   elements.authReturnRetryButton.addEventListener("click", () => {
     elements.authReturnScreen.hidden = true;
     state.authReturnActive = false;
@@ -4032,11 +4019,6 @@ async function init() {
       elements.restoreBackupButton.hidden = true;
     }
     bindEvents();
-    try {
-      bindWelcomeTilt();
-    } catch (error) {
-      console.warn("Welcome tilt enhancement unavailable", error);
-    }
     updateView();
     await loadImages();
     bindExtensionBridge();

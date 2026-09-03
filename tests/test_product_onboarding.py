@@ -23,12 +23,18 @@ class ProductOnboardingContractTests(unittest.TestCase):
         self.assertIn('<div class="welcome-brand"><img src="assets/favicon.svg?v=2"', INDEX)
         self.assertIn(".welcome-brand img", STYLES)
 
-    def test_welcome_card_has_subtle_tilt_interaction(self):
-        self.assertIn("function bindWelcomeTilt()", APP)
-        self.assertIn('perspective(1100px)', STYLES)
-        self.assertIn('rotateX(var(--tilt-x)) rotateY(var(--tilt-y))', STYLES)
-        self.assertIn('matchMedia("(hover: none), (prefers-reduced-motion: reduce)")', APP)
-        self.assertIn('Welcome tilt enhancement unavailable', APP)
+    def test_welcome_card_is_static_and_dismissible(self):
+        self.assertIn('id="closeWelcomeButton"', INDEX)
+        self.assertIn('aria-label="关闭登录页面"', INDEX)
+        self.assertIn('elements.closeWelcomeButton.addEventListener("click", closeWelcomeScreen)', APP)
+        self.assertIn('if (event.target === elements.welcomeScreen) closeWelcomeScreen()', APP)
+        self.assertNotIn("function bindWelcomeTilt()", APP)
+        self.assertNotIn('perspective(1100px)', STYLES)
+        self.assertNotIn('rotateX(var(--tilt-x)) rotateY(var(--tilt-y))', STYLES)
+
+    def test_welcome_form_targets_submit_button(self):
+        self.assertIn('querySelector(\'button[type="submit"]\')', APP)
+        self.assertIn("登录服务暂时没有准备好，请刷新页面后重试", APP)
 
     def test_recent_login_email_is_suggested_locally(self):
         self.assertIn('id="welcomeEmailSuggestion"', INDEX)

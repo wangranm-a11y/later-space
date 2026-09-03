@@ -136,8 +136,10 @@ kbd { min-width: 26px; height: 24px; display: grid; place-items: center; padding
 .auth-return-card button { margin-top: 26px; }
 @keyframes auth-return-spin { to { transform: rotate(360deg); } }
 .welcome-layout { width: min(580px,calc(100vw - 48px)); }
-.welcome-copy { --tilt-x: 0deg; --tilt-y: 0deg; position: relative; padding: 46px 50px 42px; border: 1px solid rgba(255,255,255,.68); border-radius: 9px; background: rgba(249,247,240,.88); box-shadow: var(--welcome-shadow, 0 30px 90px rgba(20,20,22,.24), inset 0 0 0 1px rgba(24,24,26,.08)); transform: perspective(1100px) rotateX(var(--tilt-x)) rotateY(var(--tilt-y)); transform-style: preserve-3d; transition: transform 180ms ease-out, box-shadow 180ms ease-out; will-change: transform; }
-.welcome-copy.is-tilting { --welcome-shadow: 0 34px 98px rgba(20,20,22,.27), inset 0 0 0 1px rgba(24,24,26,.08); }
+.welcome-copy { position: relative; padding: 46px 50px 42px; border: 1px solid rgba(255,255,255,.68); border-radius: 9px; background: rgba(249,247,240,.88); box-shadow: 0 30px 90px rgba(20,20,22,.24), inset 0 0 0 1px rgba(24,24,26,.08); }
+.welcome-close { position: absolute; top: 15px; right: 15px; width: 34px; height: 34px; display: grid; place-items: center; border: 0; border-radius: 50%; background: transparent; color: #77746d; cursor: pointer; }
+.welcome-close:hover, .welcome-close:focus-visible { background: rgba(29,29,31,.06); color: var(--ink); outline: 0; }
+.welcome-close svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-linecap: round; stroke-width: 1.8; }
 .welcome-brand { display: flex; align-items: center; gap: 9px; margin-bottom: 38px; font-size: 13px; }
 .welcome-brand img { width: 24px; height: 24px; border-radius: 5px; }
 .welcome-kicker { color: #718e64; font: 700 9px ui-monospace,"SF Mono",monospace; letter-spacing: .08em; }
@@ -635,5 +637,4 @@ button:focus-visible, .canvas-item:focus-visible { outline: 3px solid rgba(80,97
   *, *::before, *::after { transition-duration: .01ms !important; }
   .link-card.is-loading .link-cover-image { animation: none; }
   .canvas-item.is-arriving { visibility: visible; }
-  .welcome-copy { transform: none; }
 }
