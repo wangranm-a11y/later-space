@@ -64,8 +64,8 @@ class ExtensionOnboardingContractTests(unittest.TestCase):
         self.assertIn("width: 28px", WELCOME_CSS)
         self.assertIn("#718e64", WELCOME_CSS)
 
-    def test_release_version_is_1_9_3(self):
-        self.assertIn('"version": "1.9.3"', MANIFEST)
+    def test_release_version_is_1_9_4(self):
+        self.assertIn('"version": "1.9.4"', MANIFEST)
 
 
 if __name__ == "__main__":

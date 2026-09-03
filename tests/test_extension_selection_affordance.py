@@ -17,7 +17,7 @@ class ExtensionSelectionAffordanceTests(unittest.TestCase):
         self.assertIn("}, SELECTION_BUTTON_DELAY_MS);", FEEDBACK)
 
     def test_extension_version_is_bumped(self):
-        self.assertIn('"version": "1.9.3"', MANIFEST)
+        self.assertIn('"version": "1.9.4"', MANIFEST)
 
     def test_selection_button_uses_centered_moss_plus(self):
         self.assertIn('function selectionMark()', FEEDBACK)
@@ -31,9 +31,14 @@ class ExtensionSelectionAffordanceTests(unittest.TestCase):
         self.assertIn('"important"', FEEDBACK)
 
     def test_selection_button_changes_to_check_before_removal(self):
-        self.assertIn('setSelectionButtonSaved(selectionButton);', FEEDBACK)
+        self.assertIn('setSelectionButtonSaved(savedButton);', FEEDBACK)
         self.assertIn('mark.textContent = "✓"', FEEDBACK)
-        self.assertIn('setTimeout(resolve, 700)', FEEDBACK)
+        self.assertIn("const SELECTION_SAVED_HOLD_MS = 1400", FEEDBACK)
+        self.assertIn("const SELECTION_SAVED_FADE_MS = 220", FEEDBACK)
+        self.assertIn('savedButton.style.opacity = "0"', FEEDBACK)
+        self.assertIn("removeFloatingButton(savedButton)", FEEDBACK)
+        self.assertIn("if (selectionButton?.disabled) return", FEEDBACK)
+        self.assertLess(FEEDBACK.index('setSelectionButtonSaved(savedButton);'), FEEDBACK.index('savedButton.style.opacity = "0"'))
 
     def test_feedback_view_arrow_uses_centered_svg(self):
         self.assertIn('view.innerHTML = \'<svg viewBox="0 0 20 20"', FEEDBACK)
