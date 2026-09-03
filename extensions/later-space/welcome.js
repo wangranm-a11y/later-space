@@ -44,10 +44,10 @@ function positionSelectionButton(range) {
   if (!rect.width && !rect.height) return;
   selectionButton = document.createElement("button");
   selectionButton.type = "button";
-  selectionButton.className = "float-capture";
+  selectionButton.className = "float-capture selection-capture-v2";
   selectionButton.id = "selectionCapture";
   selectionButton.setAttribute("aria-label", "收藏选中文字");
-  selectionButton.innerHTML = "<span></span>";
+  selectionButton.innerHTML = '<span class="selection-plus" aria-hidden="true"></span>';
   selectionButton.style.display = "grid";
   selectionButton.style.left = `${Math.min(innerWidth - 38, rect.right + 6)}px`;
   selectionButton.style.top = `${Math.min(innerHeight - 38, rect.bottom + 6)}px`;

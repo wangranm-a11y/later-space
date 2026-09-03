@@ -30,7 +30,7 @@ python3 server.py
 插件默认连接正式版 `https://wangranm-a11y.github.io/later-space/`，不需要运行本地服务。收藏内容由正式页面写入每位用户自己浏览器的 IndexedDB，不会上传到公共仓库或其他用户的数据中。
 
 1. 打开 `chrome://extensions` 并开启右上角「开发者模式」。
-2. 点击「加载已解压的扩展程序」，选择 `extensions/later-space/`。
+2. 从 `plugin-story.html` 下载最新版 zip 并解压；点击「加载已解压的扩展程序」，选择 `later-space-chrome-extension/`。开发者也可以直接选择 `extensions/later-space/`。
 3. 浏览网页时点击插件图标，再点「加入 Later Space」收藏当前页面；不会弹出分类表单。
 4. 右键网页、链接、图片或选中文字时选择「加入 Later Space」，插件会自动识别内容类型；小红书等带交互遮罩的图片也会尝试识别。也可以按 `Control + Shift + L` 收藏当前页面。
 5. 收藏成功后，网页右上角会显示轻量的「已加入 Later Space」提示，并提供跳转和短时「撤销」；点击跳转会先打开 Later Space，再定位并高亮刚加入的卡片。再次打开插件时，也会显示最近一次收藏及查看入口。

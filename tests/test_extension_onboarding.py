@@ -9,6 +9,8 @@ WORKER = (EXTENSION / "service-worker.js").read_text(encoding="utf-8")
 FEEDBACK = (EXTENSION / "page-feedback.js").read_text(encoding="utf-8")
 POPUP = (EXTENSION / "popup.html").read_text(encoding="utf-8")
 OPTIONS = (EXTENSION / "options.html").read_text(encoding="utf-8")
+WELCOME_CSS = (EXTENSION / "selection-affordance.css").read_text(encoding="utf-8")
+WELCOME_JS = (EXTENSION / "welcome.js").read_text(encoding="utf-8")
 
 
 class ExtensionOnboardingContractTests(unittest.TestCase):
@@ -49,15 +51,21 @@ class ExtensionOnboardingContractTests(unittest.TestCase):
         self.assertIn("chrome.runtime.onStartup.addListener", WORKER)
 
     def test_welcome_files_and_user_entry_points_exist(self):
-        for name in ("welcome.html", "welcome.css", "welcome.js", "feedback-sound.js"):
+        for name in ("welcome.html", "welcome.css", "welcome.js", "feedback-sound.js", "selection-affordance.css"):
             self.assertTrue((EXTENSION / name).is_file(), name)
         self.assertIn("使用指南", POPUP)
         self.assertIn("设置", POPUP)
         self.assertIn("收藏提示音", OPTIONS)
         self.assertIn("重新查看使用指南", OPTIONS)
 
-    def test_release_version_is_1_9_2(self):
-        self.assertIn('"version": "1.9.2"', MANIFEST)
+    def test_welcome_selection_button_matches_current_affordance(self):
+        self.assertIn("selection-capture-v2", WELCOME_JS)
+        self.assertIn("selection-plus", WELCOME_JS)
+        self.assertIn("width: 28px", WELCOME_CSS)
+        self.assertIn("#718e64", WELCOME_CSS)
+
+    def test_release_version_is_1_9_3(self):
+        self.assertIn('"version": "1.9.3"', MANIFEST)
 
 
 if __name__ == "__main__":
