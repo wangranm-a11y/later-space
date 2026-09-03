@@ -136,7 +136,8 @@ kbd { min-width: 26px; height: 24px; display: grid; place-items: center; padding
 .auth-return-card button { margin-top: 26px; }
 @keyframes auth-return-spin { to { transform: rotate(360deg); } }
 .welcome-layout { width: min(580px,calc(100vw - 48px)); }
-.welcome-copy { position: relative; padding: 46px 50px 42px; border: 1px solid rgba(255,255,255,.68); border-radius: 9px; background: rgba(249,247,240,.88); box-shadow: 0 30px 90px rgba(20,20,22,.24), inset 0 0 0 1px rgba(24,24,26,.08); }
+.welcome-copy { --tilt-x: 0deg; --tilt-y: 0deg; position: relative; padding: 46px 50px 42px; border: 1px solid rgba(255,255,255,.68); border-radius: 9px; background: rgba(249,247,240,.88); box-shadow: var(--welcome-shadow, 0 30px 90px rgba(20,20,22,.24), inset 0 0 0 1px rgba(24,24,26,.08)); transform: perspective(1100px) rotateX(var(--tilt-x)) rotateY(var(--tilt-y)); transform-style: preserve-3d; transition: transform 180ms ease-out, box-shadow 180ms ease-out; will-change: transform; }
+.welcome-copy.is-tilting { --welcome-shadow: 0 34px 98px rgba(20,20,22,.27), inset 0 0 0 1px rgba(24,24,26,.08); }
 .welcome-brand { display: flex; align-items: center; gap: 9px; margin-bottom: 38px; font-size: 13px; }
 .welcome-brand img { width: 24px; height: 24px; border-radius: 5px; }
 .welcome-kicker { color: #718e64; font: 700 9px ui-monospace,"SF Mono",monospace; letter-spacing: .08em; }
@@ -157,6 +158,14 @@ kbd { min-width: 26px; height: 24px; display: grid; place-items: center; padding
 .welcome-email-suggestion strong { overflow: hidden; font-size: 12px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
 .welcome-mail-link { display: block; margin-top: 12px; color: #526b48; font-size: 11px; }
 .welcome-mail-link[hidden] { display: none; }
+.auth-divider, .sync-auth-divider { display: flex; align-items: center; gap: 12px; margin: 18px 0 12px; color: #99958d; font-size: 10px; }
+.auth-divider::before, .auth-divider::after, .sync-auth-divider::before, .sync-auth-divider::after { content: ""; height: 1px; flex: 1; background: rgba(29,29,31,.12); }
+.google-login-button { width: 100%; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; gap: 10px; border: 1px solid rgba(22,22,24,.16); border-radius: 8px; background: #fff; color: var(--ink); font-size: 12px; font-weight: 600; cursor: pointer; }
+.google-login-button:hover { background: #f8faf7; border-color: rgba(113,142,100,.55); }
+.google-login-button:disabled { cursor: default; opacity: .55; }
+.google-mark { width: 19px; height: 19px; display: grid; place-items: center; color: #4285f4; font: 700 17px Arial,sans-serif; }
+.sync-auth-divider { margin: 16px 0 10px; }
+.sync-auth-divider[hidden], .sync-google-login-button[hidden] { display: none; }
 .welcome-guest-button { margin-top: 19px; padding: 0; border: 0; border-bottom: 1px solid rgba(29,29,31,.35); background: transparent; color: var(--ink); font-size: 12px; cursor: pointer; }
 .welcome-copy>small { display: block; max-width: 390px; margin-top: 18px; color: #8a8780; font-size: 9px; line-height: 1.6; }
 
@@ -626,4 +635,5 @@ button:focus-visible, .canvas-item:focus-visible { outline: 3px solid rgba(80,97
   *, *::before, *::after { transition-duration: .01ms !important; }
   .link-card.is-loading .link-cover-image { animation: none; }
   .canvas-item.is-arriving { visibility: visible; }
+  .welcome-copy { transform: none; }
 }

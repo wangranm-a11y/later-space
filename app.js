@@ -89,6 +89,7 @@ const elements = {
   welcomeEmailInput: document.querySelector("#welcomeEmailInput"),
   welcomeEmailSuggestion: document.querySelector("#welcomeEmailSuggestion"),
   welcomeEmailSuggestionValue: document.querySelector("#welcomeEmailSuggestionValue"),
+  welcomeGoogleButton: document.querySelector("#welcomeGoogleButton"),
   welcomeMailLink: document.querySelector("#welcomeMailLink"),
   welcomeGuestButton: document.querySelector("#welcomeGuestButton"),
   authReturnScreen: document.querySelector("#authReturnScreen"),
@@ -204,6 +205,8 @@ const elements = {
   syncStatusTitle: document.querySelector("#syncStatusTitle"),
   syncStatusDetail: document.querySelector("#syncStatusDetail"),
   syncLoginForm: document.querySelector("#syncLoginForm"),
+  syncAuthDivider: document.querySelector("#syncAuthDivider"),
+  syncGoogleButton: document.querySelector("#syncGoogleButton"),
   syncEmailInput: document.querySelector("#syncEmailInput"),
   syncMailLink: document.querySelector("#syncMailLink"),
   syncActions: document.querySelector("#syncActions"),
@@ -1002,6 +1005,26 @@ function showWelcomeScreen() {
     elements.welcomeEmailInput.focus();
     showWelcomeEmailSuggestion();
   });
+}
+
+function bindWelcomeTilt() {
+  const card = document.querySelector(".welcome-copy");
+  if (!card || matchMedia("(hover: none), (prefers-reduced-motion: reduce)").matches) return;
+  const reset = () => {
+    card.classList.remove("is-tilting");
+    card.style.setProperty("--tilt-x", "0deg");
+    card.style.setProperty("--tilt-y", "0deg");
+  };
+  card.addEventListener("pointermove", (event) => {
+    const rect = card.getBoundingClientRect();
+    const x = (event.clientX - rect.left) / rect.width - .5;
+    const y = (event.clientY - rect.top) / rect.height - .5;
+    card.classList.add("is-tilting");
+    card.style.setProperty("--tilt-x", `${(-y * 3.2).toFixed(2)}deg`);
+    card.style.setProperty("--tilt-y", `${(x * 3.2).toFixed(2)}deg`);
+  });
+  card.addEventListener("pointerleave", reset);
+  card.addEventListener("pointercancel", reset);
 }
 
 function rememberedLoginEmail() {
@@ -2994,6 +3017,21 @@ async function sendMagicLink(email, feedback = {}) {
   }
 }
 
+async function signInWithGoogle(button) {
+  const client = cloudAuthClient();
+  if (!client) return showToast("云端登录组件还没有准备好");
+  saveAuthReturnState();
+  button.disabled = true;
+  const { error } = await client.auth.signInWithOAuth({
+    provider: "google",
+    options: { redirectTo: cleanAuthRedirectUrl() },
+  });
+  if (error) {
+    button.disabled = false;
+    showToast("Google 登录暂时不可用，请改用邮箱登录");
+  }
+}
+
 async function requestMagicLink(event) {
   event.preventDefault();
   const email = elements.syncEmailInput.value.trim();
@@ -3704,6 +3742,7 @@ function showToast(message, actionLabel = "", action = null) {
 
 function bindEvents() {
   elements.welcomeLoginForm.addEventListener("submit", requestWelcomeMagicLink);
+  elements.welcomeGoogleButton.addEventListener("click", () => signInWithGoogle(elements.welcomeGoogleButton));
   elements.welcomeEmailInput.addEventListener("focus", showWelcomeEmailSuggestion);
   elements.welcomeEmailInput.addEventListener("input", showWelcomeEmailSuggestion);
   elements.welcomeEmailInput.addEventListener("blur", () => setTimeout(() => { elements.welcomeEmailSuggestion.hidden = true; }, 120));
@@ -3720,6 +3759,7 @@ function bindEvents() {
     if (state.cloudSession?.user) openSyncPanel();
     else showWelcomeScreen();
   });
+  elements.syncGoogleButton.addEventListener("click", () => signInWithGoogle(elements.syncGoogleButton));
   elements.accountMigrationButton.addEventListener("click", openMigrationDialog);
   elements.closeMigrationButton.addEventListener("click", closeMigrationDialog);
   elements.migrationBackdrop.addEventListener("click", closeMigrationDialog);
@@ -3991,6 +4031,7 @@ async function init() {
       elements.restoreBackupButton.hidden = true;
     }
     bindEvents();
+    bindWelcomeTilt();
     updateView();
     await loadImages();
     bindExtensionBridge();

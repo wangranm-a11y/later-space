@@ -23,6 +23,12 @@ class ProductOnboardingContractTests(unittest.TestCase):
         self.assertIn('<div class="welcome-brand"><img src="assets/favicon.svg?v=2"', INDEX)
         self.assertIn(".welcome-brand img", STYLES)
 
+    def test_welcome_card_has_subtle_tilt_interaction(self):
+        self.assertIn("function bindWelcomeTilt()", APP)
+        self.assertIn('perspective(1100px)', STYLES)
+        self.assertIn('rotateX(var(--tilt-x)) rotateY(var(--tilt-y))', STYLES)
+        self.assertIn('matchMedia("(hover: none), (prefers-reduced-motion: reduce)")', APP)
+
     def test_recent_login_email_is_suggested_locally(self):
         self.assertIn('id="welcomeEmailSuggestion"', INDEX)
         self.assertIn('id="welcomeEmailSuggestionValue"', INDEX)
@@ -32,6 +38,14 @@ class ProductOnboardingContractTests(unittest.TestCase):
         self.assertIn("chooseWelcomeEmailSuggestion", APP)
         self.assertIn("session?.user?.email", APP)
         self.assertIn(".welcome-email-suggestion { position: static; margin-top: 7px; }", STYLES)
+
+    def test_google_oauth_login_is_available_without_mail_permissions(self):
+        self.assertIn('id="welcomeGoogleButton"', INDEX)
+        self.assertIn('id="syncGoogleButton"', INDEX)
+        self.assertIn('signInWithOAuth({', APP)
+        self.assertIn('provider: "google"', APP)
+        self.assertIn('redirectTo: cleanAuthRedirectUrl()', APP)
+        self.assertIn(".google-login-button", STYLES)
 
     def test_empty_welcome_reveals_canvas_guides_behind_it(self):
         welcome = APP[APP.index("function showWelcomeScreen") : APP.index("function closeWelcomeScreen")]
