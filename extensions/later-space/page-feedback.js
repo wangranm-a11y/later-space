@@ -202,7 +202,7 @@ function scheduleSelectionButton() {
       setSelectionButtonSaved(selectionButton);
       await Promise.all([
         sendRuntimeMessage({ type: "capture-selection", text }),
-        new Promise((resolve) => setTimeout(resolve, 480)),
+        new Promise((resolve) => setTimeout(resolve, 700)),
       ]);
       removeSelectionButton();
       selection.removeAllRanges();
@@ -273,9 +273,9 @@ function showFeedback(message) {
   if (message.recordIds?.length) {
     const view = document.createElement("button");
     view.type = "button";
-    view.textContent = "↗";
+    view.innerHTML = '<svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true"><path d="M6 14 14 6M8 6h6v6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
     view.setAttribute("aria-label", "查看刚刚加入的内容");
-    view.style.cssText = "width:28px;height:28px;padding:0;border:1px solid rgba(25,25,27,.11);border-radius:7px;background:#fafaf8;color:#202124;font:600 16px/1 -apple-system,BlinkMacSystemFont,sans-serif;cursor:pointer";
+    view.style.cssText = "width:28px;height:28px;display:grid;place-items:center;padding:0;border:1px solid rgba(25,25,27,.11);border-radius:7px;background:#fafaf8;color:#202124;cursor:pointer";
     view.addEventListener("click", () => sendRuntimeMessage({ type: "view-capture", recordIds: message.recordIds }));
     actions.append(view);
   }

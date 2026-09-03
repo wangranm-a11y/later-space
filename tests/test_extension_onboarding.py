@@ -56,8 +56,8 @@ class ExtensionOnboardingContractTests(unittest.TestCase):
         self.assertIn("收藏提示音", OPTIONS)
         self.assertIn("重新查看使用指南", OPTIONS)
 
-    def test_release_version_is_1_9_1(self):
-        self.assertIn('"version": "1.9.1"', MANIFEST)
+    def test_release_version_is_1_9_2(self):
+        self.assertIn('"version": "1.9.2"', MANIFEST)
 
 
 if __name__ == "__main__":
