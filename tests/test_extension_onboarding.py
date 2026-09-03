@@ -65,7 +65,7 @@ class ExtensionOnboardingContractTests(unittest.TestCase):
         self.assertIn("#718e64", WELCOME_CSS)
 
     def test_release_version_is_1_9_5(self):
-        self.assertIn('"version": "1.9.5"', MANIFEST)
+        self.assertIn('"version": "1.9.6"', MANIFEST)
 
     def test_connection_can_be_diagnosed_and_repaired(self):
         self.assertIn("async function connectionDiagnosis()", WORKER)

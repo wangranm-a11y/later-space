@@ -24,11 +24,11 @@ Later Space Collector 是 Later Space 的网页侧轻量入口：用户不必离
 
 - 插件名称：`Later Space Collector`
 - Manifest：Chrome Manifest V3
-- 源码版本：`1.9.5`
+- 源码版本：`1.9.6`
 - 正式网页：`https://wangranm-a11y.github.io/later-space/`
 - 插件源码：`extensions/later-space/`
 - 正式安装包内目录：`later-space-chrome-extension/`（固定名称，便于覆盖升级）
-- 正式安装包：`dist/later-space-chrome-extension-v1.9.5.zip`
+- 正式安装包：`dist/later-space-chrome-extension-v1.9.6.zip`
 
 ## 4. 用户可见的收藏入口
 
@@ -67,7 +67,7 @@ Later Space Collector 是 Later Space 的网页侧轻量入口：用户不必离
   - 悬停变成青苔底、白色 `+`
   - 按下轻微缩小
   - 点击后原位变成白色 `✓`
-  - `✓` 稳定停留 `1.4s`，再用 `220ms` 柔和淡出
+  - `✓` 稳定停留 `2.4s`，再用 `220ms` 柔和淡出
 - 按钮与网页默认蓝色选区形成中性关系，不直接争夺蓝色。
 - 使用高优先级行内样式抵抗第三方网页 CSS 污染。
 
@@ -285,7 +285,7 @@ Later Space Collector 是 Later Space 的网页侧轻量入口：用户不必离
 - 完整 favicon 在文字旁过于突兀，因此独立探索 8 个快捷按钮方向。
 - 用户选择 `02 轻盈青苔`。
 - 放大为 `28px`，重画居中 `+`，增加悬停反色和 `+ -> ✓`。
-- 完成态从 700ms 延长到 1.4s，并加入 220ms 淡出。
+- 完成态从 1.4s 延长到 2.4s，并加入 220ms 淡出。
 - 右上角查看箭头由文本字符改成居中的线性 SVG。
 
 关键提交：
@@ -301,7 +301,7 @@ Later Space Collector 是 Later Space 的网页侧轻量入口：用户不必离
 
 - `dist/later-space-chrome-extension-v1.3.0/` 曾被当作 Ego Lite 的活动目录，内部被覆盖过，不应作为历史发布依据。
 - 部分其他历史目录名与其中 `manifest.json` 版本不一致。
-- `1.9.5` 使用版本化 zip 和固定的包内目录，避免覆盖升级时因目录改名产生新的扩展实例。
+- `1.9.6` 使用版本化 zip 和固定的包内目录，避免覆盖升级时因目录改名产生新的扩展实例。
 
 ## 14. 当前已知问题与后续优先级
 
@@ -353,7 +353,7 @@ Ego Lite 更新当前活动插件目录：
 rsync -a --delete extensions/later-space/ dist/later-space-chrome-extension-v1.3.0/
 ```
 
-同步后必须在 `chrome://extensions/` 点击 Later Space Collector 的 Reload，并确认显示版本 `1.9.5`。
+同步后必须在 `chrome://extensions/` 点击 Later Space Collector 的 Reload，并确认显示版本 `1.9.6`。
 
 ## 16. 可用于 HTML 叙事页的真实主线
 
@@ -369,17 +369,17 @@ rsync -a --delete extensions/later-space/ dist/later-space-chrome-extension-v1.3
 4. **一个小图标的问题**：完整 favicon 出现在文字旁边太突兀。
 5. **真实讨论**：用户提出“青苔小圆点 `+ -> ✓`”，并注意到浏览器蓝色选区与绿色按钮的关系。
 6. **Playground 探索**：8 个方案中选择 `02 轻盈青苔`，不是最有装饰感的，而是最不打断正文的。
-7. **像素级打磨**：`28px`、居中 `+`、1.4s 完成态、箭头 `0px / 0px` 中心误差、网页 CSS 污染修复。
+7. **像素级打磨**：`28px`、居中 `+`、2.4s 完成态、箭头 `0px / 0px` 中心误差、网页 CSS 污染修复。
 8. **回到产品定位**：好的收藏工具应该留在思考的边缘，先接住，再把注意力还给用户。
 
 适合保留的真实数字：
 
-- 从 `1.1.0` 到 `1.9.5`
+- 从 `1.1.0` 到 `1.9.6`
 - 约 20 轮插件相关 Git 提交
 - 20 多个历史安装包
 - 10ms 选区按钮响应
 - 28px 收藏圆点
-- 1.4s 对勾停留与 220ms 淡出
+- 2.4s 对勾停留与 220ms 淡出
 - 60 秒撤销窗口
 - 最多 200 条离线队列
 - 每分钟自动重试
