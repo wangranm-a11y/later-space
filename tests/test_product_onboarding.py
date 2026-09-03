@@ -70,6 +70,13 @@ class ProductOnboardingContractTests(unittest.TestCase):
         self.assertLess(init.index("await initializeCloud()"), init.index("showInitialWelcome()"))
         self.assertIn("closeWelcomeAfterAuthentication", APP)
 
+    def test_cloud_failure_does_not_block_canvas_onboarding(self):
+        init = APP[APP.index("async function init()") : APP.index("init();")]
+        self.assertIn('console.error("Cloud initialization failed", error)', init)
+        self.assertLess(init.index("await initializeCloud()"), init.index("showInitialWelcome()"))
+        cloud_error = init[init.index("await initializeCloud()") : init.index("showInitialWelcome()")]
+        self.assertIn("catch (error)", cloud_error)
+
     def test_auth_callback_supports_code_and_legacy_hash(self):
         self.assertIn('searchParams.get("code")', APP)
         self.assertIn('values.get("access_token")', APP)

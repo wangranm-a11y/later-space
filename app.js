@@ -13,7 +13,7 @@ const TEXT_CARD_HEIGHT = 375;
 const EXPANDED_TEXT_WIDTH = 420;
 const EXPANDED_TEXT_HEIGHT = 520;
 const STATIC_DEPLOYMENT = location.protocol !== "file:" && !["localhost", "127.0.0.1", "::1"].includes(location.hostname);
-document.documentElement.dataset.appVersion = "74";
+document.documentElement.dataset.appVersion = "75";
 document.documentElement.dataset.deployment = STATIC_DEPLOYMENT ? "static" : "local";
 
 const state = {
@@ -3949,7 +3949,12 @@ async function init() {
     updateView();
     await loadImages();
     bindExtensionBridge();
-    await initializeCloud();
+    try {
+      await initializeCloud();
+    } catch (error) {
+      console.error("Cloud initialization failed", error);
+      showToast("云端同步暂时不可用，本地画布仍可使用");
+    }
     showInitialWelcome();
     renderAccountEntry();
     if (new URLSearchParams(location.search).get("extension") === "connect") {
