@@ -15,6 +15,13 @@ class ProductOnboardingContractTests(unittest.TestCase):
         self.assertIn("登录 / 注册", INDEX)
         self.assertIn("先体验 Later Space", INDEX)
         self.assertIn("登录后可在不同设备查看", INDEX)
+        self.assertIn("backdrop-filter: blur(8px)", STYLES)
+        self.assertIn("background: rgba(249,247,240,.88)", STYLES)
+        self.assertNotIn('class="welcome-visual"', INDEX)
+
+    def test_empty_welcome_reveals_canvas_guides_behind_it(self):
+        welcome = APP[APP.index("function showWelcomeScreen") : APP.index("function closeWelcomeScreen")]
+        self.assertIn("if (!state.images.length) elements.canvasGuide.hidden = false", welcome)
 
     def test_canvas_guides_are_interface_only(self):
         self.assertIn('id="canvasGuide"', INDEX)

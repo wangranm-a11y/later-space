@@ -13,7 +13,7 @@ const TEXT_CARD_HEIGHT = 375;
 const EXPANDED_TEXT_WIDTH = 420;
 const EXPANDED_TEXT_HEIGHT = 520;
 const STATIC_DEPLOYMENT = location.protocol !== "file:" && !["localhost", "127.0.0.1", "::1"].includes(location.hostname);
-document.documentElement.dataset.appVersion = "75";
+document.documentElement.dataset.appVersion = "76";
 document.documentElement.dataset.deployment = STATIC_DEPLOYMENT ? "static" : "local";
 
 const state = {
@@ -992,6 +992,7 @@ async function switchWorkspace(workspaceId) {
 }
 
 function showWelcomeScreen() {
+  if (!state.images.length) elements.canvasGuide.hidden = false;
   elements.welcomeScreen.hidden = false;
   requestAnimationFrame(() => elements.welcomeEmailInput.focus());
 }
