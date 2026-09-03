@@ -36,7 +36,8 @@ class ExtensionOnboardingContractTests(unittest.TestCase):
         self.assertIn('"feedback-sound.js", "page-feedback.js"', MANIFEST)
 
     def test_floating_icon_has_hover_and_pressed_states(self):
-        self.assertIn('button.style.background = "#ffffff"', FEEDBACK)
+        self.assertIn('setSelectionButtonHover(button, true)', FEEDBACK)
+        self.assertIn('setSelectionButtonHover(button, false)', FEEDBACK)
         self.assertIn('button.style.transform = "translateY(-1px) scale(.96)"', FEEDBACK)
         self.assertNotIn("backdrop-filter", FEEDBACK)
 
@@ -55,8 +56,8 @@ class ExtensionOnboardingContractTests(unittest.TestCase):
         self.assertIn("收藏提示音", OPTIONS)
         self.assertIn("重新查看使用指南", OPTIONS)
 
-    def test_release_version_is_1_9_0(self):
-        self.assertIn('"version": "1.9.0"', MANIFEST)
+    def test_release_version_is_1_9_1(self):
+        self.assertIn('"version": "1.9.1"', MANIFEST)
 
 
 if __name__ == "__main__":

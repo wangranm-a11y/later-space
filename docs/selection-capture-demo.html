@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Later Space · Capture Playground</title>
+  <link rel="icon" href="../assets/favicon.svg">
+  <style>
+    :root { --ink:#202124; --paper:#f4f3ef; --moss:#8faa80; --moss-dark:#718e64; --blue:#3079ed; --line:#d8d6cf; }
+    * { box-sizing:border-box; }
+    body { margin:0; min-height:100vh; background:var(--paper); color:var(--ink); font-family:-apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif; letter-spacing:0; }
+    header { height:70px; display:flex; align-items:center; justify-content:space-between; padding:0 5vw; border-bottom:1px solid var(--line); }
+    .brand { display:flex; align-items:center; gap:10px; font-size:13px; font-weight:700; }
+    .brand img { width:26px; height:26px; }
+    header span { color:#85827b; font-size:11px; }
+    main { width:min(1180px,90vw); margin:auto; padding:54px 0 74px; }
+    .intro { display:grid; grid-template-columns:minmax(260px,420px) 1fr; gap:7vw; align-items:end; margin-bottom:44px; }
+    h1 { margin:0; font:600 46px/1.08 "Songti SC",Georgia,serif; }
+    .intro p { max-width:520px; margin:0; color:#706e68; font-size:13px; line-height:1.85; }
+    .section-title { display:flex; align-items:baseline; justify-content:space-between; margin:40px 0 14px; }
+    .section-title h2 { margin:0; font-size:12px; font-weight:700; }
+    .section-title span { color:#8a8780; font-size:10px; }
+    .grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; }
+    .sample { min-height:208px; display:flex; flex-direction:column; justify-content:space-between; padding:20px; border:1px solid #dedcd5; border-radius:7px; background:#fff; cursor:pointer; transition:border-color .16s ease,box-shadow .16s ease,transform .16s ease; }
+    .sample:hover { border-color:#b9b7b0; box-shadow:0 10px 28px rgba(32,33,36,.07); transform:translateY(-2px); }
+    .sample.is-picked { border-color:var(--moss-dark); box-shadow:0 0 0 1px var(--moss-dark),0 12px 30px rgba(67,82,59,.08); }
+    .sample-head { display:flex; align-items:center; justify-content:space-between; color:#8b8982; font-size:9px; }
+    .sample-head b { color:var(--ink); font-size:11px; }
+    .copy { position:relative; margin:24px 0; font:16px/1.9 "Songti SC",Georgia,serif; }
+    .selected { padding:2px 0; background:#b9d2fa; }
+    .action { position:absolute; left:calc(100% + 10px); bottom:-11px; width:28px; height:28px; display:grid; place-items:center; padding:0; border:0; cursor:pointer; transition:transform .14s ease,background .14s ease,color .14s ease,box-shadow .14s ease; }
+    .action:hover { transform:scale(1.08); }
+    .action:active { transform:scale(.92); }
+    .action.is-saved { background:var(--moss-dark)!important; border-color:var(--moss-dark)!important; color:#fff!important; }
+    .plus { display:block; font:700 22px/1 Arial,sans-serif; transform:translateY(-1px); }
+    .v1 { border:1px solid #d7d7d1; border-radius:50%; background:#fff; color:var(--ink); box-shadow:0 5px 13px rgba(32,33,36,.12); }
+    .v1::after { content:""; position:absolute; right:3px; top:3px; width:5px; height:5px; border-radius:50%; background:var(--moss); }
+    .v2 { border:1px solid #d9ded5; border-radius:50%; background:#fff; color:var(--moss-dark); box-shadow:0 5px 13px rgba(66,85,58,.13); }
+    .v2:hover { background:var(--moss); color:#fff; }
+    .v3 { border-radius:50%; background:var(--ink); color:#fff; box-shadow:0 5px 13px rgba(32,33,36,.2); }
+    .v4 { border-radius:50%; background:var(--blue); color:#fff; box-shadow:0 5px 13px rgba(48,121,237,.2); }
+    .v5 { border:2px solid var(--moss); border-radius:50%; background:#fff; color:var(--ink); box-shadow:0 5px 13px rgba(32,33,36,.1); }
+    .v6 { border:1px solid #d9d8d2; border-radius:7px; background:#fff; color:var(--ink); box-shadow:0 5px 13px rgba(32,33,36,.11); }
+    .v6::before { content:""; position:absolute; left:5px; bottom:5px; width:7px; height:7px; border-left:2px solid var(--moss-dark); border-bottom:2px solid var(--moss-dark); }
+    .v7 { border:1px solid #d9d8d2; border-radius:50%; background:#fff; color:var(--ink); box-shadow:0 5px 13px rgba(32,33,36,.1); }
+    .v7::before { content:""; position:absolute; inset:-2px; border:2px solid transparent; border-top-color:var(--moss); border-right-color:var(--moss); border-radius:50%; transform:rotate(-18deg); }
+    .v8 { width:31px; border:1px solid #d9d8d2; border-radius:4px 9px 9px 4px; background:#fff; color:var(--ink); box-shadow:0 5px 13px rgba(32,33,36,.1); }
+    .v8::before { content:""; position:absolute; left:-4px; top:8px; width:7px; height:10px; border-radius:2px; background:var(--moss); }
+    .foot { display:flex; justify-content:space-between; align-items:center; color:#96938c; font-size:9px; }
+    .foot em { color:var(--moss-dark); font-style:normal; opacity:0; transition:opacity .16s ease; }
+    .sample.is-picked .foot em { opacity:1; }
+    .toast { position:fixed; top:20px; left:50%; z-index:20; display:flex; align-items:center; gap:8px; padding:9px 13px; border:1px solid #d8d6cf; border-radius:7px; background:#fff; box-shadow:0 8px 24px rgba(32,33,36,.12); color:#44433f; font-size:11px; transform:translate(-50%,-12px); opacity:0; pointer-events:none; transition:transform .2s ease,opacity .2s ease; }
+    .toast i { width:6px; height:6px; border-radius:50%; background:var(--moss); }
+    .toast.is-visible { transform:translate(-50%,0); opacity:1; }
+    @media(max-width:900px){.grid{grid-template-columns:repeat(2,minmax(0,1fr))}.intro{grid-template-columns:1fr;gap:18px}}
+    @media(max-width:560px){header span{display:none}main{width:88vw;padding-top:38px}h1{font-size:38px}.grid{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+  <header><div class="brand"><img src="../assets/favicon.svg" alt="">Later Space</div><span>Selection capture playground</span></header>
+  <main>
+    <section class="intro"><h1>选中的文字，<br>该怎样被接住？</h1><p>蓝色是浏览器的默认选区，因此收藏按钮不一定要继续争夺颜色。下面既有适配各种网页的中性方案，也有更像 Later Space 自己的形象方向。点击每个按钮，可以体验保存状态。</p></section>
+    <div class="section-title"><h2>中性圆点</h2><span>颜色关系</span></div>
+    <section class="grid">
+      <article class="sample"><div class="sample-head"><b>01</b>品牌暗号</div><div class="copy"><span class="selected">真正轻盈的收藏，是先接住。</span><button class="action v1" aria-label="收藏"><span class="plus">+</span></button></div><div class="foot">白底黑字 · 青苔小点<em>已选择</em></div></article>
+      <article class="sample"><div class="sample-head"><b>02</b>轻盈青苔</div><div class="copy"><span class="selected">真正轻盈的收藏，是先接住。</span><button class="action v2" aria-label="收藏"><span class="plus">+</span></button></div><div class="foot">白底绿字 · 推荐备选<em>已选择</em></div></article>
+      <article class="sample"><div class="sample-head"><b>03</b>深墨按钮</div><div class="copy"><span class="selected">真正轻盈的收藏，是先接住。</span><button class="action v3" aria-label="收藏"><span class="plus">+</span></button></div><div class="foot">跨网页适配最稳定<em>已选择</em></div></article>
+      <article class="sample"><div class="sample-head"><b>04</b>融入选区</div><div class="copy"><span class="selected">真正轻盈的收藏，是先接住。</span><button class="action v4" aria-label="收藏"><span class="plus">+</span></button></div><div class="foot">浏览器蓝 · 品牌感较弱<em>已选择</em></div></article>
+    </section>
+    <div class="section-title"><h2>形象方向</h2><span>记忆点</span></div>
+    <section class="grid">
+      <article class="sample"><div class="sample-head"><b>05</b>青苔细环</div><div class="copy"><span class="selected">真正轻盈的收藏，是先接住。</span><button class="action v5" aria-label="收藏"><span class="plus">+</span></button></div><div class="foot">保留圆形 · 更像标记<em>已选择</em></div></article>
+      <article class="sample"><div class="sample-head"><b>06</b>接住的角</div><div class="copy"><span class="selected">真正轻盈的收藏，是先接住。</span><button class="action v6" aria-label="收藏"><span class="plus">+</span></button></div><div class="foot">呼应 Later Space 图形<em>已选择</em></div></article>
+      <article class="sample"><div class="sample-head"><b>07</b>半圈轨道</div><div class="copy"><span class="selected">真正轻盈的收藏，是先接住。</span><button class="action v7" aria-label="收藏"><span class="plus">+</span></button></div><div class="foot">有动作感 · 仍然克制<em>已选择</em></div></article>
+      <article class="sample"><div class="sample-head"><b>08</b>纸片标签</div><div class="copy"><span class="selected">真正轻盈的收藏，是先接住。</span><button class="action v8" aria-label="收藏"><span class="plus">+</span></button></div><div class="foot">像把内容夹进收件箱<em>已选择</em></div></article>
+    </section>
+  </main>
+  <div class="toast" id="demoToast" role="status"><i></i>已加入 Later Space</div>
+  <script>
+    const toast = document.querySelector('#demoToast');
+    let toastTimer;
+    document.querySelectorAll('.sample').forEach((sample) => {
+      const button = sample.querySelector('.action');
+      button.addEventListener('click', (event) => {
+        event.stopPropagation();
+        document.querySelectorAll('.sample').forEach((card) => card.classList.remove('is-picked'));
+        document.querySelectorAll('.action').forEach((action) => {
+          action.classList.remove('is-saved');
+          action.querySelector('.plus').textContent = '+';
+        });
+        sample.classList.add('is-picked');
+        button.classList.add('is-saved');
+        button.querySelector('.plus').textContent = '✓';
+        toast.classList.add('is-visible');
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => toast.classList.remove('is-visible'), 1500);
+      });
+    });
+  </script>
+</body>
+</html>
