@@ -1009,7 +1009,8 @@ function showWelcomeScreen() {
 
 function bindWelcomeTilt() {
   const card = document.querySelector(".welcome-copy");
-  if (!card || matchMedia("(hover: none), (prefers-reduced-motion: reduce)").matches) return;
+  const supportsTilt = typeof window.matchMedia === "function" && !window.matchMedia("(hover: none), (prefers-reduced-motion: reduce)").matches;
+  if (!card || !supportsTilt) return;
   const reset = () => {
     card.classList.remove("is-tilting");
     card.style.setProperty("--tilt-x", "0deg");
@@ -4031,7 +4032,11 @@ async function init() {
       elements.restoreBackupButton.hidden = true;
     }
     bindEvents();
-    bindWelcomeTilt();
+    try {
+      bindWelcomeTilt();
+    } catch (error) {
+      console.warn("Welcome tilt enhancement unavailable", error);
+    }
     updateView();
     await loadImages();
     bindExtensionBridge();

@@ -7,7 +7,7 @@
     <title>Later Space</title>
     <link rel="icon" href="assets/favicon.svg?v=2" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="assets/apple-touch-icon.png?v=2" />
-    <link rel="stylesheet" href="styles.css?v=77" />
+    <link rel="stylesheet" href="styles.css?v=78" />
   </head>
   <body>
     <main class="canvas" id="canvas" tabindex="0" aria-label="Later Space 无限内容画布">
@@ -198,6 +198,8 @@
             <label for="welcomeEmailInput">邮箱</label>
             <div class="welcome-email-row"><span class="welcome-email-field"><input id="welcomeEmailInput" type="email" autocomplete="email" placeholder="name@example.com" aria-describedby="welcomeEmailSuggestion" required /><button class="welcome-email-suggestion" id="welcomeEmailSuggestion" type="button" hidden><span>最近使用</span><strong id="welcomeEmailSuggestionValue"></strong></button></span><button class="primary-button" type="submit">登录 / 注册</button></div>
           </form>
+          <div class="auth-divider"><span>或者</span></div>
+          <button class="google-login-button" id="welcomeGoogleButton" type="button"><span class="google-mark" aria-hidden="true">G</span>使用 Google 账号继续</button>
           <a class="welcome-mail-link" id="welcomeMailLink" href="https://mail.google.com/" target="_blank" rel="noreferrer" hidden>登录链接已发送，打开邮箱查看</a>
           <button class="welcome-guest-button" id="welcomeGuestButton" type="button">先体验 Later Space</button>
           <small>无需密码。先体验的内容保存在当前浏览器，之后登录仍可迁移。</small>
@@ -221,7 +223,7 @@
       <header><div><span>账户与空间</span><h2 id="syncTitle">我的 Later Space</h2></div><button class="tool-button" id="closeSyncButton" type="button" aria-label="关闭账户面板"><svg viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></svg></button></header>
       <form class="account-profile" id="accountProfile" hidden><span class="account-profile-avatar" id="accountPanelAvatar">L</span><label for="accountNameInput">昵称<input id="accountNameInput" type="text" maxlength="32" autocomplete="nickname" /></label><button class="secondary-button" type="submit">保存</button></form>
       <div class="sync-status"><i id="syncStatusDot"></i><div><strong id="syncStatusTitle">检查中…</strong><span id="syncStatusDetail">正在检查云端配置</span></div></div>
-      <form class="sync-login" id="syncLoginForm" hidden><label for="syncEmailInput">邮箱<input id="syncEmailInput" type="email" autocomplete="email" placeholder="name@example.com" required /></label><button class="primary-button" type="submit">发送登录链接</button></form><a class="sync-mail-link" id="syncMailLink" href="https://mail.google.com/" target="_blank" rel="noreferrer" hidden>打开邮箱查看</a>
+      <form class="sync-login" id="syncLoginForm" hidden><label for="syncEmailInput">邮箱<input id="syncEmailInput" type="email" autocomplete="email" placeholder="name@example.com" required /></label><button class="primary-button" type="submit">发送登录链接</button></form><div class="sync-auth-divider" id="syncAuthDivider" hidden><span>或者</span></div><button class="google-login-button sync-google-login-button" id="syncGoogleButton" type="button" hidden><span class="google-mark" aria-hidden="true">G</span>使用 Google 账号继续</button><a class="sync-mail-link" id="syncMailLink" href="https://mail.google.com/" target="_blank" rel="noreferrer" hidden>打开邮箱查看</a>
       <div class="sync-actions" id="syncActions" hidden><button class="secondary-button" id="signOutButton" type="button">退出登录</button><button class="primary-button" id="syncNowButton" type="button">立即同步</button><button class="secondary-button sync-undo-migration" id="undoMigrationButton" type="button" hidden>撤销本机内容导入</button></div>
       <div class="cloud-usage" id="cloudUsage" hidden>
         <div><strong id="cloudUsageTitle">图片空间</strong><span id="cloudUsageValue">0 MB / 50 MB</span></div>
@@ -331,6 +333,6 @@
     </section>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" defer></script>
     <script src="cloud-config.js?v=1"></script>
-    <script src="app.js?v=77" defer></script>
+    <script src="app.js?v=78" defer></script>
   </body>
 </html>

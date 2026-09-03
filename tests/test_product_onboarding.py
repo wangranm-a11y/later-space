@@ -28,6 +28,7 @@ class ProductOnboardingContractTests(unittest.TestCase):
         self.assertIn('perspective(1100px)', STYLES)
         self.assertIn('rotateX(var(--tilt-x)) rotateY(var(--tilt-y))', STYLES)
         self.assertIn('matchMedia("(hover: none), (prefers-reduced-motion: reduce)")', APP)
+        self.assertIn('Welcome tilt enhancement unavailable', APP)
 
     def test_recent_login_email_is_suggested_locally(self):
         self.assertIn('id="welcomeEmailSuggestion"', INDEX)
