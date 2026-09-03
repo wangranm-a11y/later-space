@@ -24,13 +24,11 @@ Later Space Collector 是 Later Space 的网页侧轻量入口：用户不必离
 
 - 插件名称：`Later Space Collector`
 - Manifest：Chrome Manifest V3
-- 源码版本：`1.9.4`
+- 源码版本：`1.9.5`
 - 正式网页：`https://wangranm-a11y.github.io/later-space/`
 - 插件源码：`extensions/later-space/`
 - 正式安装包内目录：`later-space-chrome-extension/`（固定名称，便于覆盖升级）
-- 正式安装包：`dist/later-space-chrome-extension-v1.9.4.zip`
-- 当前本地最新提交：`f6c50d7 Polish extension feedback timing`
-- 远端 `origin/main` 在本次检查时仍停留于 `5f17f0e`，本地最近两次插件细节提交尚未推送。
+- 正式安装包：`dist/later-space-chrome-extension-v1.9.5.zip`
 
 ## 4. 用户可见的收藏入口
 
@@ -41,6 +39,7 @@ Later Space Collector 是 Later Space 的网页侧轻量入口：用户不必离
 - 弹窗显示最近一次收藏，可查看或撤销。
 - 显示当前保存目的地：本地浏览器或已登录的云端账号。
 - 提供“连接 Later Space”“使用指南”“设置”。
+- 正常连接时保持轻量；异常时显示原因与“一键修复”，自动唤醒画布、重连并补送待发送内容。
 
 ### 快捷键
 
@@ -302,7 +301,7 @@ Later Space Collector 是 Later Space 的网页侧轻量入口：用户不必离
 
 - `dist/later-space-chrome-extension-v1.3.0/` 曾被当作 Ego Lite 的活动目录，内部被覆盖过，不应作为历史发布依据。
 - 部分其他历史目录名与其中 `manifest.json` 版本不一致。
-- `1.9.4` 使用版本化 zip 和固定的包内目录，避免覆盖升级时因目录改名产生新的扩展实例。
+- `1.9.5` 使用版本化 zip 和固定的包内目录，避免覆盖升级时因目录改名产生新的扩展实例。
 
 ## 14. 当前已知问题与后续优先级
 
@@ -354,7 +353,7 @@ Ego Lite 更新当前活动插件目录：
 rsync -a --delete extensions/later-space/ dist/later-space-chrome-extension-v1.3.0/
 ```
 
-同步后必须在 `chrome://extensions/` 点击 Later Space Collector 的 Reload，并确认显示版本 `1.9.4`。
+同步后必须在 `chrome://extensions/` 点击 Later Space Collector 的 Reload，并确认显示版本 `1.9.5`。
 
 ## 16. 可用于 HTML 叙事页的真实主线
 
@@ -375,7 +374,7 @@ rsync -a --delete extensions/later-space/ dist/later-space-chrome-extension-v1.3
 
 适合保留的真实数字：
 
-- 从 `1.1.0` 到 `1.9.4`
+- 从 `1.1.0` 到 `1.9.5`
 - 约 20 轮插件相关 Git 提交
 - 20 多个历史安装包
 - 10ms 选区按钮响应

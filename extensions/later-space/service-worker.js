@@ -5,6 +5,7 @@ const CLOUD_SESSION_KEY = "laterSpaceCloudSession";
 const QUEUE_KEY = "laterSpaceCaptureQueue";
 const UNDO_KEY = "laterSpaceUndoCaptures";
 const LAST_CAPTURE_KEY = "laterSpaceLastCapture";
+const LAST_FAILURE_KEY = "laterSpaceLastFailure";
 const ONBOARDING_STATE_KEY = "laterSpaceOnboardingState";
 const ONBOARDING_VERSION = 1;
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
@@ -115,8 +116,17 @@ async function removeQueuedCaptures(ids) {
   await chrome.action.setBadgeText({ text: queue.length ? String(Math.min(queue.length, 99)) : "" });
 }
 
+function isLaterSpaceCanvasTab(tab) {
+  try {
+    const url = new URL(tab?.url || "");
+    return url.origin === new URL(APP_URL).origin && ["/later-space/", "/later-space/index.html"].includes(url.pathname);
+  } catch {
+    return false;
+  }
+}
+
 async function laterSpaceTab(windowId) {
-  const tabs = await chrome.tabs.query({ url: `${APP_URL}*` });
+  const tabs = (await chrome.tabs.query({ url: `${APP_URL}*` })).filter(isLaterSpaceCanvasTab);
   return tabs.find((tab) => tab.windowId === windowId) || tabs[0];
 }
 
@@ -164,7 +174,8 @@ async function saveCapture(capture) {
       return direct;
     }
     return await sendCapture(normalized);
-  } catch {
+  } catch (error) {
+    await chrome.storage.local.set({ [LAST_FAILURE_KEY]: { message: error?.message || "capture failed", at: Date.now() } });
     return { state: "queued", windowId: normalized.windowId, capture: captureSummary(normalized) };
   }
 }
@@ -313,6 +324,37 @@ async function destinationStatus() {
   return { label: "未连接 · 点击连接 Later Space", synced: false };
 }
 
+async function connectionDiagnosis() {
+  const stored = await chrome.storage.local.get({
+    [QUEUE_KEY]: [],
+    [CLOUD_SESSION_KEY]: null,
+    [LAST_FAILURE_KEY]: null,
+  });
+  const queued = stored[QUEUE_KEY].length;
+  if (!navigator.onLine) {
+    return { state: "offline", queued, title: "当前没有网络", detail: "收藏已留在插件里，联网后会自动补送。", repairable: false };
+  }
+  const session = await getCloudSession();
+  if (session?.user?.id) {
+    return { state: queued ? "queued" : "healthy", queued, title: queued ? `有 ${queued} 条等待补送` : "连接正常", detail: `${session.user.email || "Later Space"} · 云端同步已开启`, repairable: queued > 0 };
+  }
+  const tab = await queryLaterSpaceTab(900);
+  if (tab) {
+    const ready = await Promise.race([
+      chrome.tabs.sendMessage(tab.id, { type: "later-space-capture", capture: { type: "status" } }).catch(() => null),
+      new Promise((resolve) => setTimeout(() => resolve(null), 650)),
+    ]);
+    if (ready?.state === "ready") {
+      return { state: queued ? "queued" : "local", queued, title: queued ? `有 ${queued} 条等待补送` : "本地收藏可用", detail: ready.destination?.label || "保存在当前浏览器", repairable: queued > 0 };
+    }
+    return { state: "bridge", queued, title: "页面连接需要刷新", detail: "Later Space 已打开，但收藏通道没有响应。", repairable: true };
+  }
+  if (stored[CLOUD_SESSION_KEY]?.access_token) {
+    return { state: "auth", queued, title: "登录状态已过期", detail: "重新连接账号后，待发送内容会自动补上。", repairable: true };
+  }
+  return { state: "detached", queued, title: queued ? `${queued} 条内容正在等待` : "尚未连接保存空间", detail: "可以继续收藏；连接后会自动补送。", repairable: true };
+}
+
 function queryLaterSpaceTab(timeoutMs = 800) {
   return new Promise((resolve) => {
     let settled = false;
@@ -324,7 +366,7 @@ function queryLaterSpaceTab(timeoutMs = 800) {
     };
     const timer = setTimeout(() => finish(null), timeoutMs);
     try {
-      chrome.tabs.query({ url: `${APP_URL}*` }, (tabs) => finish(tabs?.[0]));
+        chrome.tabs.query({ url: `${APP_URL}*` }, (tabs) => finish(tabs?.find(isLaterSpaceCanvasTab)));
     } catch {
       finish(null);
     }
@@ -369,6 +411,55 @@ async function connectAuth() {
   }
   const created = await chrome.tabs.create({ url: `${APP_URL}?extension=connect`, active: true });
   return { state: "needs-login", tabId: created.id, url: APP_URL };
+}
+
+async function waitForBridge(tabId, attempts = 5) {
+  await chrome.scripting.executeScript({ target: { tabId }, files: ["page-bridge.js"] }).catch(() => {});
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    const ready = await Promise.race([
+      chrome.tabs.sendMessage(tabId, { type: "later-space-capture", capture: { type: "status" } }).catch(() => null),
+      new Promise((resolve) => setTimeout(() => resolve(null), 700)),
+    ]);
+    if (ready?.state === "ready") return ready;
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+  return null;
+}
+
+async function repairConnection() {
+  if (!navigator.onLine) return connectionDiagnosis();
+  const stored = await chrome.storage.local.get({ [CLOUD_SESSION_KEY]: null });
+  const session = await getCloudSession();
+  if (stored[CLOUD_SESSION_KEY]?.access_token && !session?.user?.id) {
+    const loginTab = await chrome.tabs.create({ url: `${APP_URL}?extension=connect`, active: true });
+    return { state: "needs-login", queued: (await chrome.storage.local.get({ [QUEUE_KEY]: [] }))[QUEUE_KEY].length, title: "登录状态已过期", detail: "重新登录后，待发送内容会回到原来的账号。", repairable: true, opened: true, tabId: loginTab.id };
+  }
+  let tab = await laterSpaceTab();
+  if (tab) {
+    let ready = await waitForBridge(tab.id, 2);
+    if (!ready) {
+      await chrome.tabs.reload(tab.id).catch(() => {});
+      await new Promise((resolve) => setTimeout(resolve, 900));
+      ready = await waitForBridge(tab.id);
+    }
+    if (ready?.state === "ready") {
+      await Promise.race([
+        requestAuthFromTab(tab.id),
+        new Promise((resolve) => setTimeout(() => resolve({ state: "unauthenticated" }), 1200)),
+      ]);
+      const retry = await retryQueue();
+      return { ...(await connectionDiagnosis()), repaired: true, sent: retry.sent, remaining: retry.remaining };
+    }
+  }
+  tab = await chrome.tabs.create({ url: `${APP_URL}?extension=repair`, active: false });
+  const ready = await waitForBridge(tab.id);
+  if (ready?.state === "ready") {
+    const retry = await retryQueue();
+    await chrome.tabs.remove(tab.id).catch(() => {});
+    return { ...(await connectionDiagnosis()), repaired: true, sent: retry.sent, remaining: retry.remaining };
+  }
+  await chrome.tabs.update(tab.id, { active: true }).catch(() => {});
+  return { ...(await connectionDiagnosis()), state: "needs-login", title: "请完成一次连接", detail: "登录或选择先体验后，待发送内容会自动补上。", repairable: true, opened: true };
 }
 
 async function saveOnboardingCapture(payload = {}) {
@@ -424,9 +515,11 @@ async function cleanupOnboardingPractice() {
 
 async function retryQueue() {
   const stored = await chrome.storage.local.get({ [QUEUE_KEY]: [] });
+  let sent = 0;
   for (const capture of stored[QUEUE_KEY]) {
     try {
       const result = await sendCapture(capture);
+      if (["saved", "duplicate"].includes(result?.state)) sent += 1;
       if (capture.onboarding && result?.recordIds?.length) {
         const state = await onboardingState();
         await updateOnboardingState({
@@ -436,6 +529,8 @@ async function retryQueue() {
       }
     } catch { break; }
   }
+  const latest = await chrome.storage.local.get({ [QUEUE_KEY]: [] });
+  return { sent, remaining: latest[QUEUE_KEY].length };
 }
 
 async function blobToDataUrl(blob) {
@@ -592,7 +687,15 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     return true;
   }
   if (message.type === "retry-queue") {
-    retryQueue().then(async () => sendResponse(await chrome.storage.local.get({ [QUEUE_KEY]: [] })));
+    retryQueue().then(sendResponse);
+    return true;
+  }
+  if (message.type === "connection-diagnosis") {
+    connectionDiagnosis().then(sendResponse).catch(() => sendResponse({ state: "unknown", queued: 0, title: "暂时无法检查连接", detail: "你的收藏仍会保留在插件中。", repairable: true }));
+    return true;
+  }
+  if (message.type === "repair-connection") {
+    repairConnection().then(sendResponse).catch(() => sendResponse({ state: "unknown", queued: 0, title: "暂时没有修好", detail: "收藏仍在插件中，可以稍后再次修复。", repairable: true }));
     return true;
   }
   if (message.type === "destination-status") {

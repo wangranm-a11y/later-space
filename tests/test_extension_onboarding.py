@@ -64,8 +64,40 @@ class ExtensionOnboardingContractTests(unittest.TestCase):
         self.assertIn("width: 28px", WELCOME_CSS)
         self.assertIn("#718e64", WELCOME_CSS)
 
-    def test_release_version_is_1_9_4(self):
-        self.assertIn('"version": "1.9.4"', MANIFEST)
+    def test_release_version_is_1_9_5(self):
+        self.assertIn('"version": "1.9.5"', MANIFEST)
+
+    def test_connection_can_be_diagnosed_and_repaired(self):
+        self.assertIn("async function connectionDiagnosis()", WORKER)
+        self.assertIn("async function repairConnection()", WORKER)
+        self.assertIn('message.type === "connection-diagnosis"', WORKER)
+        self.assertIn('message.type === "repair-connection"', WORKER)
+        self.assertIn("setTimeout(() => resolve(null), 650)", WORKER)
+        self.assertIn("async function waitForBridge", WORKER)
+        self.assertIn("chrome.tabs.reload(tab.id)", WORKER)
+        self.assertIn("function isLaterSpaceCanvasTab", WORKER)
+        self.assertIn('["/later-space/", "/later-space/index.html"]', WORKER)
+        popup_script = (EXTENSION / "popup.js").read_text(encoding="utf-8")
+        self.assertIn("这次连接有点慢", popup_script)
+        self.assertIn('state: "offline"', WORKER)
+        self.assertIn('state: "auth"', WORKER)
+        self.assertIn('state: "bridge"', WORKER)
+        repair = WORKER[WORKER.index("async function repairConnection()") : WORKER.index("async function saveOnboardingCapture")]
+        self.assertIn("stored[CLOUD_SESSION_KEY]?.access_token", repair)
+        self.assertIn("待发送内容会回到原来的账号", repair)
+
+    def test_queue_retry_reports_sent_and_remaining(self):
+        retry = WORKER[WORKER.index("async function retryQueue()") : WORKER.index("async function blobToDataUrl")]
+        self.assertIn("let sent = 0", retry)
+        self.assertIn("return { sent, remaining:", retry)
+
+    def test_popup_explains_and_repairs_connection(self):
+        popup_js = (EXTENSION / "popup.js").read_text(encoding="utf-8")
+        self.assertIn('type: "connection-diagnosis"', popup_js)
+        self.assertIn('type: "repair-connection"', popup_js)
+        self.assertIn("内容没有丢", popup_js)
+        self.assertIn('id="diagnosis"', POPUP)
+        self.assertIn('id="repair"', POPUP)
 
 
 if __name__ == "__main__":
