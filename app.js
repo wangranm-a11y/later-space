@@ -7,13 +7,14 @@ const CLOUD_MIGRATION_KEY = "later-space-cloud-migration-v1";
 const WELCOME_COMPLETED_KEY = "later-space-welcome-completed-v1";
 const CANVAS_GUIDE_DISMISSED_KEY = "later-space-canvas-guide-dismissed-v2";
 const AUTH_RETURN_STATE_KEY = "later-space-auth-return-v1";
+const LAST_LOGIN_EMAIL_KEY = "later-space-last-login-email-v1";
 const THUMBNAIL_VERSION = 5;
 const TEXT_CARD_WIDTH = 300;
 const TEXT_CARD_HEIGHT = 375;
 const EXPANDED_TEXT_WIDTH = 420;
 const EXPANDED_TEXT_HEIGHT = 520;
 const STATIC_DEPLOYMENT = location.protocol !== "file:" && !["localhost", "127.0.0.1", "::1"].includes(location.hostname);
-document.documentElement.dataset.appVersion = "76";
+document.documentElement.dataset.appVersion = "77";
 document.documentElement.dataset.deployment = STATIC_DEPLOYMENT ? "static" : "local";
 
 const state = {
@@ -86,6 +87,8 @@ const elements = {
   welcomeScreen: document.querySelector("#welcomeScreen"),
   welcomeLoginForm: document.querySelector("#welcomeLoginForm"),
   welcomeEmailInput: document.querySelector("#welcomeEmailInput"),
+  welcomeEmailSuggestion: document.querySelector("#welcomeEmailSuggestion"),
+  welcomeEmailSuggestionValue: document.querySelector("#welcomeEmailSuggestionValue"),
   welcomeMailLink: document.querySelector("#welcomeMailLink"),
   welcomeGuestButton: document.querySelector("#welcomeGuestButton"),
   authReturnScreen: document.querySelector("#authReturnScreen"),
@@ -994,7 +997,41 @@ async function switchWorkspace(workspaceId) {
 function showWelcomeScreen() {
   if (!state.images.length) elements.canvasGuide.hidden = false;
   elements.welcomeScreen.hidden = false;
-  requestAnimationFrame(() => elements.welcomeEmailInput.focus());
+  renderWelcomeEmailSuggestion();
+  requestAnimationFrame(() => {
+    elements.welcomeEmailInput.focus();
+    showWelcomeEmailSuggestion();
+  });
+}
+
+function rememberedLoginEmail() {
+  return localStorage.getItem(LAST_LOGIN_EMAIL_KEY)?.trim() || "";
+}
+
+function rememberLoginEmail(email) {
+  const normalized = email?.trim().toLowerCase();
+  if (!normalized) return;
+  localStorage.setItem(LAST_LOGIN_EMAIL_KEY, normalized);
+  renderWelcomeEmailSuggestion();
+}
+
+function renderWelcomeEmailSuggestion() {
+  const email = rememberedLoginEmail();
+  elements.welcomeEmailSuggestionValue.textContent = email;
+  elements.welcomeEmailSuggestion.hidden = !email;
+}
+
+function showWelcomeEmailSuggestion() {
+  const email = rememberedLoginEmail();
+  elements.welcomeEmailSuggestion.hidden = !email || elements.welcomeEmailInput.value.trim().toLowerCase() === email;
+}
+
+function chooseWelcomeEmailSuggestion() {
+  const email = rememberedLoginEmail();
+  if (!email) return;
+  elements.welcomeEmailInput.value = email;
+  elements.welcomeEmailSuggestion.hidden = true;
+  elements.welcomeEmailInput.focus();
 }
 
 function closeWelcomeScreen() {
@@ -2798,6 +2835,7 @@ async function undoGuestMigration(userId) {
 
 function saveCloudSession(session) {
   state.cloudSession = session;
+  if (session?.user?.email) rememberLoginEmail(session.user.email);
   if (session) localStorage.setItem(CLOUD_SESSION_KEY, JSON.stringify(session));
   else localStorage.removeItem(CLOUD_SESSION_KEY);
 }
@@ -2949,6 +2987,7 @@ async function sendMagicLink(email, feedback = {}) {
     options: { emailRedirectTo: redirectTo, shouldCreateUser: true },
   });
   if (!error) {
+    rememberLoginEmail(email);
     if (feedback.success) feedback.success();
   } else {
     if (feedback.failure) feedback.failure();
@@ -3665,6 +3704,11 @@ function showToast(message, actionLabel = "", action = null) {
 
 function bindEvents() {
   elements.welcomeLoginForm.addEventListener("submit", requestWelcomeMagicLink);
+  elements.welcomeEmailInput.addEventListener("focus", showWelcomeEmailSuggestion);
+  elements.welcomeEmailInput.addEventListener("input", showWelcomeEmailSuggestion);
+  elements.welcomeEmailInput.addEventListener("blur", () => setTimeout(() => { elements.welcomeEmailSuggestion.hidden = true; }, 120));
+  elements.welcomeEmailSuggestion.addEventListener("mousedown", (event) => event.preventDefault());
+  elements.welcomeEmailSuggestion.addEventListener("click", chooseWelcomeEmailSuggestion);
   elements.welcomeGuestButton.addEventListener("click", closeWelcomeScreen);
   elements.authReturnRetryButton.addEventListener("click", () => {
     elements.authReturnScreen.hidden = true;

@@ -19,6 +19,20 @@ class ProductOnboardingContractTests(unittest.TestCase):
         self.assertIn("background: rgba(249,247,240,.88)", STYLES)
         self.assertNotIn('class="welcome-visual"', INDEX)
 
+    def test_welcome_uses_current_brand_icon(self):
+        self.assertIn('<div class="welcome-brand"><img src="assets/favicon.svg?v=2"', INDEX)
+        self.assertIn(".welcome-brand img", STYLES)
+
+    def test_recent_login_email_is_suggested_locally(self):
+        self.assertIn('id="welcomeEmailSuggestion"', INDEX)
+        self.assertIn('id="welcomeEmailSuggestionValue"', INDEX)
+        self.assertIn('autocomplete="email"', INDEX)
+        self.assertIn('const LAST_LOGIN_EMAIL_KEY = "later-space-last-login-email-v1"', APP)
+        self.assertIn("rememberLoginEmail(email)", APP)
+        self.assertIn("chooseWelcomeEmailSuggestion", APP)
+        self.assertIn("session?.user?.email", APP)
+        self.assertIn(".welcome-email-suggestion { position: static; margin-top: 7px; }", STYLES)
+
     def test_empty_welcome_reveals_canvas_guides_behind_it(self):
         welcome = APP[APP.index("function showWelcomeScreen") : APP.index("function closeWelcomeScreen")]
         self.assertIn("if (!state.images.length) elements.canvasGuide.hidden = false", welcome)

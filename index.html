@@ -7,7 +7,7 @@
     <title>Later Space</title>
     <link rel="icon" href="assets/favicon.svg?v=2" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="assets/apple-touch-icon.png?v=2" />
-    <link rel="stylesheet" href="styles.css?v=76" />
+    <link rel="stylesheet" href="styles.css?v=77" />
   </head>
   <body>
     <main class="canvas" id="canvas" tabindex="0" aria-label="Later Space 无限内容画布">
@@ -190,13 +190,13 @@
     <section class="welcome-screen" id="welcomeScreen" aria-labelledby="welcomeTitle" hidden>
       <div class="welcome-layout">
         <div class="welcome-copy">
-          <div class="welcome-brand"><span class="mark" aria-hidden="true"></span><strong>Later Space</strong></div>
+          <div class="welcome-brand"><img src="assets/favicon.svg?v=2" alt="" /><strong>Later Space</strong></div>
           <span class="welcome-kicker">YOUR TEMPORARY INSPIRATION SPACE</span>
           <h1 id="welcomeTitle">看到喜欢的，<br />先放进来。</h1>
           <p>图片、链接和文字，复制后直接粘贴。登录后可在不同设备查看，插件也无需重复登录。</p>
           <form class="welcome-login-form" id="welcomeLoginForm">
             <label for="welcomeEmailInput">邮箱</label>
-            <div><input id="welcomeEmailInput" type="email" autocomplete="email" placeholder="name@example.com" required /><button class="primary-button" type="submit">登录 / 注册</button></div>
+            <div class="welcome-email-row"><span class="welcome-email-field"><input id="welcomeEmailInput" type="email" autocomplete="email" placeholder="name@example.com" aria-describedby="welcomeEmailSuggestion" required /><button class="welcome-email-suggestion" id="welcomeEmailSuggestion" type="button" hidden><span>最近使用</span><strong id="welcomeEmailSuggestionValue"></strong></button></span><button class="primary-button" type="submit">登录 / 注册</button></div>
           </form>
           <a class="welcome-mail-link" id="welcomeMailLink" href="https://mail.google.com/" target="_blank" rel="noreferrer" hidden>登录链接已发送，打开邮箱查看</a>
           <button class="welcome-guest-button" id="welcomeGuestButton" type="button">先体验 Later Space</button>
@@ -331,6 +331,6 @@
     </section>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" defer></script>
     <script src="cloud-config.js?v=1"></script>
-    <script src="app.js?v=76" defer></script>
+    <script src="app.js?v=77" defer></script>
   </body>
 </html>
