@@ -158,8 +158,6 @@ kbd { min-width: 26px; height: 24px; display: grid; place-items: center; padding
 .welcome-email-suggestion:hover, .welcome-email-suggestion:focus-visible { background: #f1f3ed; outline: 0; }
 .welcome-email-suggestion span { color: #85827b; font-size: 9px; font-weight: 500; }
 .welcome-email-suggestion strong { overflow: hidden; font-size: 12px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
-.welcome-mail-link { display: block; margin-top: 12px; color: #526b48; font-size: 11px; }
-.welcome-mail-link[hidden] { display: none; }
 .auth-divider, .sync-auth-divider { display: flex; align-items: center; gap: 12px; margin: 18px 0 12px; color: #99958d; font-size: 10px; }
 .auth-divider::before, .auth-divider::after, .sync-auth-divider::before, .sync-auth-divider::after { content: ""; height: 1px; flex: 1; background: rgba(29,29,31,.12); }
 .google-login-button { width: 100%; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; gap: 10px; border: 1px solid rgba(22,22,24,.16); border-radius: 8px; background: #fff; color: var(--ink); font-size: 12px; font-weight: 600; cursor: pointer; }

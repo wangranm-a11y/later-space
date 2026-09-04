@@ -35,6 +35,17 @@ class ProductOnboardingContractTests(unittest.TestCase):
     def test_welcome_form_targets_submit_button(self):
         self.assertIn('querySelector(\'button[type="submit"]\')', APP)
         self.assertIn("登录服务暂时没有准备好，请刷新页面后重试", APP)
+        self.assertIn('button.dataset.action === "open-mail"', APP)
+        self.assertIn('button.textContent = "打开邮箱查看"', APP)
+        self.assertIn('function mailboxUrl(email)', APP)
+        self.assertNotIn('id="welcomeMailLink"', INDEX)
+
+    def test_pkce_login_survives_oauth_redirect(self):
+        self.assertIn('persistSession: true', APP)
+        self.assertIn('autoRefreshToken: true', APP)
+        self.assertIn('flowType: "pkce"', APP)
+        self.assertIn('Promise.race([', APP)
+        self.assertIn('发送得太频繁了，请稍等一分钟再试', APP)
 
     def test_recent_login_email_is_suggested_locally(self):
         self.assertIn('id="welcomeEmailSuggestion"', INDEX)

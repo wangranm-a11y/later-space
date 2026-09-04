@@ -14,7 +14,7 @@ const TEXT_CARD_HEIGHT = 375;
 const EXPANDED_TEXT_WIDTH = 420;
 const EXPANDED_TEXT_HEIGHT = 520;
 const STATIC_DEPLOYMENT = location.protocol !== "file:" && !["localhost", "127.0.0.1", "::1"].includes(location.hostname);
-document.documentElement.dataset.appVersion = "79";
+document.documentElement.dataset.appVersion = "80";
 document.documentElement.dataset.deployment = STATIC_DEPLOYMENT ? "static" : "local";
 
 const state = {
@@ -90,7 +90,6 @@ const elements = {
   welcomeEmailSuggestion: document.querySelector("#welcomeEmailSuggestion"),
   welcomeEmailSuggestionValue: document.querySelector("#welcomeEmailSuggestionValue"),
   welcomeGoogleButton: document.querySelector("#welcomeGoogleButton"),
-  welcomeMailLink: document.querySelector("#welcomeMailLink"),
   welcomeGuestButton: document.querySelector("#welcomeGuestButton"),
   closeWelcomeButton: document.querySelector("#closeWelcomeButton"),
   authReturnScreen: document.querySelector("#authReturnScreen"),
@@ -2847,7 +2846,7 @@ function saveCloudSession(session) {
 function cloudAuthClient() {
   if (!state.cloudAuthClient && window.supabase?.createClient) {
     state.cloudAuthClient = window.supabase.createClient(cloudConfig().supabaseUrl, cloudConfig().supabaseAnonKey, {
-      auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false, flowType: "pkce" },
+      auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false, flowType: "pkce" },
     });
   }
   return state.cloudAuthClient;
@@ -2976,6 +2975,17 @@ function cleanAuthRedirectUrl() {
   return redirectUrl.toString();
 }
 
+function mailboxUrl(email) {
+  const domain = email.split("@")[1]?.toLowerCase() || "";
+  if (["gmail.com", "googlemail.com"].includes(domain)) return "https://mail.google.com/";
+  if (["outlook.com", "hotmail.com", "live.com"].includes(domain)) return "https://outlook.live.com/mail/";
+  if (["qq.com", "foxmail.com"].includes(domain)) return "https://mail.qq.com/";
+  if (domain === "163.com") return "https://mail.163.com/";
+  if (domain === "126.com") return "https://mail.126.com/";
+  if (["icloud.com", "me.com", "mac.com"].includes(domain)) return "https://www.icloud.com/mail/";
+  return "";
+}
+
 async function sendMagicLink(email, feedback = {}) {
   if (!email) {
     if (feedback.failure) feedback.failure("请输入邮箱地址");
@@ -2989,15 +2999,31 @@ async function sendMagicLink(email, feedback = {}) {
     if (feedback.failure) feedback.failure("登录服务暂时没有准备好，请刷新页面后重试");
     return;
   }
-  const { error } = await client.auth.signInWithOtp({
-    email,
-    options: { emailRedirectTo: redirectTo, shouldCreateUser: true },
-  });
+  let timeoutId;
+  let result;
+  try {
+    result = await Promise.race([
+      client.auth.signInWithOtp({
+        email,
+        options: { emailRedirectTo: redirectTo, shouldCreateUser: true },
+      }),
+      new Promise((_, reject) => {
+        timeoutId = setTimeout(() => reject(new Error("timeout")), 15000);
+      }),
+    ]);
+  } catch (error) {
+    if (feedback.failure) feedback.failure(error.message === "timeout" ? "发送时间有点久，请检查网络后重试" : "邮件发送失败，请稍后重试");
+    return;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+  const { error } = result;
   if (!error) {
     rememberLoginEmail(email);
     if (feedback.success) feedback.success();
   } else {
-    if (feedback.failure) feedback.failure("邮件发送失败，请稍后重试");
+    const limited = error.status === 429 || /rate|limit/i.test(error.message || "");
+    if (feedback.failure) feedback.failure(limited ? "发送得太频繁了，请稍等一分钟再试" : "邮件发送失败，请稍后重试");
   }
 }
 
@@ -3036,15 +3062,28 @@ async function requestMagicLink(event) {
 async function requestWelcomeMagicLink(event) {
   event.preventDefault();
   const button = elements.welcomeLoginForm.querySelector('button[type="submit"]');
-  await sendMagicLink(elements.welcomeEmailInput.value.trim(), {
-    pending: () => { button.disabled = true; button.textContent = "正在发送…"; },
+  if (button.dataset.action === "open-mail") {
+    if (button.dataset.mailboxUrl) window.open(button.dataset.mailboxUrl, "_blank", "noopener,noreferrer");
+    else showToast("请打开你的邮箱，点击 Later Space 登录链接");
+    return;
+  }
+  const email = elements.welcomeEmailInput.value.trim();
+  await sendMagicLink(email, {
+    pending: () => {
+      button.disabled = true;
+      button.textContent = "正在发送登录邮件…";
+    },
     success: () => {
       button.disabled = false;
-      button.textContent = "重新发送";
-      elements.welcomeMailLink.hidden = false;
+      button.dataset.action = "open-mail";
+      button.dataset.mailboxUrl = mailboxUrl(email);
+      button.textContent = "打开邮箱查看";
+      showToast("登录邮件已发送，请在邮箱中完成登录");
     },
     failure: (message = "邮件发送失败，请稍后重试") => {
       button.disabled = false;
+      delete button.dataset.action;
+      delete button.dataset.mailboxUrl;
       button.textContent = "登录 / 注册";
       showToast(message);
     },
