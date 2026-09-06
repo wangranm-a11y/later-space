@@ -80,7 +80,6 @@ Later Space 可以成为用户和 Agent 之间的个人信息层，但 Agent 不
 当前 MVP 已包含 `supabase/functions/agent-read` 和 `bin/later-space.js`。部署 Edge Function、运行 schema 后，在已登录的 Later Space 中通过同一函数创建一次性显示的只读 Token，再在终端配置：
 
 ```bash
-LATER_SPACE_AGENT_URL="https://你的项目.supabase.co/functions/v1/agent-read" \
 node bin/later-space.js auth "ls_agent_你的Token"
 node bin/later-space.js recent
 node bin/later-space.js search "关键词"
