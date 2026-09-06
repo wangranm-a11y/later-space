@@ -1,0 +1,6 @@
+{
+  "name": "later-space-agent-cli",
+  "private": true,
+  "bin": { "later-space": "bin/later-space.js" },
+  "scripts": { "agent:help": "node bin/later-space.js" }
+}

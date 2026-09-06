@@ -1,0 +1,5 @@
+[functions.mobile-inbox]
+verify_jwt = false
+
+[functions.agent-read]
+verify_jwt = false

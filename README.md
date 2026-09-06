@@ -4,7 +4,7 @@
 
 ## 在线版
 
-在线版采用本地优先架构：每位用户的收藏只保存在自己的浏览器 IndexedDB 中，不会上传到公共仓库，也不会与其他用户混用。更换浏览器或清理网站数据前，请先使用底部下载按钮导出备份；旁边的上传按钮可导入 JSON 备份并迁移完整画布。公开静态版暂不提供自动备份、外部收件箱与多设备云同步。
+在线版采用本地优先架构。未登录时，收藏只保存在当前浏览器 IndexedDB 中；正常关闭网页不会丢失，但不能多端同步，清理网站数据后也无法恢复。邮箱登录后，本机内容会默认安全迁移到 Supabase，Mac、iPhone 和其他浏览器共享同一账号数据；断网操作先保存在本机，联网后继续同步。
 
 选中图片后，可以点击「复制图片」或按 `Command/Ctrl + C`，再粘贴到飞书、微信或 Figma。
 
@@ -40,23 +40,25 @@ python3 server.py
 
 ## iPhone 分享入口
 
-访问 `http://127.0.0.1:5177/mobile/ios-shortcut.html` 查看快捷指令设置。电脑和手机需在同一 Wi-Fi，并这样启动服务：
+正式第一版使用“Web + 云端快捷指令”。用户登录 Later Space 后，在“同步中心”生成并复制个人收件地址；iPhone 快捷指令直接调用 Supabase Edge Function，因此不要求 Mac 开机、同一 Wi-Fi 或保持终端运行。
+
+本地开发兼容入口仍可运行：
 
 ```bash
-LATER_SPACE_HOST=0.0.0.0 LATER_SPACE_CAPTURE_TOKEN="换成一段随机密码" python3 server.py
+python3 phone_inbox.py
 ```
 
-然后把快捷指令接口改成 `http://电脑局域网IP:5177/api/inbox`。默认只监听本机，不会主动暴露给局域网。
+本地入口只用于尚未部署云函数时的开发测试。正式手机教程位于 `mobile/ios-shortcut-eli5.html`；云端部署见 `docs/SUPABASE_SETUP.md`。
 
-`ios/` 目录还包含一个 SwiftUI App 和 Share Extension。它支持从 Safari、小红书、相册等 App 分享链接、文字和图片；发送失败时先保存在 App Group 队列，之后打开 App 自动重试。完整安装步骤见 `ios/README.md`。
+`ios/` 目录还包含一个 SwiftUI App 和 Share Extension。它支持从 Safari、小红书、相册等 App 分享链接、文字和图片；登录云端后可直接写入 Supabase，发送失败时先保存在 App Group 队列，之后打开 App 自动重试。完整安装步骤见 `ios/README.md`。
 
-GitHub Pages 和当前 Vercel 部署都是静态网站，不提供 `/api/inbox`。Chrome 插件与正式网页运行在同一台电脑、同一个浏览器中，因此可以直接写入网页的本地数据库；iPhone 分享来自另一台设备，要实现离开家、Mac 休眠后仍自动收集，则仍需把收件箱 API 单独部署到公网并加入用户认证。
+GitHub Pages 仍是静态网页，手机公网收件由 Supabase Edge Function 提供。每位用户使用一枚可撤销的个人收件密钥，Supabase 只保存密钥哈希。
 
-## 可选云同步
+## 云端同步
 
 公开多用户版本采用“本地优先 + Supabase Auth/Database/Storage”的逐条同步方案。数据库、私有媒体桶、RLS 权限和部署步骤见 `docs/SUPABASE_SETUP.md`；`service_role` 密钥绝不能放进前端。
 
-当前前端已接入 Email Magic Link、首次本地内容合并、逐条双向同步、私有媒体上传和离线补传。启用前必须先在对应 Supabase 项目的 SQL Editor 运行 `supabase/schema.sql`。
+当前前端已接入 Email Magic Link、访客/账号工作区、首次默认迁移、逐条双向同步、Realtime、私有优化图片、离线补传、个人手机收件地址和 70%/80%/85% 容量提醒。启用前必须先运行 `supabase/schema.sql` 并部署 `supabase/functions/mobile-inbox`。
 
 不配置云服务时，本地收藏、自动备份和导入导出都可正常使用。下面的环境变量属于原有的个人本地服务“整份画布备份”兼容方案，不提供公开用户账号隔离，也不能合并多设备同时产生的改动：
 
@@ -72,6 +74,20 @@ python3 server.py
 ## Agent / MCP 路线
 
 Later Space 可以成为用户和 Agent 之间的个人信息层，但 Agent 不应直接读取浏览器 IndexedDB。第一期从 Supabase 的用户云数据提供只读 CLI / MCP：列出最近收藏、按关键词或类型搜索、读取链接/文字元数据和正文；请求复用用户身份并受行级权限保护。第二期再增加带确认的写入、标签整理和删除能力，媒体文件只返回经过授权的短时访问地址。这样既能让 Codex、Claude 等工具读取 Later Space，又不会破坏本地优先和每位用户的数据隔离。
+
+### Agent Read MVP
+
+当前 MVP 已包含 `supabase/functions/agent-read` 和 `bin/later-space.js`。部署 Edge Function、运行 schema 后，在已登录的 Later Space 中通过同一函数创建一次性显示的只读 Token，再在终端配置：
+
+```bash
+LATER_SPACE_AGENT_URL="https://你的项目.supabase.co/functions/v1/agent-read" \
+node bin/later-space.js auth "ls_agent_你的Token"
+node bin/later-space.js recent
+node bin/later-space.js search "关键词"
+node bin/later-space.js get "item-id"
+```
+
+Token 只允许读取当前用户未删除的内容；CLI 输出稳定的公开字段，不包含 `user_id`、同步版本、画布坐标或永久媒体地址。MCP 适配层待 API 用真实收藏验证后再加入。
 
 图片与画布位置保存在当前浏览器的 IndexedDB 中。运行本地服务时，内容变化会自动写入 `backups/`，滚动保留最近 10 份状态备份；图片资产按内容哈希只保存一次，避免每次拖动或编辑都重新编码全部高清图片。底部时钟按钮可恢复上一个版本，下载按钮仍可导出完整的独立备份文件。
 
