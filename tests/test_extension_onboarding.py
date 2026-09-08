@@ -49,6 +49,8 @@ class ExtensionOnboardingContractTests(unittest.TestCase):
         self.assertIn('files: ["feedback-sound.js", "page-feedback.js"]', WORKER)
         self.assertIn("refreshOpenWebTabs();", WORKER)
         self.assertIn("chrome.runtime.onStartup.addListener", WORKER)
+        self.assertIn("chrome.tabs.onUpdated.addListener", WORKER)
+        self.assertIn("async function injectFeedbackScript(tab)", WORKER)
 
     def test_welcome_files_and_user_entry_points_exist(self):
         for name in ("welcome.html", "welcome.css", "welcome.js", "feedback-sound.js", "selection-affordance.css"):
@@ -65,7 +67,7 @@ class ExtensionOnboardingContractTests(unittest.TestCase):
         self.assertIn("#718e64", WELCOME_CSS)
 
     def test_release_version_is_current(self):
-        self.assertIn('"version": "1.9.8"', MANIFEST)
+        self.assertIn('"version": "1.9.9"', MANIFEST)
         self.assertIn('"https://wangranm-a11y.github.io/later-space/", "https://wangranm-a11y.github.io/later-space/index.html"', MANIFEST)
         self.assertNotIn('"exclude_matches": ["https://wangranm-a11y.github.io/later-space/*"]', MANIFEST)
 

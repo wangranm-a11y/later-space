@@ -627,12 +627,17 @@ function pageCapture(tab) {
   return saveCapture({ kind: "link", url: tab?.url || "", title: tab?.title || "", windowId: tab?.windowId });
 }
 
-async function refreshOpenWebTabs() {
-  const tabs = await chrome.tabs.query({ url: ["http://*/*", "https://*/*"] });
-  await Promise.allSettled(tabs.map((tab) => chrome.scripting.executeScript({
+async function injectFeedbackScript(tab) {
+  if (!tab?.id || !/^https?:/i.test(tab.url || "") || isLaterSpaceCanvasTab(tab)) return;
+  await chrome.scripting.executeScript({
     target: { tabId: tab.id },
     files: ["feedback-sound.js", "page-feedback.js"],
-  })));
+  }).catch(() => {});
+}
+
+async function refreshOpenWebTabs() {
+  const tabs = await chrome.tabs.query({ url: ["http://*/*", "https://*/*"] });
+  await Promise.allSettled(tabs.map((tab) => injectFeedbackScript(tab)));
 }
 
 chrome.runtime.onInstalled.addListener((details) => {
@@ -649,6 +654,9 @@ chrome.runtime.onInstalled.addListener((details) => {
 });
 
 chrome.runtime.onStartup.addListener(() => refreshOpenWebTabs());
+chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+  if (changeInfo.status === "complete") injectFeedbackScript({ ...tab, id: tabId });
+});
 refreshOpenWebTabs();
 
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
