@@ -11,7 +11,7 @@
     <link rel="icon" href="assets/favicon.svg?v=2" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="assets/apple-touch-icon.png?v=2" />
     <link rel="manifest" href="manifest.webmanifest" />
-    <link rel="stylesheet" href="styles.css?v=83" />
+    <link rel="stylesheet" href="styles.css?v=84" />
   </head>
   <body>
     <main class="canvas" id="canvas" tabindex="0" aria-label="Later Space 无限内容画布">
@@ -182,6 +182,18 @@
       <div class="selection-marquee" id="selectionMarquee" hidden></div>
       <div class="toast" id="toast" role="status" aria-live="polite"><span class="toast-success-mark" id="toastSuccessMark" aria-hidden="true">✓</span><span id="toastMessage"></span><button id="toastAction" type="button" hidden></button></div>
     </main>
+
+    <section class="text-reader-backdrop" id="textReaderBackdrop" hidden>
+      <article class="text-reader-dialog text-theme-paper" id="textReaderDialog" role="dialog" aria-modal="true" aria-labelledby="textReaderTitle" tabindex="-1">
+        <header class="text-reader-header">
+          <h2 id="textReaderTitle"></h2>
+          <button class="text-reader-close" id="textReaderCloseButton" type="button" aria-label="收起文字卡片" title="收起">
+            <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m6 6 8 8M14 6l-8 8" /></svg>
+          </button>
+        </header>
+        <div class="text-reader-body" id="textReaderBody" tabindex="0"></div>
+      </article>
+    </section>
 
     <section class="auth-return-screen" id="authReturnScreen" aria-live="polite" hidden>
       <div class="auth-return-card">
@@ -387,6 +399,6 @@
         });
       }
     </script>
-    <script src="app.js?v=83" defer></script>
+    <script src="app.js?v=84" defer></script>
   </body>
 </html>

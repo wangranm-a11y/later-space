@@ -12,10 +12,8 @@ const INSTALL_GUIDE_SHOWN_KEY = "later-space-install-guide-shown-v1";
 const THUMBNAIL_VERSION = 5;
 const TEXT_CARD_WIDTH = 300;
 const TEXT_CARD_HEIGHT = 375;
-const EXPANDED_TEXT_WIDTH = 420;
-const EXPANDED_TEXT_HEIGHT = 520;
 const STATIC_DEPLOYMENT = location.protocol !== "file:" && !["localhost", "127.0.0.1", "::1"].includes(location.hostname);
-document.documentElement.dataset.appVersion = "80";
+document.documentElement.dataset.appVersion = "81";
 document.documentElement.dataset.deployment = STATIC_DEPLOYMENT ? "static" : "local";
 
 const state = {
@@ -51,6 +49,7 @@ const state = {
   duplicateFocusId: null,
   duplicatePrompt: null,
   expandedTextIds: new Set(),
+  textReaderClosing: false,
   backupTimer: null,
   backupInFlight: false,
   backupQueued: false,
@@ -87,6 +86,11 @@ const elements = {
   emptyHint: document.querySelector("#emptyHint"),
   canvasGuide: document.querySelector("#canvasGuide"),
   closeCanvasGuideButton: document.querySelector("#closeCanvasGuideButton"),
+  textReaderBackdrop: document.querySelector("#textReaderBackdrop"),
+  textReaderDialog: document.querySelector("#textReaderDialog"),
+  textReaderTitle: document.querySelector("#textReaderTitle"),
+  textReaderBody: document.querySelector("#textReaderBody"),
+  textReaderCloseButton: document.querySelector("#textReaderCloseButton"),
   welcomeScreen: document.querySelector("#welcomeScreen"),
   welcomeLoginForm: document.querySelector("#welcomeLoginForm"),
   welcomeEmailInput: document.querySelector("#welcomeEmailInput"),
@@ -856,11 +860,28 @@ function longTextPreview(text) {
   return preview || normalized;
 }
 
-function textCard(record, expanded) {
-  if (expanded) return `<div class="text-block long-text-full" tabindex="0"><button class="long-text-collapse" type="button" data-toggle-long-text>收起</button><div>${escapeHtml(record.text)}</div></div>`;
+function readerTextTitle(text) {
+  const firstLine = String(text || "").replace(/\r/g, "").split("\n").map((line) => line.trim()).find(Boolean);
+  if (!firstLine) return "文字收藏";
+  const characters = [...firstLine];
+  return characters.length > 64 ? `${characters.slice(0, 63).join("")}…` : firstLine;
+}
+
+function readerTextBody(text) {
+  const source = String(text || "").replace(/\r/g, "");
+  const lines = source.split("\n");
+  const firstIndex = lines.findIndex((line) => line.trim());
+  if (firstIndex < 0 || lines[firstIndex].trim() !== readerTextTitle(source)) return source;
+  const remaining = lines.slice(firstIndex + 1);
+  if (!remaining.some((line) => line.trim())) return source;
+  while (remaining[0] !== undefined && !remaining[0].trim()) remaining.shift();
+  return remaining.join("\n");
+}
+
+function textCard(record) {
   return `<div class="long-text-card">
     <span class="long-text-type">文字</span>
-    <h2><button class="long-text-open" type="button" data-open-long-text>${escapeHtml(longTextTitle(record.text))}</button></h2>
+    <h2><span class="long-text-open">${escapeHtml(longTextTitle(record.text))}</span></h2>
     <p>${escapeHtml(longTextPreview(record.text))}</p>
   </div>`;
 }
@@ -1173,15 +1194,13 @@ function render() {
     const isLink = record.kind === "link";
     const isText = record.kind === "text";
     const isVideo = record.kind === "video";
-    const expanded = isText && state.expandedTextIds.has(record.id);
-    const content = isLink ? linkCard(record) : isText ? textCard(record, expanded) : isVideo ? `<span class="video-drag-handle" aria-hidden="true"></span><video class="video-preview" controls preload="metadata" poster="${imageUrl(record)}" aria-label="${escapeHtml(record.note || record.name || "收藏视频")}"></video>` : `<img src="${imageUrl(record)}" alt="${escapeHtml(record.note || record.name || "收藏图片")}" draggable="false" />`;
+    const content = isLink ? linkCard(record) : isText ? textCard(record) : isVideo ? `<span class="video-drag-handle" aria-hidden="true"></span><video class="video-preview" controls preload="metadata" poster="${imageUrl(record)}" aria-label="${escapeHtml(record.note || record.name || "收藏视频")}"></video>` : `<img src="${imageUrl(record)}" alt="${escapeHtml(record.note || record.name || "收藏图片")}" draggable="false" />`;
     const transform = `translate(${record.canvasX}px,${record.canvasY}px)`;
-    const textWidth = expanded ? record.expandedWidth || EXPANDED_TEXT_WIDTH : TEXT_CARD_WIDTH;
-    const textHeight = isText ? `height:${expanded ? record.expandedHeight || EXPANDED_TEXT_HEIGHT : TEXT_CARD_HEIGHT}px;` : "";
+    const textHeight = isText ? `height:${TEXT_CARD_HEIGHT}px;` : "";
     const textTheme = record.textTheme || state.globalTextPreference;
-    return `<article class="canvas-item${isLink ? " link-item" : ""}${isText ? ` text-item text-card-item text-theme-${textTheme}` : ""}${expanded ? " is-expanded" : ""}${isVideo ? " video-item" : ""}${selected ? " is-selected" : ""}${multiSelected ? " is-multi-selected" : ""}${state.recentIds.has(record.id) ? " is-new" : ""}${state.arrivingIds.has(record.id) ? " is-arriving" : ""}${state.duplicateFocusId === record.id ? " is-duplicate-focus" : ""}" data-id="${record.id}" data-status="${record.status || "unread"}" tabindex="0" aria-label="${escapeHtml(record.title || longTextTitle(record.text) || record.text || record.name || "收藏内容")}" style="width:${isText ? textWidth : record.canvasWidth}px;${textHeight}transform:${transform};z-index:${record.zIndex || 1}">
+    return `<article class="canvas-item${isLink ? " link-item" : ""}${isText ? ` text-item text-card-item text-theme-${textTheme}` : ""}${isVideo ? " video-item" : ""}${selected ? " is-selected" : ""}${multiSelected ? " is-multi-selected" : ""}${state.recentIds.has(record.id) ? " is-new" : ""}${state.arrivingIds.has(record.id) ? " is-arriving" : ""}${state.duplicateFocusId === record.id ? " is-duplicate-focus" : ""}" data-id="${record.id}" data-status="${record.status || "unread"}" tabindex="0" aria-label="${escapeHtml(record.title || longTextTitle(record.text) || record.text || record.name || "收藏内容")}" style="width:${isText ? TEXT_CARD_WIDTH : record.canvasWidth}px;${textHeight}transform:${transform};z-index:${record.zIndex || 1}">
       ${content}
-      ${isText && expanded ? textResizeHandles() : isText ? "" : `<span class="resize-handle" data-resize aria-hidden="true"></span>`}
+      ${isText ? "" : `<span class="resize-handle" data-resize aria-hidden="true"></span>`}
       <span class="item-caption">${escapeHtml(record.title || record.note || record.name || "内容")}</span>
     </article>`;
   }).join("");
@@ -1198,6 +1217,7 @@ function render() {
   renderGlobalTextTheme();
   renderMobileInbox();
   renderAccountEntry();
+  renderTextReader();
 }
 
 function mobileRecordTitle(record) {
@@ -1850,25 +1870,111 @@ function isGenericTitle(title, record) {
 
 function itemHeight(record) {
   if (record.kind === "link") return record.canvasWidth * 1.25;
-  if (record.kind === "text") {
-    return state.expandedTextIds.has(record.id) ? record.expandedHeight || EXPANDED_TEXT_HEIGHT : TEXT_CARD_HEIGHT;
-  }
+  if (record.kind === "text") return TEXT_CARD_HEIGHT;
   return record.canvasWidth * (record.height && record.width ? record.height / record.width : 1);
 }
 
 function itemWidth(record) {
-  if (record.kind === "text") return state.expandedTextIds.has(record.id) ? record.expandedWidth || EXPANDED_TEXT_WIDTH : TEXT_CARD_WIDTH;
+  if (record.kind === "text") return TEXT_CARD_WIDTH;
   return record.canvasWidth;
 }
 
-function toggleTextCard(record) {
+function renderTextReader() {
+  if (!elements.textReaderBackdrop || !elements.textReaderDialog) return;
+  const id = [...state.expandedTextIds][0];
+  const record = state.images.find((entry) => entry.id === id && entry.kind === "text");
+  if (!record) {
+    state.expandedTextIds.clear();
+    elements.textReaderBackdrop.hidden = true;
+    elements.textReaderDialog.dataset.recordId = "";
+    elements.textReaderTitle.textContent = "";
+    elements.textReaderBody.textContent = "";
+    return;
+  }
+  const theme = record.textTheme || state.globalTextPreference;
+  elements.textReaderDialog.className = `text-reader-dialog text-reader-${theme}`;
+  if (elements.textReaderDialog.dataset.recordId !== record.id) {
+    elements.textReaderDialog.dataset.recordId = record.id;
+    elements.textReaderTitle.textContent = readerTextTitle(record.text);
+    elements.textReaderBody.textContent = readerTextBody(record.text);
+    elements.textReaderBody.scrollTop = 0;
+  }
+  elements.textReaderBackdrop.hidden = false;
+  requestAnimationFrame(updateTextReaderScrollCue);
+}
+
+function updateTextReaderScrollCue() {
+  if (!elements.textReaderDialog || !elements.textReaderBody) return;
+  const remaining = elements.textReaderBody.scrollHeight - elements.textReaderBody.scrollTop - elements.textReaderBody.clientHeight;
+  elements.textReaderDialog.classList.toggle("can-scroll", remaining > 8);
+}
+
+function textReaderSourceRect(recordId) {
+  return elements.world.querySelector(`[data-id="${CSS.escape(recordId)}"]`)?.getBoundingClientRect() || null;
+}
+
+function readerStartFrame(sourceRect, destinationRect) {
+  if (!sourceRect) return { opacity: .35, transform: "scale(.94)" };
+  const sourceCenterX = sourceRect.left + sourceRect.width / 2;
+  const sourceCenterY = sourceRect.top + sourceRect.height / 2;
+  const destinationCenterX = destinationRect.left + destinationRect.width / 2;
+  const destinationCenterY = destinationRect.top + destinationRect.height / 2;
+  const scaleX = Math.max(.2, Math.min(1, sourceRect.width / destinationRect.width));
+  const scaleY = Math.max(.2, Math.min(1, sourceRect.height / destinationRect.height));
+  return {
+    opacity: .28,
+    transform: `translate(${sourceCenterX - destinationCenterX}px, ${sourceCenterY - destinationCenterY}px) scale(${scaleX}, ${scaleY})`,
+  };
+}
+
+function animateTextReader(sourceRect, closing = false) {
+  const dialog = elements.textReaderDialog;
+  if (!dialog || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return Promise.resolve();
+  const start = readerStartFrame(sourceRect, dialog.getBoundingClientRect());
+  const settled = { opacity: 1, transform: "translate(0, 0) scale(1)" };
+  const animation = dialog.animate(closing ? [settled, start] : [start, settled], {
+    duration: closing ? 190 : 260,
+    easing: closing ? "cubic-bezier(.4,0,1,1)" : "cubic-bezier(.16,.8,.24,1)",
+    fill: "both",
+  });
+  elements.textReaderBackdrop.animate(closing ? [{ opacity: 1 }, { opacity: 0 }] : [{ opacity: 0 }, { opacity: 1 }], {
+    duration: closing ? 170 : 220,
+    easing: "ease-out",
+  });
+  return animation.finished.catch(() => undefined);
+}
+
+function openTextReader(record) {
   if (record?.kind !== "text") return;
-  if (state.expandedTextIds.has(record.id)) state.expandedTextIds.delete(record.id);
-  else state.expandedTextIds.add(record.id);
+  const sourceRect = textReaderSourceRect(record.id);
+  state.expandedTextIds.clear();
+  state.expandedTextIds.add(record.id);
   state.selectedId = record.id;
   state.selectedIds.clear();
   state.selectedIds.add(record.id);
   render();
+  requestAnimationFrame(() => {
+    animateTextReader(sourceRect);
+    elements.textReaderCloseButton.focus({ preventScroll: true });
+  });
+}
+
+async function closeTextReader() {
+  if (!state.expandedTextIds.size || state.textReaderClosing) return;
+  state.textReaderClosing = true;
+  const recordId = [...state.expandedTextIds][0];
+  const sourceRect = textReaderSourceRect(recordId);
+  await animateTextReader(sourceRect, true);
+  state.expandedTextIds.clear();
+  state.textReaderClosing = false;
+  render();
+  elements.world.querySelector(`[data-id="${CSS.escape(recordId)}"]`)?.focus({ preventScroll: true });
+}
+
+function toggleTextCard(record) {
+  if (record?.kind !== "text") return;
+  if (state.expandedTextIds.has(record.id)) closeTextReader();
+  else openTextReader(record);
 }
 
 function closeDuplicatePrompt(keepDuplicate) {
@@ -2149,7 +2255,6 @@ function selectItem(id) {
 
 function beginPointer(event) {
   if (event.button !== 0) return;
-  if (event.target.closest(".text-card-item.is-expanded .long-text-full")) return;
   if (event.target.closest("button, a, input, textarea, select, label")) return;
   if (event.target.closest("video")) return;
   const openButton = event.target.closest("[data-open-link]");
@@ -2227,24 +2332,6 @@ function movePointer(event) {
   if (state.pointer.mode === "item") {
     record.canvasX = state.pointer.originX + dx / state.view.zoom;
     record.canvasY = state.pointer.originY + dy / state.view.zoom;
-  } else if (record.kind === "text" && state.expandedTextIds.has(record.id)) {
-    const direction = state.pointer.resizeDirection;
-    const worldDx = dx / state.view.zoom;
-    const worldDy = dy / state.view.zoom;
-    const minimumWidth = 120;
-    const minimumHeight = 72;
-    if (direction.includes("e")) record.expandedWidth = Math.max(minimumWidth, state.pointer.originWidth + worldDx);
-    if (direction.includes("s")) record.expandedHeight = Math.max(minimumHeight, state.pointer.originHeight + worldDy);
-    if (direction.includes("w")) {
-      const nextWidth = Math.max(minimumWidth, state.pointer.originWidth - worldDx);
-      record.canvasX = state.pointer.originX + state.pointer.originWidth - nextWidth;
-      record.expandedWidth = nextWidth;
-    }
-    if (direction.includes("n")) {
-      const nextHeight = Math.max(minimumHeight, state.pointer.originHeight - worldDy);
-      record.canvasY = state.pointer.originY + state.pointer.originHeight - nextHeight;
-      record.expandedHeight = nextHeight;
-    }
   } else {
     record.canvasWidth = Math.max(72, state.pointer.originWidth + dx / state.view.zoom);
   }
@@ -2332,6 +2419,7 @@ async function deleteSelected() {
   }
   const deletedIds = new Set(ids);
   state.images = state.images.filter((image) => !deletedIds.has(image.id));
+  deletedIds.forEach((id) => state.expandedTextIds.delete(id));
   state.selectedId = null;
   state.selectedIds.clear();
   render();
@@ -3910,6 +3998,15 @@ function bindEvents() {
     showWelcomeScreen();
   });
   elements.closeCanvasGuideButton.addEventListener("click", finishCanvasGuide);
+  elements.textReaderCloseButton.addEventListener("click", closeTextReader);
+  elements.textReaderBackdrop.addEventListener("click", (event) => {
+    if (event.target === elements.textReaderBackdrop) closeTextReader();
+  });
+  elements.textReaderDialog.addEventListener("dblclick", (event) => {
+    if (event.target.closest("button") || !window.getSelection()?.isCollapsed) return;
+    closeTextReader();
+  });
+  elements.textReaderBody.addEventListener("scroll", updateTextReaderScrollCue, { passive: true });
   elements.accountButton.addEventListener("click", () => {
     if (state.cloudSession?.user) openSyncPanel();
     else showWelcomeScreen();
@@ -4092,30 +4189,14 @@ function bindEvents() {
   elements.canvas.addEventListener("pointermove", movePointer);
   elements.canvas.addEventListener("pointerup", endPointer);
   elements.canvas.addEventListener("pointercancel", endPointer);
-  elements.canvas.addEventListener("click", (event) => {
-    const open = event.target.closest("[data-open-long-text]");
-    if (open) {
-      const record = state.images.find((entry) => entry.id === open.closest(".canvas-item")?.dataset.id);
-      if (record && !state.expandedTextIds.has(record.id)) toggleTextCard(record);
-      return;
-    }
-    const toggle = event.target.closest("[data-toggle-long-text]");
-    if (toggle) {
-      const record = state.images.find((entry) => entry.id === toggle.closest(".canvas-item")?.dataset.id);
-      if (record) toggleTextCard(record);
-      return;
-    }
-  });
   elements.canvas.addEventListener("dblclick", (event) => {
-    if (event.target.closest(".canvas-item, button, a, input, textarea, select, label")) return;
-    if (!state.expandedTextIds.size) return;
-    state.expandedTextIds.clear();
-    state.selectedId = null;
-    state.selectedIds.clear();
-    render();
+    if (event.target.closest("button, a, input, textarea, select, label")) return;
+    const item = event.target.closest(".text-card-item");
+    if (!item) return;
+    const record = state.images.find((entry) => entry.id === item.dataset.id);
+    if (record) openTextReader(record);
   });
   elements.canvas.addEventListener("wheel", (event) => {
-    if (event.target.closest(".text-card-item.is-expanded .long-text-full")) return;
     event.preventDefault();
     if (event.ctrlKey || event.metaKey) zoomAt(event.clientX, event.clientY, Math.exp(-event.deltaY * .008));
     else {
@@ -4137,6 +4218,11 @@ function bindEvents() {
   window.addEventListener("keydown", (event) => {
     const isEditing = event.target.matches?.("input, textarea, [contenteditable='true']");
     const selectedRecord = state.images.find((record) => record.id === state.selectedId);
+    if (event.key === "Escape" && state.expandedTextIds.size) {
+      event.preventDefault();
+      closeTextReader();
+      return;
+    }
     if (!isEditing && !event.shiftKey && (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "z" && state.deletionUndoSnapshot) {
       event.preventDefault();
       undoDeletion();
@@ -4146,7 +4232,7 @@ function bindEvents() {
       event.preventDefault();
       copySelectedImage();
     }
-    if (!isEditing && (event.key === "Delete" || event.key === "Backspace") && (state.selectedId || state.selectedIds.size)) { event.preventDefault(); deleteSelected(); }
+    if (!isEditing && !state.expandedTextIds.size && (event.key === "Delete" || event.key === "Backspace") && (state.selectedId || state.selectedIds.size)) { event.preventDefault(); deleteSelected(); }
     if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "f") {
       event.preventDefault();
       elements.searchInput.focus();
@@ -4163,7 +4249,6 @@ function bindEvents() {
       elements.filterToggleButton.setAttribute("aria-expanded", "false");
       renderFilterControls();
     }
-    else if (event.key === "Escape" && state.expandedTextIds.size) { state.expandedTextIds.clear(); render(); }
     else if (event.key === "Escape") { state.selectedId = null; state.selectedIds.clear(); render(); }
     if (event.key === "0" && (event.metaKey || event.ctrlKey)) { event.preventDefault(); resetView(); }
     if ((event.key === "+" || event.key === "=") && (event.metaKey || event.ctrlKey)) { event.preventDefault(); zoomAt(innerWidth / 2, innerHeight / 2, 1.15); }
