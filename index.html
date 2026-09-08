@@ -11,7 +11,7 @@
     <link rel="icon" href="assets/favicon.svg?v=2" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="assets/apple-touch-icon.png?v=2" />
     <link rel="manifest" href="manifest.webmanifest" />
-    <link rel="stylesheet" href="styles.css?v=84" />
+    <link rel="stylesheet" href="styles.css?v=85" />
   </head>
   <body>
     <main class="canvas" id="canvas" tabindex="0" aria-label="Later Space 无限内容画布">
@@ -279,7 +279,8 @@
           <svg viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></svg>
         </button>
       </div>
-      <p class="install-dialog-intro">以后像打开普通 App 一样使用。你的登录状态和收藏会留在这个浏览器里。</p>
+      <p class="install-dialog-intro" id="installDialogIntro">以后像打开普通 App 一样使用。已经登录时，账号会安全地带到主屏幕版本。</p>
+      <p class="install-handoff-status" id="pwaHandoffStatus" hidden>登录状态没有自动带过来，点一下重新登录即可。</p>
       <div class="install-steps" id="installIosSteps">
         <div class="install-step"><b>01</b><div><strong>点 Safari 的分享按钮</strong><span>就是底部中间那个方框向上的箭头。</span></div></div>
         <div class="install-step"><b>02</b><div><strong>选择“添加到主屏幕”</strong><span>如果没看到，向上滑一下分享菜单。</span></div></div>
@@ -399,6 +400,6 @@
         });
       }
     </script>
-    <script src="app.js?v=84" defer></script>
+    <script src="app.js?v=85" defer></script>
   </body>
 </html>

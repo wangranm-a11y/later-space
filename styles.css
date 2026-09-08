@@ -359,6 +359,7 @@ kbd { min-width: 26px; height: 24px; display: grid; place-items: center; padding
 .install-dialog-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
 .install-dialog h2 { margin: 0; font-size: 21px; font-weight: 650; line-height: 1.3; }
 .install-dialog-intro { margin: 14px 0 18px; color: var(--muted); font-size: 13px; line-height: 1.6; }
+.install-handoff-status { margin: -8px 0 16px; padding: 10px 12px; border-radius: 10px; background: rgba(113,142,100,.12); color: #4f7044; font-size: 12px; line-height: 1.5; }
 .install-steps { display: grid; gap: 9px; }
 .install-steps[hidden] { display: none; }
 .install-step { display: grid; grid-template-columns: 34px 1fr; gap: 11px; align-items: start; padding: 13px; border-radius: 12px; background: #f6f6f3; }

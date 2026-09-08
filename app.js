@@ -9,11 +9,14 @@ const CANVAS_GUIDE_DISMISSED_KEY = "later-space-canvas-guide-dismissed-v2";
 const AUTH_RETURN_STATE_KEY = "later-space-auth-return-v1";
 const LAST_LOGIN_EMAIL_KEY = "later-space-last-login-email-v1";
 const INSTALL_GUIDE_SHOWN_KEY = "later-space-install-guide-shown-v1";
+const PWA_HANDOFF_COOKIE = "later_space_pwa_handoff";
+const PWA_HANDOFF_MAX_AGE_SECONDS = 15 * 60;
+const CLOUD_REFRESH_LEEWAY_MS = 5 * 60 * 1000;
 const THUMBNAIL_VERSION = 5;
 const TEXT_CARD_WIDTH = 300;
 const TEXT_CARD_HEIGHT = 375;
 const STATIC_DEPLOYMENT = location.protocol !== "file:" && !["localhost", "127.0.0.1", "::1"].includes(location.hostname);
-document.documentElement.dataset.appVersion = "81";
+document.documentElement.dataset.appVersion = "85";
 document.documentElement.dataset.deployment = STATIC_DEPLOYMENT ? "static" : "local";
 
 const state = {
@@ -59,6 +62,8 @@ const state = {
   externalInboxImporting: false,
   externalInboxTimer: null,
   cloudSession: null,
+  cloudSessionRefreshTimer: null,
+  cloudSessionRefreshPromise: null,
   cloudSyncTimer: null,
   cloudPollTimer: null,
   cloudSyncing: false,
@@ -74,6 +79,8 @@ const state = {
   globalCoverPreference: localStorage.getItem("later-space-global-cover-mode") || "editorial",
   globalTextPreference: localStorage.getItem("later-space-global-text-theme") || "paper",
   deferredInstallPrompt: null,
+  pwaHandoffStatus: "idle",
+  pwaHandoffRestored: false,
   mobileCanvasRecordId: null,
 };
 
@@ -266,10 +273,12 @@ const elements = {
   mobileFocusCanvasButton: document.querySelector("#mobileFocusCanvasButton"),
   installBackdrop: document.querySelector("#installBackdrop"),
   installDialog: document.querySelector("#installDialog"),
+  installDialogIntro: document.querySelector("#installDialogIntro"),
   closeInstallButton: document.querySelector("#closeInstallButton"),
   installIosSteps: document.querySelector("#installIosSteps"),
   installNativePromptButton: document.querySelector("#installNativePromptButton"),
   installHint: document.querySelector("#installHint"),
+  pwaHandoffStatus: document.querySelector("#pwaHandoffStatus"),
 };
 
 const WORKFLOW_STATUSES = new Set(["inbox", "unread", "inspired", "action", "read"]);
@@ -1297,6 +1306,68 @@ function isStandaloneMode() {
   return window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
 }
 
+function pwaCookiePath() {
+  return new URL(".", location.href).pathname;
+}
+
+function writePwaHandoffCookie(handoffCode) {
+  const secure = location.protocol === "https:" ? "; Secure" : "";
+  document.cookie = `${PWA_HANDOFF_COOKIE}=${encodeURIComponent(handoffCode)}; Max-Age=${PWA_HANDOFF_MAX_AGE_SECONDS}; Path=${pwaCookiePath()}; SameSite=Strict${secure}`;
+}
+
+function readPwaHandoffCookie() {
+  const prefix = `${PWA_HANDOFF_COOKIE}=`;
+  const match = document.cookie.split(";").map((part) => part.trim()).find((part) => part.startsWith(prefix));
+  return match ? decodeURIComponent(match.slice(prefix.length)) : "";
+}
+
+function clearPwaHandoffCookie() {
+  const secure = location.protocol === "https:" ? "; Secure" : "";
+  document.cookie = `${PWA_HANDOFF_COOKIE}=; Max-Age=0; Path=${pwaCookiePath()}; SameSite=Strict${secure}`;
+}
+
+function renderPwaHandoffStatus() {
+  if (!elements.pwaHandoffStatus) return;
+  const messages = {
+    preparing: "正在安全地准备登录状态……",
+    ready: "登录状态已准备好，请在 15 分钟内添加并第一次打开。",
+    failed: "登录状态没有自动带过来时，点一下重新登录即可。",
+    restored: "登录状态已自动带过来。",
+  };
+  const message = messages[state.pwaHandoffStatus] || "";
+  elements.pwaHandoffStatus.hidden = !message;
+  elements.pwaHandoffStatus.textContent = message;
+  elements.pwaHandoffStatus.dataset.status = state.pwaHandoffStatus;
+  if (elements.installNativePromptButton) {
+    elements.installNativePromptButton.disabled = state.pwaHandoffStatus === "preparing";
+  }
+}
+
+async function preparePwaAuthHandoff() {
+  if (!state.cloudSession?.user || isStandaloneMode()) return false;
+  state.pwaHandoffStatus = "preparing";
+  renderPwaHandoffStatus();
+  try {
+    const response = await cloudRequest("/functions/v1/pwa-auth-handoff", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "create" }),
+    });
+    const result = await response.json();
+    if (!response.ok || !result.handoffCode) throw new Error(result.code || "handoff_unavailable");
+    writePwaHandoffCookie(result.handoffCode);
+    state.pwaHandoffStatus = "ready";
+    renderPwaHandoffStatus();
+    return true;
+  } catch (error) {
+    console.warn("PWA auth handoff preparation failed", error);
+    clearPwaHandoffCookie();
+    state.pwaHandoffStatus = "failed";
+    renderPwaHandoffStatus();
+    return false;
+  }
+}
+
 function closeInstallDialog() {
   if (!elements.installDialog || !elements.installBackdrop) return;
   elements.installDialog.hidden = true;
@@ -1320,17 +1391,26 @@ function updateMobileInstallEntry() {
         ? "iPhone：按上面 3 步添加即可。"
         : "如果没有弹出安装窗口，请打开浏览器菜单，选择“添加到主屏幕”。";
   }
+  if (elements.installDialogIntro) {
+    elements.installDialogIntro.textContent = state.cloudSession?.user
+      ? "以后像打开普通 App 一样使用。账号会通过一次性凭证安全地带到主屏幕版本。"
+      : "以后像打开普通 App 一样使用。登录后再安装，可以自动带入账号。";
+  }
+  renderPwaHandoffStatus();
 }
 
-function openInstallDialog() {
+async function openInstallDialog() {
   if (isStandaloneMode() || !elements.installDialog || !elements.installBackdrop) return;
   elements.installDialog.hidden = false;
   elements.installBackdrop.hidden = false;
+  state.pwaHandoffStatus = "idle";
   updateMobileInstallEntry();
+  if (state.cloudSession?.user) await preparePwaAuthHandoff();
 }
 
 async function installLaterSpace() {
   if (!state.deferredInstallPrompt) return;
+  if (state.cloudSession?.user && state.pwaHandoffStatus !== "ready") await preparePwaAuthHandoff();
   const prompt = state.deferredInstallPrompt;
   state.deferredInstallPrompt = null;
   await prompt.prompt();
@@ -3042,20 +3122,87 @@ async function undoGuestMigration(userId) {
   showToast("已撤销，原来的本机内容仍然保留");
 }
 
+function cloudSessionExpiresAt(session = state.cloudSession) {
+  if (!session) return 0;
+  if (Number(session.expires_at)) return Number(session.expires_at) * 1000;
+  if (Number(session.expires_in)) return Date.now() + Number(session.expires_in) * 1000;
+  return 0;
+}
+
+function scheduleCloudSessionRefresh() {
+  clearTimeout(state.cloudSessionRefreshTimer);
+  state.cloudSessionRefreshTimer = null;
+  const expiresAt = cloudSessionExpiresAt();
+  if (!state.cloudSession?.refresh_token || !expiresAt) return;
+  const delay = Math.max(1000, expiresAt - Date.now() - CLOUD_REFRESH_LEEWAY_MS);
+  state.cloudSessionRefreshTimer = window.setTimeout(() => ensureFreshCloudSession(), delay);
+}
+
+async function ensureFreshCloudSession() {
+  if (!state.cloudSession?.refresh_token) return false;
+  const expiresAt = cloudSessionExpiresAt();
+  if (expiresAt && expiresAt - Date.now() > CLOUD_REFRESH_LEEWAY_MS) {
+    scheduleCloudSessionRefresh();
+    return true;
+  }
+  if (state.cloudSessionRefreshPromise) return state.cloudSessionRefreshPromise;
+  state.cloudSessionRefreshPromise = refreshCloudSession()
+    .then(() => true)
+    .catch((error) => {
+      console.warn("Cloud session refresh failed", error);
+      return false;
+    })
+    .finally(() => { state.cloudSessionRefreshPromise = null; });
+  return state.cloudSessionRefreshPromise;
+}
+
 function saveCloudSession(session) {
   state.cloudSession = session;
   if (session?.user?.email) rememberLoginEmail(session.user.email);
   if (session) localStorage.setItem(CLOUD_SESSION_KEY, JSON.stringify(session));
   else localStorage.removeItem(CLOUD_SESSION_KEY);
+  scheduleCloudSessionRefresh();
 }
 
 function cloudAuthClient() {
   if (!state.cloudAuthClient && window.supabase?.createClient) {
     state.cloudAuthClient = window.supabase.createClient(cloudConfig().supabaseUrl, cloudConfig().supabaseAnonKey, {
-      auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false, flowType: "pkce" },
+      auth: { persistSession: true, autoRefreshToken: false, detectSessionInUrl: false, flowType: "pkce" },
     });
   }
   return state.cloudAuthClient;
+}
+
+async function redeemPwaAuthHandoff() {
+  if (!isStandaloneMode() || !cloudConfigured()) return false;
+  const handoffCode = readPwaHandoffCookie();
+  if (!handoffCode) return false;
+  try {
+    const config = cloudConfig();
+    const response = await fetch(`${config.supabaseUrl}/functions/v1/pwa-auth-handoff`, {
+      method: "POST",
+      headers: { apikey: config.supabaseAnonKey, "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "redeem", handoffCode }),
+    });
+    const result = await response.json();
+    if (!response.ok || !result.tokenHash) throw new Error(result.code || "handoff_invalid");
+    const client = window.supabase.createClient(config.supabaseUrl, config.supabaseAnonKey, {
+      auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+    });
+    const { data, error } = await client.auth.verifyOtp({ token_hash: result.tokenHash, type: "email" });
+    if (error || !data?.session) throw error || new Error("handoff_invalid");
+    saveCloudSession(data.session);
+    state.pwaHandoffRestored = true;
+    state.pwaHandoffStatus = "restored";
+    return true;
+  } catch (error) {
+    console.warn("PWA auth handoff redemption failed", error);
+    state.pwaHandoffStatus = "failed";
+    showToast("登录状态没有自动带过来，请重新登录一次");
+    return false;
+  } finally {
+    clearPwaHandoffCookie();
+  }
 }
 
 function cloudHeaders(extra = {}) {
@@ -4294,7 +4441,9 @@ async function init() {
     await loadImages();
     bindExtensionBridge();
     try {
+      await redeemPwaAuthHandoff();
       await initializeCloud();
+      if (state.pwaHandoffRestored) showToast("登录状态已自动带过来");
     } catch (error) {
       console.error("Cloud initialization failed", error);
       showToast("云端同步暂时不可用，本地画布仍可使用");
@@ -4315,9 +4464,11 @@ async function init() {
     const incompleteLinks = state.images.filter((record) => record.kind === "link" && isGenericTitle(record.title, record));
     incompleteLinks.forEach((record) => enrichLink(record));
     window.addEventListener("online", () => syncCloud());
+    window.addEventListener("online", () => ensureFreshCloudSession());
     window.addEventListener("focus", () => syncCloud());
+    window.addEventListener("focus", () => ensureFreshCloudSession());
     document.addEventListener("visibilitychange", () => {
-      if (!document.hidden) syncCloud();
+      if (!document.hidden) ensureFreshCloudSession().then(() => syncCloud());
     });
   } catch (error) {
     console.error(error);

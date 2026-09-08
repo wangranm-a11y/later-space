@@ -3,3 +3,6 @@ verify_jwt = false
 
 [functions.agent-read]
 verify_jwt = false
+
+[functions.pwa-auth-handoff]
+verify_jwt = false

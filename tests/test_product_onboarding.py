@@ -42,7 +42,8 @@ class ProductOnboardingContractTests(unittest.TestCase):
 
     def test_pkce_login_survives_oauth_redirect(self):
         self.assertIn('persistSession: true', APP)
-        self.assertIn('autoRefreshToken: true', APP)
+        self.assertIn('autoRefreshToken: false', APP)
+        self.assertIn("scheduleCloudSessionRefresh", APP)
         self.assertIn('flowType: "pkce"', APP)
         self.assertIn('Promise.race([', APP)
         self.assertIn('发送得太频繁了，请稍等一分钟再试', APP)

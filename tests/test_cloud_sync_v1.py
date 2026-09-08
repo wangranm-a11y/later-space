@@ -61,7 +61,7 @@ class MobileInboxContractTests(unittest.TestCase):
     def test_success_is_returned_only_after_storage_and_row_write(self):
         upload_at = MOBILE_INBOX.index(".upload(assetPath")
         insert_at = MOBILE_INBOX.index('.from("later_space_items").insert')
-        success_at = MOBILE_INBOX.index('textResponse("已收进 Later Space"')
+        success_at = MOBILE_INBOX.index('textResponse("✓ 已加入 Later Space"')
         self.assertLess(upload_at, insert_at)
         self.assertLess(insert_at, success_at)
 
