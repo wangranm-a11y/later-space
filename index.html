@@ -209,6 +209,7 @@
           <div class="auth-divider"><span>或者</span></div>
           <button class="google-login-button" id="welcomeGoogleButton" type="button"><span class="google-mark" aria-hidden="true">G</span>使用 Google 账号继续</button>
           <button class="welcome-guest-button" id="welcomeGuestButton" type="button">先体验 Later Space</button>
+          <button class="welcome-install-button" id="welcomeInstallButton" type="button">安装到主屏幕</button>
           <small>无需密码。先体验的内容保存在当前浏览器，之后登录仍可迁移。</small>
         </div>
       </div>
@@ -240,7 +241,7 @@
       <div class="account-migration" id="accountMigration" hidden><div><strong id="accountMigrationTitle">发现本机旧收藏</strong><span id="accountMigrationDetail">可以随时迁移到当前账号。</span></div><button class="secondary-button" id="accountMigrationButton" type="button">迁移本机收藏</button></div>
       <div class="sync-divider"></div>
       <div class="sync-entry"><strong>浏览器插件</strong><span>保存网页、图片和选中文字</span><a href="plugin-story.html" target="_blank">了解并安装</a></div>
-      <div class="sync-entry sync-entry-shortcut"><strong>手机分享入口</strong><span id="captureTokenStatus">登录后生成你的专属收件地址</span><a href="mobile/ios-shortcut-eli5.html" target="_blank">安装教程</a></div>
+      <div class="sync-entry sync-entry-shortcut"><strong>手机分享入口</strong><span id="captureTokenStatus">登录后生成你的专属收件地址</span><div class="sync-entry-actions"><button class="secondary-button sync-install-button" id="syncInstallButton" type="button">安装到主屏幕</button><a href="mobile/ios-shortcut-eli5.html" target="_blank">安装教程</a></div></div>
       <div class="capture-token-actions" id="captureTokenActions" hidden><button class="primary-button" id="createCaptureTokenButton" type="button">生成专属地址</button><button class="secondary-button" id="copyCaptureUrlButton" type="button" hidden>复制收件地址</button><button class="text-button" id="revokeCaptureTokenButton" type="button" hidden>停用</button></div>
       <div class="sync-entry"><strong>Agent 只读入口</strong><span id="agentTokenStatus">让 CLI / MCP 读取你的收藏；重新生成会让旧 Token 失效</span><button class="secondary-button" id="createAgentTokenButton" type="button">生成 Token</button></div>
     </aside>

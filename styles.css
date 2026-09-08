@@ -167,6 +167,8 @@ kbd { min-width: 26px; height: 24px; display: grid; place-items: center; padding
 .sync-auth-divider { margin: 16px 0 10px; }
 .sync-auth-divider[hidden], .sync-google-login-button[hidden] { display: none; }
 .welcome-guest-button { margin-top: 19px; padding: 0; border: 0; border-bottom: 1px solid rgba(29,29,31,.35); background: transparent; color: var(--ink); font-size: 12px; cursor: pointer; }
+.welcome-install-button, .sync-install-button { border: 1px dashed rgba(80,97,201,.38); background: rgba(255,255,255,.5); color: var(--accent); cursor: pointer; }
+.welcome-install-button { margin-top: 12px; min-height: 38px; padding: 0 13px; border-radius: 8px; font-size: 12px; }
 .welcome-copy>small { display: block; max-width: 390px; margin-top: 18px; color: #8a8780; font-size: 9px; line-height: 1.6; }
 
 .migration-backdrop { position: fixed; inset: 0; z-index: 88; background: rgba(27,27,29,.28); backdrop-filter: blur(8px); }
@@ -346,6 +348,9 @@ kbd { min-width: 26px; height: 24px; display: grid; place-items: center; padding
 .install-step span { margin-top: 3px; color: var(--muted); font-size: 11px; line-height: 1.5; }
 .install-native-prompt { width: 100%; margin-top: 14px; }
 .install-dialog-hint { margin: 14px 0 0; color: var(--muted); font-size: 11px; line-height: 1.5; text-align: center; }
+.sync-entry-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 9px; }
+.sync-entry-actions .sync-install-button { min-height: 32px; padding: 0 10px; font-size: 11px; }
+.welcome-install-button[hidden], .sync-install-button[hidden] { display: none; }
 .capture-dialog-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
 .capture-eyebrow { display: block; margin-bottom: 4px; color: var(--muted); font-size: 11px; }
 .capture-dialog h2 { margin: 0; font-size: 19px; font-weight: 600; }

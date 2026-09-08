@@ -8,6 +8,7 @@ const WELCOME_COMPLETED_KEY = "later-space-welcome-completed-v1";
 const CANVAS_GUIDE_DISMISSED_KEY = "later-space-canvas-guide-dismissed-v2";
 const AUTH_RETURN_STATE_KEY = "later-space-auth-return-v1";
 const LAST_LOGIN_EMAIL_KEY = "later-space-last-login-email-v1";
+const INSTALL_GUIDE_SHOWN_KEY = "later-space-install-guide-shown-v1";
 const THUMBNAIL_VERSION = 5;
 const TEXT_CARD_WIDTH = 300;
 const TEXT_CARD_HEIGHT = 375;
@@ -92,6 +93,7 @@ const elements = {
   welcomeEmailSuggestionValue: document.querySelector("#welcomeEmailSuggestionValue"),
   welcomeGoogleButton: document.querySelector("#welcomeGoogleButton"),
   welcomeGuestButton: document.querySelector("#welcomeGuestButton"),
+  welcomeInstallButton: document.querySelector("#welcomeInstallButton"),
   closeWelcomeButton: document.querySelector("#closeWelcomeButton"),
   authReturnScreen: document.querySelector("#authReturnScreen"),
   authReturnMark: document.querySelector("#authReturnMark"),
@@ -249,6 +251,7 @@ const elements = {
   mobileCanvasButton: document.querySelector("#mobileCanvasButton"),
   mobileSyncButton: document.querySelector("#mobileSyncButton"),
   mobileInstallButton: document.querySelector("#mobileInstallButton"),
+  syncInstallButton: document.querySelector("#syncInstallButton"),
   installBackdrop: document.querySelector("#installBackdrop"),
   installDialog: document.querySelector("#installDialog"),
   closeInstallButton: document.querySelector("#closeInstallButton"),
@@ -1096,6 +1099,13 @@ function closeWelcomeAfterAuthentication() {
   renderAccountEntry();
   showToast("登录成功，内容已开始同步");
   showCanvasGuide();
+  window.setTimeout(maybePromptInstallAfterAuthentication, 550);
+}
+
+function maybePromptInstallAfterAuthentication() {
+  if (isStandaloneMode() || localStorage.getItem(INSTALL_GUIDE_SHOWN_KEY) === "true") return;
+  localStorage.setItem(INSTALL_GUIDE_SHOWN_KEY, "true");
+  openInstallDialog();
 }
 
 function showCanvasGuide() {
@@ -1219,10 +1229,12 @@ function closeInstallDialog() {
 }
 
 function updateMobileInstallEntry() {
-  if (!elements.mobileInstallButton) return;
   const installed = isStandaloneMode();
-  elements.mobileInstallButton.hidden = installed;
-  elements.mobileInstallButton.setAttribute("aria-hidden", String(installed));
+  [elements.mobileInstallButton, elements.syncInstallButton, elements.welcomeInstallButton].forEach((button) => {
+    if (!button) return;
+    button.hidden = installed;
+    button.setAttribute("aria-hidden", String(installed));
+  });
   if (installed) closeInstallDialog();
   if (elements.installIosSteps) elements.installIosSteps.hidden = Boolean(state.deferredInstallPrompt);
   if (elements.installNativePromptButton) elements.installNativePromptButton.hidden = !state.deferredInstallPrompt;
@@ -3823,6 +3835,7 @@ function bindEvents() {
   elements.welcomeEmailSuggestion.addEventListener("mousedown", (event) => event.preventDefault());
   elements.welcomeEmailSuggestion.addEventListener("click", chooseWelcomeEmailSuggestion);
   elements.welcomeGuestButton.addEventListener("click", closeWelcomeScreen);
+  elements.welcomeInstallButton?.addEventListener("click", openInstallDialog);
   elements.closeWelcomeButton.addEventListener("click", closeWelcomeScreen);
   elements.welcomeScreen.addEventListener("click", (event) => {
     if (event.target === elements.welcomeScreen) closeWelcomeScreen();
@@ -3929,6 +3942,7 @@ function bindEvents() {
   elements.mobileAddButton?.addEventListener("click", openCapture);
   elements.mobileSyncButton?.addEventListener("click", openSyncPanel);
   elements.mobileInstallButton?.addEventListener("click", openInstallDialog);
+  elements.syncInstallButton?.addEventListener("click", openInstallDialog);
   elements.closeInstallButton?.addEventListener("click", closeInstallDialog);
   elements.installBackdrop?.addEventListener("click", closeInstallDialog);
   elements.installNativePromptButton?.addEventListener("click", installLaterSpace);
