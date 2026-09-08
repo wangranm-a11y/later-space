@@ -351,6 +351,7 @@ kbd { min-width: 26px; height: 24px; display: grid; place-items: center; padding
 .sync-entry-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 9px; }
 .sync-entry-actions .sync-install-button { min-height: 32px; padding: 0 10px; font-size: 11px; }
 .welcome-install-button[hidden], .sync-install-button[hidden] { display: none; }
+.mobile-focus-dialog, .mobile-canvas-back-button { display: none; }
 .capture-dialog-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
 .capture-eyebrow { display: block; margin-bottom: 4px; color: var(--muted); font-size: 11px; }
 .capture-dialog h2 { margin: 0; font-size: 19px; font-weight: 600; }
@@ -633,9 +634,25 @@ button:focus-visible, .canvas-item:focus-visible { outline: 3px solid rgba(80,97
   body.mobile-show-canvas .mobile-inbox { display: none; }
   body.mobile-show-canvas { overflow: hidden; }
   body.mobile-show-canvas .canvas { height: 100%; min-height: 0; overflow: hidden; background-color: var(--canvas); background-image: radial-gradient(circle, var(--dot) 1px, transparent 1.2px); cursor: grab; }
-  body.mobile-show-canvas .world, body.mobile-show-canvas .brand-bar, body.mobile-show-canvas .search-tools, body.mobile-show-canvas .view-switcher, body.mobile-show-canvas .workflow-switcher, body.mobile-show-canvas .appearance-switcher, body.mobile-show-canvas .tool-bar, body.mobile-show-canvas .selection-bar, body.mobile-show-canvas .empty-cue, body.mobile-show-canvas .account-button { display: flex; }
+  body.mobile-show-canvas .brand-bar, body.mobile-show-canvas .search-tools, body.mobile-show-canvas .view-switcher, body.mobile-show-canvas .workflow-switcher, body.mobile-show-canvas .appearance-switcher, body.mobile-show-canvas .tool-bar, body.mobile-show-canvas .selection-bar, body.mobile-show-canvas .empty-cue, body.mobile-show-canvas .account-button { display: none; }
   body.mobile-show-canvas .world { display: block; }
-  body.mobile-show-canvas .empty-cue { display: block; }
+  body.mobile-show-canvas .empty-cue { display: none; }
+  body.mobile-show-canvas .mobile-canvas-back-button { display: inline-flex; }
+  .mobile-canvas-back-button { position: fixed; top: max(14px, env(safe-area-inset-top)); left: 14px; z-index: 50; align-items: center; min-height: 40px; padding: 0 13px; border: 1px solid rgba(22,22,24,.12); border-radius: 12px; background: rgba(255,255,255,.9); color: var(--ink); font-size: 13px; box-shadow: 0 6px 20px rgba(20,20,22,.08); }
+  .mobile-focus-dialog { position: fixed; inset: 0; z-index: 90; display: flex; flex-direction: column; overflow-y: auto; background: #f7f7f5; }
+  .mobile-focus-dialog[hidden] { display: none; }
+  .mobile-focus-header { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; min-height: 58px; padding: max(8px, env(safe-area-inset-top)) 16px 8px; border-bottom: 1px solid var(--hairline); background: rgba(255,255,255,.8); }
+  .mobile-focus-header > span { color: var(--muted); font-size: 12px; }
+  .mobile-focus-back, .mobile-focus-close { border: 0; background: transparent; color: var(--ink); font-size: 14px; text-align: left; }
+  .mobile-focus-close { justify-self: end; font-size: 25px; font-weight: 300; }
+  .mobile-focus-content { flex: 1; padding: 28px 20px 22px; }
+  .mobile-focus-type { color: var(--muted); font-size: 11px; }
+  .mobile-focus-content h2 { margin: 10px 0 24px; font-size: 25px; line-height: 1.35; }
+  .mobile-focus-text { margin: 0; white-space: pre-wrap; font-size: 17px; line-height: 1.8; }
+  .mobile-focus-link { display: block; padding: 17px; border: 1px solid var(--hairline); border-radius: 13px; background: #fff; color: var(--accent); font-size: 14px; line-height: 1.6; overflow-wrap: anywhere; }
+  .mobile-focus-media { display: block; width: 100%; max-height: 58vh; object-fit: contain; border-radius: 14px; background: #eae9e4; }
+  .mobile-focus-footer { padding: 14px 20px max(20px, env(safe-area-inset-bottom)); border-top: 1px solid var(--hairline); background: rgba(255,255,255,.82); }
+  .mobile-focus-footer button { width: 100%; min-height: 46px; }
   .brand-bar { top: 12px; left: 12px; }
   .account-button { top: 12px; right: 12px; min-width: 44px; width: 44px; padding: 5px; }
   .account-copy { display: none; }

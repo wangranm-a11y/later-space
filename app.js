@@ -75,6 +75,7 @@ const state = {
   globalCoverPreference: localStorage.getItem("later-space-global-cover-mode") || "editorial",
   globalTextPreference: localStorage.getItem("later-space-global-text-theme") || "paper",
   deferredInstallPrompt: null,
+  mobileCanvasRecordId: null,
 };
 
 const elements = {
@@ -252,6 +253,12 @@ const elements = {
   mobileSyncButton: document.querySelector("#mobileSyncButton"),
   mobileInstallButton: document.querySelector("#mobileInstallButton"),
   syncInstallButton: document.querySelector("#syncInstallButton"),
+  mobileCanvasBackButton: document.querySelector("#mobileCanvasBackButton"),
+  mobileFocusDialog: document.querySelector("#mobileFocusDialog"),
+  mobileFocusContent: document.querySelector("#mobileFocusContent"),
+  mobileFocusBackButton: document.querySelector("#mobileFocusBackButton"),
+  mobileFocusCloseButton: document.querySelector("#mobileFocusCloseButton"),
+  mobileFocusCanvasButton: document.querySelector("#mobileFocusCanvasButton"),
   installBackdrop: document.querySelector("#installBackdrop"),
   installDialog: document.querySelector("#installDialog"),
   closeInstallButton: document.querySelector("#closeInstallButton"),
@@ -1137,7 +1144,7 @@ function renderAccountEntry() {
 }
 
 function render() {
-  const filteredRecords = visibleRecords();
+  const filteredRecords = mobileCanvasRecords();
   const renderedRecords = recordsNearViewport(filteredRecords);
   if (filteredRecords.length >= 80) {
     const renderedIds = new Set(renderedRecords.map((record) => record.id));
@@ -1216,6 +1223,53 @@ function renderMobileInbox() {
     const icon = record.kind === "link" ? "↗" : record.kind === "text" ? "✎" : record.kind === "video" ? "▶" : "▧";
     return `<button class="mobile-inbox-item" type="button" data-mobile-record-id="${escapeHtml(record.id)}"><span class="mobile-inbox-thumb">${media || icon}</span><span class="mobile-inbox-meta"><strong>${escapeHtml(mobileRecordTitle(record))}</strong><span>${escapeHtml(mobileRecordMeta(record))}</span></span><span class="mobile-inbox-arrow" aria-hidden="true">›</span></button>`;
   }).join("");
+}
+
+function mobileCanvasRecords() {
+  const records = visibleRecords();
+  if (!document.body.classList.contains("mobile-show-canvas") || !state.mobileCanvasRecordId) return records;
+  return records.filter((record) => record.id === state.mobileCanvasRecordId);
+}
+
+function openMobileFocus(record) {
+  if (!record || !elements.mobileFocusDialog || !elements.mobileFocusContent) return;
+  const media = isMediaRecord(record) ? imageUrl(record) : "";
+  const body = record.kind === "text"
+    ? `<p class="mobile-focus-text">${escapeHtml(record.text || "")}</p>`
+    : record.kind === "link"
+      ? `<a class="mobile-focus-link" href="${escapeHtml(record.url || "#")}" target="_blank" rel="noopener noreferrer">${escapeHtml(record.url || "打开原链接")} ↗</a>`
+      : record.kind === "video"
+        ? `<video class="mobile-focus-media" src="${escapeHtml(media)}" controls playsinline></video>`
+        : `<img class="mobile-focus-media" src="${escapeHtml(media)}" alt="" />`;
+  elements.mobileFocusContent.innerHTML = `<span class="mobile-focus-type">${escapeHtml(mobileRecordMeta(record))}</span><h2 id="mobileFocusTitle">${escapeHtml(mobileRecordTitle(record))}</h2>${body}`;
+  elements.mobileFocusContent.dataset.recordId = record.id;
+  elements.mobileFocusDialog.hidden = false;
+}
+
+function closeMobileFocus() {
+  if (!elements.mobileFocusDialog) return;
+  elements.mobileFocusDialog.hidden = true;
+  elements.mobileFocusContent.innerHTML = "";
+  delete elements.mobileFocusContent.dataset.recordId;
+}
+
+function enterMobileCanvas() {
+  const recordId = elements.mobileFocusContent?.dataset.recordId || state.selectedId;
+  if (!recordId) return;
+  state.mobileCanvasRecordId = recordId;
+  closeMobileFocus();
+  document.body.classList.add("mobile-show-canvas");
+  elements.mobileCanvasBackButton.hidden = false;
+  fitAll();
+  render();
+}
+
+function leaveMobileCanvas() {
+  state.mobileCanvasRecordId = null;
+  document.body.classList.remove("mobile-show-canvas");
+  elements.mobileCanvasBackButton.hidden = true;
+  elements.mobileCanvasButton.textContent = "打开画布";
+  render();
 }
 
 function isStandaloneMode() {
@@ -2221,7 +2275,7 @@ function zoomAt(clientX, clientY, factor) {
 }
 
 function fitAll() {
-  const filteredRecords = visibleRecords();
+  const filteredRecords = mobileCanvasRecords();
   if (!filteredRecords.length) return resetView();
   const bounds = filteredRecords.reduce((result, item) => {
     const height = itemHeight(item);
@@ -3947,23 +4001,24 @@ function bindEvents() {
   elements.installBackdrop?.addEventListener("click", closeInstallDialog);
   elements.installNativePromptButton?.addEventListener("click", installLaterSpace);
   elements.mobileCanvasButton?.addEventListener("click", () => {
+    state.mobileCanvasRecordId = null;
     document.body.classList.toggle("mobile-show-canvas");
+    elements.mobileCanvasBackButton.hidden = !document.body.classList.contains("mobile-show-canvas");
     elements.mobileCanvasButton.textContent = document.body.classList.contains("mobile-show-canvas") ? "返回收件箱" : "打开画布";
     if (document.body.classList.contains("mobile-show-canvas")) fitAll();
+    else render();
   });
+  elements.mobileCanvasBackButton?.addEventListener("click", leaveMobileCanvas);
+  elements.mobileFocusBackButton?.addEventListener("click", closeMobileFocus);
+  elements.mobileFocusCloseButton?.addEventListener("click", closeMobileFocus);
+  elements.mobileFocusCanvasButton?.addEventListener("click", enterMobileCanvas);
   elements.mobileInboxList?.addEventListener("click", (event) => {
     const button = event.target.closest("[data-mobile-record-id]");
     if (!button) return;
     const record = state.images.find((entry) => entry.id === button.dataset.mobileRecordId);
     if (!record) return;
-    if (record.kind === "link" && record.url) window.open(record.url, "_blank", "noopener,noreferrer");
-    else {
-      document.body.classList.add("mobile-show-canvas");
-      elements.mobileCanvasButton.textContent = "返回收件箱";
-      state.selectedId = record.id;
-      fitAll();
-      render();
-    }
+    state.selectedId = record.id;
+    openMobileFocus(record);
   });
   elements.copyImageButton.addEventListener("click", copySelectedImage);
   elements.cropImageButton.addEventListener("click", openCropEditor);

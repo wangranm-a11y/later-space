@@ -130,6 +130,7 @@
         <div class="mobile-inbox-list" id="mobileInboxList"></div>
         <div class="mobile-inbox-empty" id="mobileInboxEmpty" hidden><span>🫳</span><strong>这里还没有内容</strong><p>去 Safari 或其他 App 点“分享”，选择 Later Space。</p></div>
       </section>
+      <button class="mobile-canvas-back-button" id="mobileCanvasBackButton" type="button" hidden>‹ 返回收件箱</button>
 
       <div class="floating selection-bar" id="selectionBar" hidden>
         <span id="selectionName">图片</span>
@@ -274,6 +275,15 @@
       </div>
       <button class="primary-button install-native-prompt" id="installNativePromptButton" type="button" hidden>安装 Later Space</button>
       <p class="install-dialog-hint" id="installHint">iPhone：按上面 3 步添加即可。</p>
+    </section>
+    <section class="mobile-focus-dialog" id="mobileFocusDialog" role="dialog" aria-modal="true" aria-labelledby="mobileFocusTitle" hidden>
+      <header class="mobile-focus-header">
+        <button class="mobile-focus-back" id="mobileFocusBackButton" type="button">‹ 收件箱</button>
+        <span>专注查看</span>
+        <button class="mobile-focus-close" id="mobileFocusCloseButton" type="button" aria-label="关闭内容">×</button>
+      </header>
+      <article class="mobile-focus-content" id="mobileFocusContent"></article>
+      <footer class="mobile-focus-footer"><button class="secondary-button" id="mobileFocusCanvasButton" type="button">在完整画布中查看</button></footer>
     </section>
     <section class="capture-dialog" id="captureDialog" role="dialog" aria-modal="true" aria-labelledby="captureTitle" hidden>
       <div class="capture-dialog-header">
