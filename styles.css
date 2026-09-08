@@ -329,6 +329,10 @@ kbd { min-width: 26px; height: 24px; display: grid; place-items: center; padding
 .toast { position: fixed; left: 50%; bottom: 84px; z-index: 100; display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-radius: 8px; background: rgba(29,29,31,.92); color: white; font-size: 12px; box-shadow: 0 8px 24px rgba(0,0,0,.15); opacity: 0; pointer-events: none; transform: translate(-50%, 8px); transition: opacity 180ms ease, transform 180ms ease; }
 .toast.is-visible { opacity: 1; pointer-events: auto; transform: translate(-50%, 0); }
 .toast button { padding: 0; border: 0; background: transparent; color: #d9dcff; font: inherit; font-weight: 600; cursor: pointer; }
+.toast-success-mark { display: none; width: 20px; height: 20px; place-items: center; border-radius: 50%; background: #718e64; color: #fff; font-size: 13px; font-weight: 700; }
+.toast-success-mark:not([hidden]) { display: grid; animation: success-pop 220ms cubic-bezier(.2,.8,.2,1); }
+.toast.is-capture-success { background: #718e64; color: #fff; }
+@keyframes success-pop { from { opacity: 0; transform: scale(.65); } to { opacity: 1; transform: scale(1); } }
 
 .capture-backdrop { position: fixed; inset: 0; z-index: 80; background: rgba(20,20,22,.28); backdrop-filter: blur(4px); }
 .capture-dialog { position: fixed; left: 50%; top: 50%; z-index: 81; width: min(520px, calc(100vw - 28px)); padding: 20px; border: 1px solid var(--hairline); border-radius: 14px; background: rgba(255,255,255,.97); box-shadow: 0 24px 70px rgba(20,20,22,.2); transform: translate(-50%, -50%); }

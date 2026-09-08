@@ -168,6 +168,7 @@ const elements = {
   addContentButton: document.querySelector("#addContentButton"),
   dropState: document.querySelector("#dropState"),
   toast: document.querySelector("#toast"),
+  toastSuccessMark: document.querySelector("#toastSuccessMark"),
   toastMessage: document.querySelector("#toastMessage"),
   toastAction: document.querySelector("#toastAction"),
   cropBackdrop: document.querySelector("#cropBackdrop"),
@@ -3481,7 +3482,7 @@ async function importExternalInbox() {
       else if (entry.text) await saveText(entry.text, screenCenter());
       imported += 1;
     }
-    if (imported) showToast(`${imported} 条新收藏已进入收件箱`);
+    if (imported) showCaptureSuccess(imported === 1 ? "已加入 Later Space" : `${imported} 条内容已加入 Later Space`);
   } catch {
   } finally {
     state.externalInboxImporting = false;
@@ -3576,10 +3577,11 @@ function bindExtensionBridge() {
     }
     let result;
     try {
-      result = await importExtensionCapture(event.data.capture);
+    result = await importExtensionCapture(event.data.capture);
     } catch {
       result = { state: "unavailable" };
     }
+    if (["saved", "duplicate"].includes(result.state)) showCaptureSuccess("已加入 Later Space");
     window.postMessage({ source: "later-space-page", requestId: event.data.requestId, result: { ...result, destination } }, location.origin);
   });
 }
@@ -3866,6 +3868,8 @@ async function exportBackup() {
 let toastTimer;
 function showToast(message, actionLabel = "", action = null) {
   clearTimeout(toastTimer);
+  elements.toast.classList.remove("is-capture-success");
+  elements.toastSuccessMark.hidden = true;
   elements.toastMessage.textContent = message;
   elements.toastAction.textContent = actionLabel;
   elements.toastAction.hidden = !actionLabel;
@@ -3878,6 +3882,12 @@ function showToast(message, actionLabel = "", action = null) {
     elements.toast.classList.remove("is-visible");
     elements.toastAction.hidden = true;
   }, actionLabel ? 5000 : 2200);
+}
+
+function showCaptureSuccess(message = "已加入 Later Space") {
+  showToast(message);
+  elements.toast.classList.add("is-capture-success");
+  elements.toastSuccessMark.hidden = false;
 }
 
 function bindEvents() {

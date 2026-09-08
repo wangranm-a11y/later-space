@@ -58,9 +58,9 @@ elements.save.addEventListener("click", async () => {
   catch { result = { state: "unavailable" }; }
   const saved = ["saved", "duplicate"].includes(result?.state);
   elements.save.classList.add(saved ? "is-saved" : "is-queued");
-  elements.save.querySelector("span").textContent = saved ? "已经接住" : result?.state === "queued" ? "已放入待发送" : "暂时没有接住";
+  elements.save.querySelector("span").textContent = saved ? "已加入 Later Space" : result?.state === "queued" ? "已放入待发送" : "暂时没有接住";
   elements.save.querySelector("b").textContent = saved ? "✓" : "↻";
-  elements.status.textContent = saved ? "可以继续浏览了。" : "内容没有丢，正在检查连接。";
+  elements.status.textContent = saved ? "已加入 Later Space，可以继续浏览了。" : "内容没有丢，正在检查连接。";
   globalThis.laterSpaceSound?.play(result?.state);
   if (result?.destination?.label) elements.destination.textContent = result.destination.label;
   undoToken = result?.undoToken || "";

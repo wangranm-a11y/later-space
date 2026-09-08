@@ -265,10 +265,10 @@ function showFeedback(message) {
   document.querySelector("#later-space-feedback")?.remove();
   const toast = document.createElement("div");
   toast.id = "later-space-feedback";
-  toast.style.cssText = "position:fixed;right:20px;top:20px;z-index:2147483647;display:flex;align-items:center;gap:10px;min-width:178px;max-width:340px;padding:10px 11px;border:1px solid rgba(25,25,27,.11);border-radius:9px;background:#fff;color:#202124;box-shadow:0 10px 30px rgba(20,20,22,.16);font:12px/1.4 -apple-system,BlinkMacSystemFont,'PingFang SC',sans-serif;transform:translateY(0);opacity:1;transition:transform .18s ease-out,opacity .18s ease-out";
+  toast.style.cssText = "position:fixed;right:20px;top:20px;z-index:2147483647;display:flex;align-items:center;gap:10px;min-width:178px;max-width:340px;padding:10px 11px;border:1px solid rgba(113,142,100,.24);border-radius:9px;background:#f3f7f0;color:#202124;box-shadow:0 10px 30px rgba(66,85,58,.16);font:12px/1.4 -apple-system,BlinkMacSystemFont,'PingFang SC',sans-serif;transform:translateY(-8px);opacity:0;transition:transform .22s cubic-bezier(.2,.8,.2,1),opacity .22s ease-out";
   const check = document.createElement("span");
   check.textContent = "✓";
-  check.style.cssText = "font-size:16px;line-height:1";
+  check.style.cssText = "width:22px;height:22px;display:grid;place-items:center;flex:none;border-radius:50%;background:#718e64;color:#fff;font-size:14px;font-weight:700;line-height:1;transform:scale(.7);transition:transform .22s cubic-bezier(.2,.8,.2,1)";
   toast.append(check);
   const label = document.createElement("span");
   label.textContent = message.text;
@@ -305,8 +305,13 @@ function showFeedback(message) {
   requestAnimationFrame(() => {
     toast.style.transform = "translateY(0)";
     toast.style.opacity = "1";
+    check.style.transform = "scale(1)";
   });
-  setTimeout(() => toast.remove(), message.undoToken ? 6000 : 3200);
+  setTimeout(() => {
+    toast.style.transform = "translateY(-5px)";
+    toast.style.opacity = "0";
+    setTimeout(() => toast.remove(), 220);
+  }, message.undoToken ? 6000 : 2800);
 }
 
 function receiveRuntimeMessage(message, _sender, sendResponse) {
