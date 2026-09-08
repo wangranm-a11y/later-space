@@ -65,7 +65,9 @@ class ExtensionOnboardingContractTests(unittest.TestCase):
         self.assertIn("#718e64", WELCOME_CSS)
 
     def test_release_version_is_current(self):
-        self.assertIn('"version": "1.9.7"', MANIFEST)
+        self.assertIn('"version": "1.9.8"', MANIFEST)
+        self.assertIn('"https://wangranm-a11y.github.io/later-space/", "https://wangranm-a11y.github.io/later-space/index.html"', MANIFEST)
+        self.assertNotIn('"exclude_matches": ["https://wangranm-a11y.github.io/later-space/*"]', MANIFEST)
 
     def test_connection_can_be_diagnosed_and_repaired(self):
         self.assertIn("async function connectionDiagnosis()", WORKER)
