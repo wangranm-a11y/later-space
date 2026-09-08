@@ -24,11 +24,11 @@ Later Space Collector 是 Later Space 的网页侧轻量入口：用户不必离
 
 - 插件名称：`Later Space Collector`
 - Manifest：Chrome Manifest V3
-- 源码版本：`1.9.6`
+- 源码版本：`1.9.7`
 - 正式网页：`https://wangranm-a11y.github.io/later-space/`
 - 插件源码：`extensions/later-space/`
 - 正式安装包内目录：`later-space-chrome-extension/`（固定名称，便于覆盖升级）
-- 正式安装包：`dist/later-space-chrome-extension-v1.9.6.zip`
+- 正式安装包：`dist/later-space-chrome-extension-v1.9.7.zip`
 
 ## 4. 用户可见的收藏入口
 
@@ -353,7 +353,7 @@ Ego Lite 更新当前活动插件目录：
 rsync -a --delete extensions/later-space/ dist/later-space-chrome-extension-v1.3.0/
 ```
 
-同步后必须在 `chrome://extensions/` 点击 Later Space Collector 的 Reload，并确认显示版本 `1.9.6`。
+同步后必须在 `chrome://extensions/` 点击 Later Space Collector 的 Reload，并确认显示版本 `1.9.7`。
 
 ## 16. 可用于 HTML 叙事页的真实主线
 
@@ -374,7 +374,7 @@ rsync -a --delete extensions/later-space/ dist/later-space-chrome-extension-v1.3
 
 适合保留的真实数字：
 
-- 从 `1.1.0` 到 `1.9.6`
+- 从 `1.1.0` 到 `1.9.7`
 - 约 20 轮插件相关 Git 提交
 - 20 多个历史安装包
 - 10ms 选区按钮响应

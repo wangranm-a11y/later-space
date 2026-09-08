@@ -9,6 +9,7 @@ const LAST_FAILURE_KEY = "laterSpaceLastFailure";
 const ONBOARDING_STATE_KEY = "laterSpaceOnboardingState";
 const ONBOARDING_VERSION = 1;
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
+const MAX_SOURCE_IMAGE_BYTES = 40 * 1024 * 1024;
 
 function defaultOnboardingState() {
   return { version: ONBOARDING_VERSION, step: 1, completed: false, sessionId: captureId(), recordIds: [], queuedCaptureIds: [], keepPractice: false };
@@ -75,16 +76,36 @@ async function directCloudCapture(capture) {
   const cloud = session?.user?.id ? { session } : null;
   if (!cloud) return null;
   const id = capture.id || captureId();
-  let assetPath = null;
+  let asset = null;
   if (capture.kind === "image" && capture.imageData) {
     const blob = dataUrlToBlob(capture.imageData);
-    assetPath = `${cloud.session.user.id}/${id}/${now}.jpg`;
-    const asset = await cloudRequest(`/storage/v1/object/later-space-media/${assetPath}`, { method: "POST", headers: { "Content-Type": blob.type, "x-upsert": "true" }, body: blob });
-    if (!asset?.response.ok) throw new Error("cloud asset upload failed");
+    const uploadUrl = new URL(`${SUPABASE_URL}/functions/v1/mobile-inbox`);
+    uploadUrl.searchParams.set("mode", "asset");
+    uploadUrl.searchParams.set("record_id", id);
+    const response = await fetch(uploadUrl, {
+      method: "POST",
+      headers: {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${cloud.session.access_token}`,
+        "Content-Type": blob.type || "image/jpeg",
+        "X-Later-Space-Kind": "image",
+        "X-Later-Space-Name": capture.name || "网页图片.jpg",
+      },
+      body: blob,
+    });
+    if (!response.ok) throw new Error(await response.text() || "cloud asset upload failed");
+    asset = await response.json();
   }
-  const row = { id, user_id: cloud.session.user.id, kind: capture.kind || "link", data: cloudRecordData(capture, now), asset_path: assetPath, source_device_id: `extension-${chrome.runtime.id}`, client_updated_at: now, deleted_at: null };
+  const row = { id, user_id: cloud.session.user.id, kind: capture.kind || "link", data: cloudRecordData(capture, now), asset_path: asset?.assetPath || null, asset_bytes: asset?.assetBytes || 0, content_hash: asset?.contentHash || null, source_device_id: `extension-${chrome.runtime.id}`, client_updated_at: now, deleted_at: null };
   const result = await cloudRequest("/rest/v1/later_space_items?on_conflict=id", { method: "POST", headers: { "Content-Type": "application/json", Prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify([row]) });
-  if (!result?.response.ok) throw new Error(await result?.response.text());
+  if (!result?.response.ok) {
+    if (asset?.assetPath && asset?.assetBytes) {
+      const discardUrl = new URL(`${SUPABASE_URL}/functions/v1/mobile-inbox`);
+      discardUrl.searchParams.set("mode", "discard");
+      await fetch(discardUrl, { method: "POST", headers: { Authorization: `Bearer ${cloud.session.access_token}`, "Content-Type": "application/json" }, body: JSON.stringify({ assetPath: asset.assetPath, assetBytes: asset.assetBytes }) }).catch(() => null);
+    }
+    throw new Error(await result?.response.text());
+  }
   return { state: "saved", recordIds: [id], windowId: capture.windowId, capture: captureSummary(capture), destination: { label: `${cloud.session.user.email || "Later Space"} · 云端同步已开启`, email: cloud.session.user.email, synced: true } };
 }
 
@@ -167,17 +188,32 @@ async function deliverToTab(tabId, capture) {
 async function saveCapture(capture) {
   const normalized = { id: capture.id || captureId(), createdAt: capture.createdAt || Date.now(), source: "chrome-extension", ...capture };
   await queueCapture(normalized);
+  let directFailure = null;
   try {
     const direct = await directCloudCapture(normalized);
     if (direct) {
       await removeQueued(normalized.id);
       return direct;
     }
+  } catch (error) {
+    directFailure = error;
+  }
+  try {
     return await sendCapture(normalized);
   } catch (error) {
-    await chrome.storage.local.set({ [LAST_FAILURE_KEY]: { message: error?.message || "capture failed", at: Date.now() } });
+    await chrome.storage.local.set({ [LAST_FAILURE_KEY]: { message: error?.message || directFailure?.message || "capture failed", at: Date.now(), kind: normalized.kind || "link" } });
     return { state: "queued", windowId: normalized.windowId, capture: captureSummary(normalized) };
   }
+}
+
+async function cancelCaptureQueue() {
+  const stored = await chrome.storage.local.get({ [QUEUE_KEY]: [], [LAST_CAPTURE_KEY]: null });
+  const cancelled = stored[QUEUE_KEY].length;
+  await chrome.storage.local.set({ [QUEUE_KEY]: [] });
+  await chrome.storage.local.remove(LAST_FAILURE_KEY);
+  if (stored[LAST_CAPTURE_KEY]?.state === "queued") await chrome.storage.local.remove(LAST_CAPTURE_KEY);
+  await chrome.action.setBadgeText({ text: "" });
+  return { cancelled, diagnosis: await connectionDiagnosis() };
 }
 
 function captureSummary(capture) {
@@ -559,8 +595,9 @@ async function imageCapture(srcUrl, pageUrl, windowId) {
   const response = await fetch(srcUrl, { credentials: "include" });
   if (!response.ok) throw new Error("image fetch failed");
   const blob = await response.blob();
-  if (!blob.type.startsWith("image/") || blob.size > MAX_IMAGE_BYTES) throw new Error("image too large");
+  if (blob.size > MAX_SOURCE_IMAGE_BYTES) throw new Error("image source too large");
   const optimized = await optimizedImage(blob);
+  if (optimized.size > MAX_IMAGE_BYTES) throw new Error("optimized image too large");
   const name = decodeURIComponent(new URL(srcUrl).pathname.split("/").pop() || "网页图片").slice(0, 180);
   return saveCapture({ kind: "image", imageData: await blobToDataUrl(optimized), mimeType: optimized.type, name: name.replace(/\.[^.]+$/, "") + ".jpg", pageUrl, windowId });
 }
@@ -696,6 +733,10 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   }
   if (message.type === "repair-connection") {
     repairConnection().then(sendResponse).catch(() => sendResponse({ state: "unknown", queued: 0, title: "暂时没有修好", detail: "收藏仍在插件中，可以稍后再次修复。", repairable: true }));
+    return true;
+  }
+  if (message.type === "cancel-queue") {
+    cancelCaptureQueue().then(sendResponse).catch(() => sendResponse({ cancelled: 0 }));
     return true;
   }
   if (message.type === "destination-status") {

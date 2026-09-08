@@ -64,8 +64,8 @@ class ExtensionOnboardingContractTests(unittest.TestCase):
         self.assertIn("width: 28px", WELCOME_CSS)
         self.assertIn("#718e64", WELCOME_CSS)
 
-    def test_release_version_is_1_9_5(self):
-        self.assertIn('"version": "1.9.6"', MANIFEST)
+    def test_release_version_is_current(self):
+        self.assertIn('"version": "1.9.7"', MANIFEST)
 
     def test_connection_can_be_diagnosed_and_repaired(self):
         self.assertIn("async function connectionDiagnosis()", WORKER)
@@ -98,6 +98,23 @@ class ExtensionOnboardingContractTests(unittest.TestCase):
         self.assertIn("内容没有丢", popup_js)
         self.assertIn('id="diagnosis"', POPUP)
         self.assertIn('id="repair"', POPUP)
+
+    def test_queued_captures_can_be_cancelled(self):
+        popup_script = (EXTENSION / "popup.js").read_text(encoding="utf-8")
+        self.assertIn('id="cancelQueue"', POPUP)
+        self.assertIn('type: "cancel-queue"', popup_script)
+        self.assertIn('message.type === "cancel-queue"', WORKER)
+        self.assertIn("async function cancelCaptureQueue()", WORKER)
+
+    def test_image_capture_uses_capacity_checked_upload_and_fallback(self):
+        direct = WORKER[WORKER.index("async function directCloudCapture") : WORKER.index("function captureId")]
+        save = WORKER[WORKER.index("async function saveCapture") : WORKER.index("function captureSummary")]
+        self.assertIn('/functions/v1/mobile-inbox', direct)
+        self.assertIn('uploadUrl.searchParams.set("mode", "asset")', direct)
+        self.assertNotIn('/storage/v1/object/later-space-media/', direct)
+        self.assertIn("directFailure", save)
+        self.assertIn("return await sendCapture(normalized)", save)
+        self.assertIn("MAX_SOURCE_IMAGE_BYTES", WORKER)
 
 
 if __name__ == "__main__":

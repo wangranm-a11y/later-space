@@ -125,23 +125,20 @@ function floatingButton(label, kind = "image") {
   button.dataset.laterSpaceFloating = "true";
   button.setAttribute("aria-label", label);
   const isSelection = kind === "selection";
-  if (isSelection) button.append(selectionMark());
-  else button.innerHTML = `<svg viewBox="0 0 128 128" width="22" height="22" aria-hidden="true"><path d="M28 37v54c0 7 5 12 12 12h54" fill="none" stroke="#1c1c1e" stroke-width="15" stroke-linecap="square"/><rect x="62" y="24" width="39" height="45" rx="7" fill="#a8c49a" transform="rotate(7 81.5 46.5)"/></svg>`;
+  button.append(selectionMark());
   button.style.cssText = isSelection
     ? "position:fixed;z-index:2147483646;width:28px;height:28px;display:grid;place-items:center;padding:0;border:1px solid #d9ded5;border-radius:50%;background:#fff;box-shadow:0 5px 13px rgba(66,85,58,.13);cursor:pointer;transition:transform .14s ease,opacity .22s ease,background .14s ease,box-shadow .14s ease,border-color .14s ease"
-    : "position:fixed;z-index:2147483646;width:30px;height:30px;display:grid;place-items:center;padding:0;border:1px solid #d8d8d2;border-radius:8px;background:#f8f7f2;box-shadow:0 5px 14px rgba(37,38,49,.11);cursor:pointer;transition:transform .14s ease,background .14s ease,box-shadow .14s ease";
+    : "position:fixed;z-index:2147483646;width:30px;height:30px;display:grid;place-items:center;padding:0;border:1px solid #d9ded5;border-radius:50%;background:#fff;box-shadow:0 5px 13px rgba(66,85,58,.13);cursor:pointer;transition:transform .14s ease,opacity .22s ease,background .14s ease,box-shadow .14s ease,border-color .14s ease";
   button.addEventListener("mouseenter", () => {
     if (button.disabled) return;
     button.style.transform = "translateY(-1px) scale(1.06)";
-    if (isSelection) setSelectionButtonHover(button, true);
-    else button.style.background = "#ffffff";
+    setSelectionButtonHover(button, true);
     button.style.boxShadow = "0 7px 18px rgba(37,38,49,.15)";
   });
   button.addEventListener("mouseleave", () => {
     button.style.transform = "";
     if (button.disabled) return;
-    if (isSelection) setSelectionButtonHover(button, false);
-    else button.style.background = "#f8f7f2";
+    setSelectionButtonHover(button, false);
     button.style.boxShadow = isSelection ? "0 5px 13px rgba(66,85,58,.13)" : "0 5px 14px rgba(37,38,49,.11)";
   });
   button.addEventListener("pointerdown", () => { globalThis.laterSpaceSound?.prepare(); button.style.transform = "translateY(-1px) scale(.96)"; });

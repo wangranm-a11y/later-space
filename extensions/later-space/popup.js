@@ -3,7 +3,7 @@ brandStylesheet.rel = "stylesheet";
 brandStylesheet.href = "brand.css";
 document.head.append(brandStylesheet);
 
-const elements = Object.fromEntries(["status", "pageTitle", "save", "destination", "undo", "view", "recent", "recentView", "recentKind", "recentTitle", "diagnosis", "diagnosisEyebrow", "diagnosisTitle", "diagnosisDetail", "healthDot", "repair", "connect", "guide", "settings", "retry"].map((id) => [id, document.querySelector(`#${id}`)]));
+const elements = Object.fromEntries(["status", "pageTitle", "save", "destination", "undo", "view", "recent", "recentView", "recentKind", "recentTitle", "diagnosis", "diagnosisEyebrow", "diagnosisTitle", "diagnosisDetail", "healthDot", "repair", "cancelQueue", "connect", "guide", "settings", "retry"].map((id) => [id, document.querySelector(`#${id}`)]));
 let undoToken = "";
 let recordIds = [];
 let currentTabId = null;
@@ -29,6 +29,7 @@ function renderDiagnosis(result = {}) {
   elements.diagnosisTitle.textContent = result.title || "连接需要检查";
   elements.diagnosisDetail.textContent = result.detail || "收藏会先保留在插件中。";
   elements.repair.hidden = result.repairable === false;
+  elements.cancelQueue.hidden = !result.queued;
   elements.repair.disabled = false;
   elements.repair.textContent = ["auth", "needs-login"].includes(result.state) ? "重新连接" : "修复并重试";
 }
@@ -83,6 +84,15 @@ elements.repair.addEventListener("click", async () => {
   if (result.sent) elements.status.textContent = `已补送 ${result.sent} 条内容`;
   renderDiagnosis(result);
   renderRecent(await chrome.runtime.sendMessage({ type: "recent-capture" }).catch(() => null));
+});
+
+elements.cancelQueue.addEventListener("click", async () => {
+  elements.cancelQueue.disabled = true;
+  const result = await chrome.runtime.sendMessage({ type: "cancel-queue" }).catch(() => null);
+  elements.status.textContent = result?.cancelled ? `已取消 ${result.cancelled} 条等待补送` : "没有需要取消的内容";
+  elements.recent.hidden = true;
+  renderDiagnosis(result?.diagnosis || await refreshDiagnosis());
+  elements.cancelQueue.disabled = false;
 });
 
 elements.recentView.addEventListener("click", async () => { if (recordIds.length) await chrome.runtime.sendMessage({ type: "view-capture", recordIds }); else window.open("https://wangranm-a11y.github.io/later-space/", "_blank"); });

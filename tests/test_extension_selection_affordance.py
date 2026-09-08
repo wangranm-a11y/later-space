@@ -17,7 +17,7 @@ class ExtensionSelectionAffordanceTests(unittest.TestCase):
         self.assertIn("}, SELECTION_BUTTON_DELAY_MS);", FEEDBACK)
 
     def test_extension_version_is_bumped(self):
-        self.assertIn('"version": "1.9.6"', MANIFEST)
+        self.assertIn('"version": "1.9.7"', MANIFEST)
 
     def test_selection_button_uses_centered_moss_plus(self):
         self.assertIn('function selectionMark()', FEEDBACK)
@@ -29,6 +29,12 @@ class ExtensionSelectionAffordanceTests(unittest.TestCase):
         self.assertIn('background:#718e64', FEEDBACK)
         self.assertIn('style.setProperty("background"', FEEDBACK)
         self.assertIn('"important"', FEEDBACK)
+
+    def test_image_hover_button_uses_the_same_plus_mark(self):
+        floating = FEEDBACK[FEEDBACK.index("function floatingButton") : FEEDBACK.index("function removeFloatingButton")]
+        self.assertIn("button.append(selectionMark())", floating)
+        self.assertNotIn("<svg viewBox=", floating)
+        self.assertIn('border-radius:50%', floating)
 
     def test_selection_button_changes_to_check_before_removal(self):
         self.assertIn('setSelectionButtonSaved(savedButton);', FEEDBACK)
