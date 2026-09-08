@@ -4,10 +4,14 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#f7f7f5" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Later Space" />
+    <meta name="mobile-web-app-capable" content="yes" />
     <title>Later Space</title>
     <link rel="icon" href="assets/favicon.svg?v=2" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="assets/apple-touch-icon.png?v=2" />
-    <link rel="stylesheet" href="styles.css?v=80" />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="stylesheet" href="styles.css?v=81" />
   </head>
   <body>
     <main class="canvas" id="canvas" tabindex="0" aria-label="Later Space 无限内容画布">
@@ -120,6 +124,7 @@
         <div class="mobile-inbox-actions">
           <button class="mobile-primary-action" id="mobileAddButton" type="button"><span>＋</span>添加内容</button>
           <button class="mobile-secondary-action" id="mobileCanvasButton" type="button">打开画布</button>
+          <button class="mobile-install-action" id="mobileInstallButton" type="button">安装到主屏幕</button>
         </div>
         <div class="mobile-inbox-summary"><strong id="mobileInboxCount">0 条收藏</strong><span id="mobileInboxUnsorted">0 条未整理</span></div>
         <div class="mobile-inbox-list" id="mobileInboxList"></div>
@@ -252,6 +257,23 @@
     </section>
 
     <div class="capture-backdrop" id="captureBackdrop" hidden></div>
+    <div class="install-backdrop" id="installBackdrop" hidden></div>
+    <section class="install-dialog" id="installDialog" role="dialog" aria-modal="true" aria-labelledby="installTitle" hidden>
+      <div class="install-dialog-header">
+        <div><span class="capture-eyebrow">只设置一次</span><h2 id="installTitle">把 Later Space 放到主屏幕</h2></div>
+        <button class="tool-button" id="closeInstallButton" type="button" aria-label="关闭安装提示">
+          <svg viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></svg>
+        </button>
+      </div>
+      <p class="install-dialog-intro">以后像打开普通 App 一样使用。你的登录状态和收藏会留在这个浏览器里。</p>
+      <div class="install-steps" id="installIosSteps">
+        <div class="install-step"><b>01</b><div><strong>点 Safari 的分享按钮</strong><span>就是底部中间那个方框向上的箭头。</span></div></div>
+        <div class="install-step"><b>02</b><div><strong>选择“添加到主屏幕”</strong><span>如果没看到，向上滑一下分享菜单。</span></div></div>
+        <div class="install-step"><b>03</b><div><strong>点右上角“添加”</strong><span>回到主屏幕，就能直接打开 Later Space。</span></div></div>
+      </div>
+      <button class="primary-button install-native-prompt" id="installNativePromptButton" type="button" hidden>安装 Later Space</button>
+      <p class="install-dialog-hint" id="installHint">iPhone：按上面 3 步添加即可。</p>
+    </section>
     <section class="capture-dialog" id="captureDialog" role="dialog" aria-modal="true" aria-labelledby="captureTitle" hidden>
       <div class="capture-dialog-header">
         <div><span class="capture-eyebrow">统一入口</span><h2 id="captureTitle">添加到画布</h2></div>
@@ -335,6 +357,25 @@
     </section>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" defer></script>
     <script src="cloud-config.js?v=1"></script>
-    <script src="app.js?v=80" defer></script>
+    <script>
+      if ("serviceWorker" in navigator && location.protocol !== "file:") {
+        let refreshing = false;
+        navigator.serviceWorker.addEventListener("controllerchange", () => {
+          if (refreshing) return;
+          refreshing = true;
+          window.location.reload();
+        });
+        window.addEventListener("load", () => {
+          navigator.serviceWorker.register("sw.js", { updateViaCache: "none" })
+            .then((registration) => registration.update())
+            .catch(() => {});
+        });
+        document.addEventListener("visibilitychange", () => {
+          if (document.hidden) return;
+          navigator.serviceWorker.getRegistration().then((registration) => registration?.update()).catch(() => {});
+        });
+      }
+    </script>
+    <script src="app.js?v=81" defer></script>
   </body>
 </html>

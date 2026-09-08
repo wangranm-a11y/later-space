@@ -331,6 +331,21 @@ kbd { min-width: 26px; height: 24px; display: grid; place-items: center; padding
 .capture-backdrop { position: fixed; inset: 0; z-index: 80; background: rgba(20,20,22,.28); backdrop-filter: blur(4px); }
 .capture-dialog { position: fixed; left: 50%; top: 50%; z-index: 81; width: min(520px, calc(100vw - 28px)); padding: 20px; border: 1px solid var(--hairline); border-radius: 14px; background: rgba(255,255,255,.97); box-shadow: 0 24px 70px rgba(20,20,22,.2); transform: translate(-50%, -50%); }
 .capture-dialog[hidden], .capture-backdrop[hidden] { display: none; }
+.install-backdrop { position: fixed; inset: 0; z-index: 82; background: rgba(20,20,22,.28); backdrop-filter: blur(4px); }
+.install-dialog { position: fixed; left: 50%; top: 50%; z-index: 83; width: min(430px, calc(100vw - 28px)); padding: 22px; border: 1px solid var(--hairline); border-radius: 18px; background: rgba(255,255,255,.98); box-shadow: 0 24px 70px rgba(20,20,22,.2); transform: translate(-50%, -50%); }
+.install-dialog[hidden], .install-backdrop[hidden] { display: none; }
+.install-dialog-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.install-dialog h2 { margin: 0; font-size: 21px; font-weight: 650; line-height: 1.3; }
+.install-dialog-intro { margin: 14px 0 18px; color: var(--muted); font-size: 13px; line-height: 1.6; }
+.install-steps { display: grid; gap: 9px; }
+.install-steps[hidden] { display: none; }
+.install-step { display: grid; grid-template-columns: 34px 1fr; gap: 11px; align-items: start; padding: 13px; border-radius: 12px; background: #f6f6f3; }
+.install-step b { color: var(--accent); font: 700 11px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; }
+.install-step strong, .install-step span { display: block; }
+.install-step strong { font-size: 13px; }
+.install-step span { margin-top: 3px; color: var(--muted); font-size: 11px; line-height: 1.5; }
+.install-native-prompt { width: 100%; margin-top: 14px; }
+.install-dialog-hint { margin: 14px 0 0; color: var(--muted); font-size: 11px; line-height: 1.5; text-align: center; }
 .capture-dialog-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
 .capture-eyebrow { display: block; margin-bottom: 4px; color: var(--muted); font-size: 11px; }
 .capture-dialog h2 { margin: 0; font-size: 19px; font-weight: 600; }
@@ -593,6 +608,8 @@ button:focus-visible, .canvas-item:focus-visible { outline: 3px solid rgba(80,97
   .mobile-primary-action { border: 0; background: var(--ink); color: #fff; }
   .mobile-primary-action span { font-size: 20px; vertical-align: -1px; }
   .mobile-secondary-action { border: 1px solid var(--hairline); background: rgba(255,255,255,.68); color: var(--ink); }
+  .mobile-install-action { grid-column: 1 / -1; border: 1px dashed rgba(80,97,201,.38); background: rgba(255,255,255,.48); color: var(--accent); }
+  .mobile-install-action[hidden] { display: none; }
   .mobile-inbox-summary { display: flex; justify-content: space-between; align-items: baseline; padding: 0 2px 11px; border-bottom: 1px solid var(--hairline); }
   .mobile-inbox-summary strong { font-size: 15px; }
   .mobile-inbox-summary span { color: var(--muted); font-size: 12px; }

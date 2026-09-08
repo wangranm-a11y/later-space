@@ -73,6 +73,7 @@ const state = {
   authReturnActive: false,
   globalCoverPreference: localStorage.getItem("later-space-global-cover-mode") || "editorial",
   globalTextPreference: localStorage.getItem("later-space-global-text-theme") || "paper",
+  deferredInstallPrompt: null,
 };
 
 const elements = {
@@ -247,6 +248,13 @@ const elements = {
   mobileAddButton: document.querySelector("#mobileAddButton"),
   mobileCanvasButton: document.querySelector("#mobileCanvasButton"),
   mobileSyncButton: document.querySelector("#mobileSyncButton"),
+  mobileInstallButton: document.querySelector("#mobileInstallButton"),
+  installBackdrop: document.querySelector("#installBackdrop"),
+  installDialog: document.querySelector("#installDialog"),
+  closeInstallButton: document.querySelector("#closeInstallButton"),
+  installIosSteps: document.querySelector("#installIosSteps"),
+  installNativePromptButton: document.querySelector("#installNativePromptButton"),
+  installHint: document.querySelector("#installHint"),
 };
 
 const WORKFLOW_STATUSES = new Set(["inbox", "unread", "inspired", "action", "read"]);
@@ -1198,6 +1206,49 @@ function renderMobileInbox() {
     const icon = record.kind === "link" ? "↗" : record.kind === "text" ? "✎" : record.kind === "video" ? "▶" : "▧";
     return `<button class="mobile-inbox-item" type="button" data-mobile-record-id="${escapeHtml(record.id)}"><span class="mobile-inbox-thumb">${media || icon}</span><span class="mobile-inbox-meta"><strong>${escapeHtml(mobileRecordTitle(record))}</strong><span>${escapeHtml(mobileRecordMeta(record))}</span></span><span class="mobile-inbox-arrow" aria-hidden="true">›</span></button>`;
   }).join("");
+}
+
+function isStandaloneMode() {
+  return window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
+}
+
+function closeInstallDialog() {
+  if (!elements.installDialog || !elements.installBackdrop) return;
+  elements.installDialog.hidden = true;
+  elements.installBackdrop.hidden = true;
+}
+
+function updateMobileInstallEntry() {
+  if (!elements.mobileInstallButton) return;
+  const installed = isStandaloneMode();
+  elements.mobileInstallButton.hidden = installed;
+  elements.mobileInstallButton.setAttribute("aria-hidden", String(installed));
+  if (installed) closeInstallDialog();
+  if (elements.installIosSteps) elements.installIosSteps.hidden = Boolean(state.deferredInstallPrompt);
+  if (elements.installNativePromptButton) elements.installNativePromptButton.hidden = !state.deferredInstallPrompt;
+  if (elements.installHint) {
+    elements.installHint.textContent = state.deferredInstallPrompt
+      ? "浏览器会弹出确认窗口，点“安装”即可。"
+      : /iPhone|iPad|iPod/i.test(navigator.userAgent)
+        ? "iPhone：按上面 3 步添加即可。"
+        : "如果没有弹出安装窗口，请打开浏览器菜单，选择“添加到主屏幕”。";
+  }
+}
+
+function openInstallDialog() {
+  if (isStandaloneMode() || !elements.installDialog || !elements.installBackdrop) return;
+  elements.installDialog.hidden = false;
+  elements.installBackdrop.hidden = false;
+  updateMobileInstallEntry();
+}
+
+async function installLaterSpace() {
+  if (!state.deferredInstallPrompt) return;
+  const prompt = state.deferredInstallPrompt;
+  state.deferredInstallPrompt = null;
+  await prompt.prompt();
+  await prompt.userChoice;
+  updateMobileInstallEntry();
 }
 
 function renderGlobalCoverMode() {
@@ -3877,6 +3928,10 @@ function bindEvents() {
   elements.revokeCaptureTokenButton?.addEventListener("click", stopCaptureToken);
   elements.mobileAddButton?.addEventListener("click", openCapture);
   elements.mobileSyncButton?.addEventListener("click", openSyncPanel);
+  elements.mobileInstallButton?.addEventListener("click", openInstallDialog);
+  elements.closeInstallButton?.addEventListener("click", closeInstallDialog);
+  elements.installBackdrop?.addEventListener("click", closeInstallDialog);
+  elements.installNativePromptButton?.addEventListener("click", installLaterSpace);
   elements.mobileCanvasButton?.addEventListener("click", () => {
     document.body.classList.toggle("mobile-show-canvas");
     elements.mobileCanvasButton.textContent = document.body.classList.contains("mobile-show-canvas") ? "返回收件箱" : "打开画布";
@@ -4053,6 +4108,19 @@ function bindEvents() {
 
 async function init() {
   try {
+    window.addEventListener("beforeinstallprompt", (event) => {
+      event.preventDefault();
+      state.deferredInstallPrompt = event;
+      updateMobileInstallEntry();
+    });
+    window.addEventListener("appinstalled", () => {
+      state.deferredInstallPrompt = null;
+      closeInstallDialog();
+      updateMobileInstallEntry();
+      showToast("Later Space 已添加到主屏幕");
+    });
+    window.matchMedia("(display-mode: standalone)").addEventListener?.("change", updateMobileInstallEntry);
+    updateMobileInstallEntry();
     state.db = await openDatabase();
     if (STATIC_DEPLOYMENT) {
       elements.restoreBackupButton.hidden = true;
