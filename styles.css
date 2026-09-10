@@ -430,9 +430,9 @@ kbd { min-width: 26px; height: 24px; display: grid; place-items: center; padding
 .storage-stats span { color: var(--muted); font-size: 10px; }
 .storage-stats strong { font-size: 13px; font-weight: 600; }
 .storage-panel p { margin: 18px 0 0; padding-top: 14px; border-top: 1px solid var(--hairline); color: var(--muted); font-size: 11px; line-height: 1.6; }
-.sync-panel { top: 78px; right: 20px; z-index: 36; width: min(350px, calc(100vw - 40px)); display: block; padding: 18px; border-radius: 8px; }
+.sync-panel { top: 78px; right: 20px; z-index: 36; width: min(350px, calc(100vw - 40px)); max-height: calc(100dvh - 98px); display: block; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; touch-action: pan-y; padding: 18px; border-radius: 8px; }
 .sync-panel[hidden] { display: none; }
-.sync-panel header { display: flex; align-items: flex-start; justify-content: space-between; }
+.sync-panel header { position: sticky; top: -18px; z-index: 2; display: flex; align-items: flex-start; justify-content: space-between; margin: -18px -18px 0; padding: 18px 18px 12px; background: linear-gradient(var(--surface) 78%, rgba(255,255,255,0)); }
 .sync-panel header span { color: var(--muted); font-size: 10px; }
 .sync-panel h2 { margin: 3px 0 0; font-size: 17px; }
 .account-profile { display: grid; grid-template-columns: 42px minmax(0,1fr) auto; gap: 10px; align-items: end; margin-top: 16px; padding-bottom: 15px; border-bottom: 1px solid var(--hairline); }

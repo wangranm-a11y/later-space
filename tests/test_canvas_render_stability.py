@@ -25,8 +25,16 @@ class CanvasRenderStabilityTests(unittest.TestCase):
         self.assertIn("backface-visibility: hidden", STYLES)
 
     def test_static_assets_are_cache_busted(self):
-        self.assertIn('styles.css?v=86', INDEX)
-        self.assertIn('app.js?v=88', INDEX)
+        self.assertIn('styles.css?v=87', INDEX)
+        self.assertIn('app.js?v=89', INDEX)
+
+    def test_account_panel_scrolls_independently_at_every_desktop_width(self):
+        self.assertIn(".sync-panel { top: 78px", STYLES)
+        self.assertIn("max-height: calc(100dvh - 98px)", STYLES)
+        self.assertIn("overflow-y: auto", STYLES)
+        self.assertIn("overscroll-behavior: contain", STYLES)
+        self.assertIn(".sync-panel header { position: sticky", STYLES)
+        self.assertIn('elements.syncPanel.addEventListener("wheel", (event) => event.stopPropagation()', APP)
 
 
 if __name__ == "__main__":

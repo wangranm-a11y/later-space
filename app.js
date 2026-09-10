@@ -16,7 +16,7 @@ const THUMBNAIL_VERSION = 5;
 const TEXT_CARD_WIDTH = 300;
 const TEXT_CARD_HEIGHT = 375;
 const STATIC_DEPLOYMENT = location.protocol !== "file:" && !["localhost", "127.0.0.1", "::1"].includes(location.hostname);
-document.documentElement.dataset.appVersion = "88";
+document.documentElement.dataset.appVersion = "89";
 document.documentElement.dataset.deployment = STATIC_DEPLOYMENT ? "static" : "local";
 
 const state = {
@@ -4256,6 +4256,7 @@ function bindEvents() {
   elements.closeStorageButton.addEventListener("click", () => { elements.storagePanel.hidden = true; });
   elements.syncButton.addEventListener("click", openSyncPanel);
   elements.closeSyncButton.addEventListener("click", () => { elements.syncPanel.hidden = true; });
+  elements.syncPanel.addEventListener("wheel", (event) => event.stopPropagation(), { passive: true });
   elements.syncLoginForm.addEventListener("submit", requestMagicLink);
   elements.accountProfile.addEventListener("submit", saveAccountProfile);
   elements.signOutButton.addEventListener("click", signOutCloud);
