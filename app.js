@@ -16,7 +16,7 @@ const THUMBNAIL_VERSION = 5;
 const TEXT_CARD_WIDTH = 300;
 const TEXT_CARD_HEIGHT = 375;
 const STATIC_DEPLOYMENT = location.protocol !== "file:" && !["localhost", "127.0.0.1", "::1"].includes(location.hostname);
-document.documentElement.dataset.appVersion = "87";
+document.documentElement.dataset.appVersion = "88";
 document.documentElement.dataset.deployment = STATIC_DEPLOYMENT ? "static" : "local";
 
 const state = {
@@ -58,6 +58,7 @@ const state = {
   backupQueued: false,
   backedUpAssets: null,
   renderFrame: null,
+  worldMarkup: "",
   searchTimer: null,
   externalInboxImporting: false,
   externalInboxTimer: null,
@@ -476,7 +477,7 @@ function worldCenter() {
 
 function updateView() {
   const { x, y, zoom } = state.view;
-  elements.world.style.transform = `translate(${x}px, ${y}px) scale(${zoom})`;
+  elements.world.style.transform = `translate3d(${x}px, ${y}px, 0) scale(${zoom})`;
   elements.world.style.setProperty("--canvas-control-scale", String(1 / zoom));
   elements.canvas.style.setProperty("--pan-x", `${x % (24 * zoom)}px`);
   elements.canvas.style.setProperty("--pan-y", `${y % (24 * zoom)}px`);
@@ -486,7 +487,7 @@ function updateView() {
 }
 
 function scheduleViewportRender() {
-  if (state.pointer?.mode === "item" || state.pointer?.mode === "resize" || state.arrivingIds.size || state.renderFrame) return;
+  if (state.pointer || state.arrivingIds.size || state.renderFrame) return;
   state.renderFrame = requestAnimationFrame(() => {
     state.renderFrame = null;
     render();
@@ -1197,14 +1198,14 @@ function render() {
   if (state.selectedId && !filteredRecords.some((record) => record.id === state.selectedId)) state.selectedId = null;
   const filteredIds = new Set(filteredRecords.map((record) => record.id));
   state.selectedIds.forEach((id) => { if (!filteredIds.has(id)) state.selectedIds.delete(id); });
-  elements.world.innerHTML = renderedRecords.map((record) => {
+  const worldMarkup = renderedRecords.map((record) => {
     const selected = record.id === state.selectedId;
     const multiSelected = state.selectedIds.has(record.id);
     const isLink = record.kind === "link";
     const isText = record.kind === "text";
     const isVideo = record.kind === "video";
     const content = isLink ? linkCard(record) : isText ? textCard(record) : isVideo ? `<span class="video-drag-handle" aria-hidden="true"></span><video class="video-preview" controls preload="metadata" poster="${imageUrl(record)}" aria-label="${escapeHtml(record.note || record.name || "收藏视频")}"></video>` : `<img src="${imageUrl(record)}" alt="${escapeHtml(record.note || record.name || "收藏图片")}" draggable="false" />`;
-    const transform = `translate(${record.canvasX}px,${record.canvasY}px)`;
+    const transform = `translate3d(${record.canvasX}px,${record.canvasY}px,0)`;
     const textHeight = isText ? `height:${TEXT_CARD_HEIGHT}px;` : "";
     const textTheme = record.textTheme || state.globalTextPreference;
     return `<article class="canvas-item${isLink ? " link-item" : ""}${isText ? ` text-item text-card-item text-theme-${textTheme}` : ""}${isVideo ? " video-item" : ""}${selected ? " is-selected" : ""}${multiSelected ? " is-multi-selected" : ""}${state.recentIds.has(record.id) ? " is-new" : ""}${state.arrivingIds.has(record.id) ? " is-arriving" : ""}${state.duplicateFocusId === record.id ? " is-duplicate-focus" : ""}" data-id="${record.id}" data-status="${record.status || "unread"}" tabindex="0" aria-label="${escapeHtml(record.title || longTextTitle(record.text) || record.text || record.name || "收藏内容")}" style="width:${isText ? TEXT_CARD_WIDTH : record.canvasWidth}px;${textHeight}transform:${transform};z-index:${record.zIndex || 1}">
@@ -1213,12 +1214,16 @@ function render() {
       <span class="item-caption">${escapeHtml(record.title || record.note || record.name || "内容")}</span>
     </article>`;
   }).join("");
-  renderedRecords.filter((record) => record.kind === "video").forEach((record) => {
-    videoUrl(record).then((url) => {
-      const node = elements.world.querySelector(`[data-id="${record.id}"] video`);
-      if (node && url) node.src = url;
-    }).catch(() => {});
-  });
+  if (worldMarkup !== state.worldMarkup) {
+    elements.world.innerHTML = worldMarkup;
+    state.worldMarkup = worldMarkup;
+    renderedRecords.filter((record) => record.kind === "video").forEach((record) => {
+      videoUrl(record).then((url) => {
+        const node = elements.world.querySelector(`[data-id="${record.id}"] video`);
+        if (node && url) node.src = url;
+      }).catch(() => {});
+    });
+  }
   renderFilterControls();
   renderWorkflowControls();
   renderSelection();
@@ -2424,7 +2429,7 @@ function movePointer(event) {
   if (node) {
     node.style.width = `${itemWidth(record)}px`;
     if (record.kind === "text") node.style.height = `${itemHeight(record)}px`;
-    node.style.transform = `translate(${record.canvasX}px,${record.canvasY}px)`;
+    node.style.transform = `translate3d(${record.canvasX}px,${record.canvasY}px,0)`;
   }
   renderSelection();
 }
@@ -2437,6 +2442,7 @@ function endPointer() {
   elements.selectionMarquee.hidden = true;
   state.pointer = null;
   elements.canvas.classList.remove("is-panning");
+  if (["pan", "marquee"].includes(pointer.mode)) scheduleViewportRender();
 }
 
 function zoomAt(clientX, clientY, factor) {
