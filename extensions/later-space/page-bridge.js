@@ -25,7 +25,6 @@ function receiveCapture(message, _sender, sendResponse) {
   window.addEventListener("message", receiveResult);
   if (message.type === "later-space-auth") {
     postCapture();
-    retryTimer = setInterval(postCapture, 250);
     return true;
   }
   const bridgeType = ["status", "undo", "view"].includes(message.capture?.type) ? message.capture.type : "capture";

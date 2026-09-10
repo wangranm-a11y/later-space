@@ -155,6 +155,21 @@ async function laterSpaceTab(windowId) {
   return tabs.find((tab) => tab.windowId === windowId) || tabs[0];
 }
 
+async function performAuthFromOpenTabs(tabs) {
+  for (const tab of tabs || []) {
+    const result = await performAuthFromTab(tab.id).catch(() => ({ state: "unauthenticated" }));
+    if (result.state === "auth" && result.session?.user?.id) return result;
+  }
+  return { state: "unauthenticated" };
+}
+
+function requestAuthFromOpenTabs(tabs) {
+  if (!authSyncPromise) {
+    authSyncPromise = performAuthFromOpenTabs(tabs).finally(() => { authSyncPromise = null; });
+  }
+  return authSyncPromise;
+}
+
 async function sendCapture(capture) {
   let tab = await laterSpaceTab(capture.windowId);
   let temporaryTab = false;
@@ -354,9 +369,9 @@ async function destinationStatus() {
   if (session?.user?.id) {
     return { label: `${session.user.email || "Later Space"} · 云端同步已开启`, email: session.user.email, synced: true };
   }
-  const tab = await queryLaterSpaceTab(800);
-  if (tab) {
-    const result = await requestAuthFromTab(tab.id).catch(() => ({ state: "unauthenticated" }));
+  const tabs = await queryLaterSpaceTabs(800);
+  if (tabs.length) {
+    const result = await requestAuthFromOpenTabs(tabs);
     if (result.state === "auth" && result.session?.user?.id) {
       await retryQueue();
       return { label: `${result.session.user.email || "Later Space"} · 云端同步已开启`, email: result.session.user.email, synced: true };
@@ -379,17 +394,19 @@ async function connectionDiagnosis() {
   if (session?.user?.id) {
     return { state: queued ? "queued" : "healthy", queued, title: queued ? `有 ${queued} 条等待补送` : "连接正常", detail: `${session.user.email || "Later Space"} · 云端同步已开启`, repairable: queued > 0 };
   }
-  const tab = await queryLaterSpaceTab(900);
-  if (tab) {
-    const auth = await requestAuthFromTab(tab.id).catch(() => ({ state: "unauthenticated" }));
+  const tabs = await queryLaterSpaceTabs(900);
+  if (tabs.length) {
+    const auth = await requestAuthFromOpenTabs(tabs);
     if (auth.state === "auth" && auth.session?.user?.id) {
       await retryQueue();
       return { state: queued ? "queued" : "healthy", queued, title: queued ? `有 ${queued} 条等待补送` : "连接正常", detail: `${auth.session.user.email || "Later Space"} · 云端同步已开启`, repairable: queued > 0 };
     }
-    const ready = await Promise.race([
-      chrome.tabs.sendMessage(tab.id, { type: "later-space-capture", capture: { type: "status" } }).catch(() => null),
-      new Promise((resolve) => setTimeout(() => resolve(null), 650)),
-    ]);
+    const ready = await Promise.any(tabs.map((tab) => Promise.race([
+      chrome.tabs.sendMessage(tab.id, { type: "later-space-capture", capture: { type: "status" } })
+        .then((result) => result?.state === "ready" ? result : Promise.reject())
+        .catch(() => Promise.reject()),
+      new Promise((_, reject) => setTimeout(reject, 650)),
+    ]))).catch(() => null);
     if (ready?.state === "ready") {
       return { state: queued ? "queued" : "local", queued, title: queued ? `有 ${queued} 条等待补送` : "本地收藏可用", detail: ready.destination?.label || "保存在当前浏览器", repairable: queued > 0 };
     }
@@ -401,29 +418,26 @@ async function connectionDiagnosis() {
   return { state: "detached", queued, title: queued ? `${queued} 条内容正在等待` : "尚未连接保存空间", detail: "可以继续收藏；连接后会自动补送。", repairable: true };
 }
 
-function queryLaterSpaceTab(timeoutMs = 800) {
+function queryLaterSpaceTabs(timeoutMs = 800) {
   return new Promise((resolve) => {
     let settled = false;
     const finish = (value) => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
-      resolve(value || null);
+      resolve(value || []);
     };
-    const timer = setTimeout(() => finish(null), timeoutMs);
+    const timer = setTimeout(() => finish([]), timeoutMs);
     try {
-      chrome.tabs.query({}, (tabs) => finish(tabs?.find(isLaterSpaceCanvasTab)));
+      chrome.tabs.query({}, (tabs) => finish((tabs || []).filter(isLaterSpaceCanvasTab)));
     } catch {
-      finish(null);
+      finish([]);
     }
   });
 }
 
 function requestAuthFromTab(tabId) {
-  if (!authSyncPromise) {
-    authSyncPromise = performAuthFromTab(tabId).finally(() => { authSyncPromise = null; });
-  }
-  return authSyncPromise;
+  return requestAuthFromOpenTabs([{ id: tabId }]);
 }
 
 async function performAuthFromTab(tabId) {
@@ -462,6 +476,9 @@ async function sessionFromAuthResult(result) {
     });
     if (!verifyResponse.ok) throw new Error("handoff_verify_failed");
     session = await verifyResponse.json();
+    if (!session.expires_at) {
+      session.expires_at = Math.floor(Date.now() / 1000) + Number(session.expires_in || 3600);
+    }
   } else {
     session = result.session;
   }
@@ -476,9 +493,9 @@ async function connectAuth() {
     await retryQueue();
     return { state: "connected", email: existing.user.email };
   }
-  const tab = await laterSpaceTab();
-  if (tab) {
-    const result = await requestAuthFromTab(tab.id);
+  const tabs = await queryLaterSpaceTabs(1000);
+  if (tabs.length) {
+    const result = await requestAuthFromOpenTabs(tabs);
     if (result.state === "auth") {
       await retryQueue();
       return { state: "connected", email: result.session.user?.email };

@@ -17,7 +17,7 @@ class ExtensionSelectionAffordanceTests(unittest.TestCase):
         self.assertIn("}, SELECTION_BUTTON_DELAY_MS);", FEEDBACK)
 
     def test_extension_version_is_bumped(self):
-        self.assertIn('"version": "1.10.1"', MANIFEST)
+        self.assertIn('"version": "1.10.4"', MANIFEST)
 
     def test_selection_button_uses_centered_moss_plus(self):
         self.assertIn('function selectionMark()', FEEDBACK)

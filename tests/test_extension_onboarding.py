@@ -67,7 +67,7 @@ class ExtensionOnboardingContractTests(unittest.TestCase):
         self.assertIn("#718e64", WELCOME_CSS)
 
     def test_release_version_is_current(self):
-        self.assertIn('"version": "1.10.1"', MANIFEST)
+        self.assertIn('"version": "1.10.4"', MANIFEST)
         self.assertIn('"https://wangranm-a11y.github.io/later-space/", "https://wangranm-a11y.github.io/later-space/index.html"', MANIFEST)
         self.assertNotIn('"exclude_matches": ["https://wangranm-a11y.github.io/later-space/*"]', MANIFEST)
 
@@ -76,13 +76,16 @@ class ExtensionOnboardingContractTests(unittest.TestCase):
         self.assertIn("async function repairConnection()", WORKER)
         self.assertIn('message.type === "connection-diagnosis"', WORKER)
         self.assertIn('message.type === "repair-connection"', WORKER)
-        self.assertIn("setTimeout(() => resolve(null), 650)", WORKER)
+        self.assertIn("setTimeout(reject, 650)", WORKER)
         self.assertIn("async function waitForBridge", WORKER)
         self.assertIn("chrome.tabs.reload(tab.id)", WORKER)
         self.assertIn("function isLaterSpaceCanvasTab", WORKER)
         self.assertIn('["/later-space/", "/later-space/index.html"]', WORKER)
         self.assertIn("chrome.tabs.query({})", WORKER)
         self.assertNotIn('chrome.tabs.query({ url: `${APP_URL}*` })', WORKER)
+        self.assertIn("async function performAuthFromOpenTabs(tabs)", WORKER)
+        self.assertIn("function requestAuthFromOpenTabs(tabs)", WORKER)
+        self.assertIn("if (result.state === \"auth\" && result.session?.user?.id) return result", WORKER)
         popup_script = (EXTENSION / "popup.js").read_text(encoding="utf-8")
         self.assertIn("这次连接有点慢", popup_script)
         self.assertIn('state: "offline"', WORKER)
@@ -93,15 +96,20 @@ class ExtensionOnboardingContractTests(unittest.TestCase):
         self.assertIn("待发送内容会回到原来的账号", repair)
 
     def test_extension_receives_an_independent_refreshable_session(self):
+        bridge = (EXTENSION / "page-bridge.js").read_text(encoding="utf-8")
         self.assertIn("async function sessionFromAuthResult(result)", WORKER)
         self.assertIn("let authSyncPromise = null", WORKER)
-        self.assertIn("authSyncPromise = performAuthFromTab(tabId)", WORKER)
+        self.assertIn("authSyncPromise = performAuthFromOpenTabs(tabs)", WORKER)
         self.assertIn('/functions/v1/pwa-auth-handoff', WORKER)
         self.assertIn('body: JSON.stringify({ action: "redeem", handoffCode: result.handoffCode })', WORKER)
         self.assertIn('/auth/v1/verify', WORKER)
         self.assertIn('body: JSON.stringify({ token_hash: redeem.tokenHash, type: "email" })', WORKER)
         self.assertIn("await chrome.storage.local.set({ [CLOUD_SESSION_KEY]: session })", WORKER)
+        self.assertIn("session.expires_at = Math.floor(Date.now() / 1000) + Number(session.expires_in || 3600)", WORKER)
         self.assertIn("await chrome.storage.local.remove(CLOUD_SESSION_KEY)", WORKER)
+        auth_branch = bridge[bridge.index('if (message.type === "later-space-auth")') : bridge.index("// Keep the legacy command envelope")]
+        self.assertIn("postCapture();", auth_branch)
+        self.assertNotIn("setInterval", auth_branch)
 
     def test_queue_retry_reports_sent_and_remaining(self):
         retry = WORKER[WORKER.index("async function retryQueue()") : WORKER.index("async function blobToDataUrl")]
