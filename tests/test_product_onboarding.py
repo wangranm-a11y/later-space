@@ -40,11 +40,13 @@ class ProductOnboardingContractTests(unittest.TestCase):
         self.assertIn('function mailboxUrl(email)', APP)
         self.assertNotIn('id="welcomeMailLink"', INDEX)
 
-    def test_pkce_login_survives_oauth_redirect(self):
+    def test_static_login_survives_oauth_redirect(self):
         self.assertIn('persistSession: true', APP)
         self.assertIn('autoRefreshToken: false', APP)
         self.assertIn("scheduleCloudSessionRefresh", APP)
-        self.assertIn('flowType: "pkce"', APP)
+        self.assertIn('flowType: "implicit"', APP)
+        self.assertIn('values.get("access_token")', APP)
+        self.assertIn("clearCloudAuthParameters()", APP)
         self.assertIn('Promise.race([', APP)
         self.assertIn('发送得太频繁了，请稍等一分钟再试', APP)
 

@@ -16,7 +16,7 @@ const THUMBNAIL_VERSION = 5;
 const TEXT_CARD_WIDTH = 300;
 const TEXT_CARD_HEIGHT = 375;
 const STATIC_DEPLOYMENT = location.protocol !== "file:" && !["localhost", "127.0.0.1", "::1"].includes(location.hostname);
-document.documentElement.dataset.appVersion = "86";
+document.documentElement.dataset.appVersion = "87";
 document.documentElement.dataset.deployment = STATIC_DEPLOYMENT ? "static" : "local";
 
 const state = {
@@ -3172,7 +3172,7 @@ function saveCloudSession(session) {
 function cloudAuthClient() {
   if (!state.cloudAuthClient && window.supabase?.createClient) {
     state.cloudAuthClient = window.supabase.createClient(cloudConfig().supabaseUrl, cloudConfig().supabaseAnonKey, {
-      auth: { persistSession: true, autoRefreshToken: false, detectSessionInUrl: false, flowType: "pkce" },
+      auth: { persistSession: true, autoRefreshToken: false, detectSessionInUrl: false, flowType: "implicit" },
     });
   }
   return state.cloudAuthClient;
