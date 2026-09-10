@@ -67,7 +67,7 @@ class ExtensionOnboardingContractTests(unittest.TestCase):
         self.assertIn("#718e64", WELCOME_CSS)
 
     def test_release_version_is_current(self):
-        self.assertIn('"version": "1.9.9"', MANIFEST)
+        self.assertIn('"version": "1.10.0"', MANIFEST)
         self.assertIn('"https://wangranm-a11y.github.io/later-space/", "https://wangranm-a11y.github.io/later-space/index.html"', MANIFEST)
         self.assertNotIn('"exclude_matches": ["https://wangranm-a11y.github.io/later-space/*"]', MANIFEST)
 
@@ -89,6 +89,17 @@ class ExtensionOnboardingContractTests(unittest.TestCase):
         repair = WORKER[WORKER.index("async function repairConnection()") : WORKER.index("async function saveOnboardingCapture")]
         self.assertIn("stored[CLOUD_SESSION_KEY]?.access_token", repair)
         self.assertIn("待发送内容会回到原来的账号", repair)
+
+    def test_extension_receives_an_independent_refreshable_session(self):
+        self.assertIn("async function sessionFromAuthResult(result)", WORKER)
+        self.assertIn("let authSyncPromise = null", WORKER)
+        self.assertIn("authSyncPromise = performAuthFromTab(tabId)", WORKER)
+        self.assertIn('/functions/v1/pwa-auth-handoff', WORKER)
+        self.assertIn('body: JSON.stringify({ action: "redeem", handoffCode: result.handoffCode })', WORKER)
+        self.assertIn('/auth/v1/verify', WORKER)
+        self.assertIn('body: JSON.stringify({ token_hash: redeem.tokenHash, type: "email" })', WORKER)
+        self.assertIn("await chrome.storage.local.set({ [CLOUD_SESSION_KEY]: session })", WORKER)
+        self.assertIn("await chrome.storage.local.remove(CLOUD_SESSION_KEY)", WORKER)
 
     def test_queue_retry_reports_sent_and_remaining(self):
         retry = WORKER[WORKER.index("async function retryQueue()") : WORKER.index("async function blobToDataUrl")]

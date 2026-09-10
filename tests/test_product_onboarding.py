@@ -96,6 +96,12 @@ class ProductOnboardingContractTests(unittest.TestCase):
         self.assertNotIn("startGuestMigration", initialize)
         self.assertIn("refreshMigrationOffer", initialize)
 
+    def test_extension_auth_uses_a_one_time_handoff(self):
+        self.assertIn("async function createCloudAuthHandoff()", APP)
+        bridge = APP[APP.index("function bindExtensionBridge") : APP.index("function imageElementFromBlob")]
+        self.assertIn("handoffCode: await createCloudAuthHandoff()", bridge)
+        self.assertIn('state: "auth"', bridge)
+
     def test_migration_can_be_deferred_and_resumed(self):
         self.assertIn('id="migrationDialog"', INDEX)
         self.assertIn('id="deferMigrationButton"', INDEX)

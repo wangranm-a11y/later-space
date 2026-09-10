@@ -10,6 +10,7 @@ const ONBOARDING_STATE_KEY = "laterSpaceOnboardingState";
 const ONBOARDING_VERSION = 1;
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 const MAX_SOURCE_IMAGE_BYTES = 40 * 1024 * 1024;
+let authSyncPromise = null;
 
 function defaultOnboardingState() {
   return { version: ONBOARDING_VERSION, step: 1, completed: false, sessionId: captureId(), recordIds: [], queuedCaptureIds: [], keepPractice: false };
@@ -37,7 +38,10 @@ async function getCloudSession() {
     headers: { apikey: SUPABASE_ANON_KEY, "Content-Type": "application/json" },
     body: JSON.stringify({ refresh_token: session.refresh_token }),
   });
-  if (!response.ok) return null;
+  if (!response.ok) {
+    if ([400, 401].includes(response.status)) await chrome.storage.local.remove(CLOUD_SESSION_KEY);
+    return null;
+  }
   const next = await response.json();
   const refreshed = { ...session, ...next, expires_at: Math.floor(Date.now() / 1000) + Number(next.expires_in || 3600) };
   await chrome.storage.local.set({ [CLOUD_SESSION_KEY]: refreshed });
@@ -352,10 +356,11 @@ async function destinationStatus() {
   }
   const tab = await queryLaterSpaceTab(800);
   if (tab) {
-    requestAuthFromTab(tab.id).then((result) => {
-      if (result.state === "auth") return retryQueue();
-      return null;
-    }).catch(() => {});
+    const result = await requestAuthFromTab(tab.id).catch(() => ({ state: "unauthenticated" }));
+    if (result.state === "auth" && result.session?.user?.id) {
+      await retryQueue();
+      return { label: `${result.session.user.email || "Later Space"} · 云端同步已开启`, email: result.session.user.email, synced: true };
+    }
   }
   return { label: "未连接 · 点击连接 Later Space", synced: false };
 }
@@ -376,6 +381,11 @@ async function connectionDiagnosis() {
   }
   const tab = await queryLaterSpaceTab(900);
   if (tab) {
+    const auth = await requestAuthFromTab(tab.id).catch(() => ({ state: "unauthenticated" }));
+    if (auth.state === "auth" && auth.session?.user?.id) {
+      await retryQueue();
+      return { state: queued ? "queued" : "healthy", queued, title: queued ? `有 ${queued} 条等待补送` : "连接正常", detail: `${auth.session.user.email || "Later Space"} · 云端同步已开启`, repairable: queued > 0 };
+    }
     const ready = await Promise.race([
       chrome.tabs.sendMessage(tab.id, { type: "later-space-capture", capture: { type: "status" } }).catch(() => null),
       new Promise((resolve) => setTimeout(() => resolve(null), 650)),
@@ -409,26 +419,55 @@ function queryLaterSpaceTab(timeoutMs = 800) {
   });
 }
 
-async function requestAuthFromTab(tabId) {
+function requestAuthFromTab(tabId) {
+  if (!authSyncPromise) {
+    authSyncPromise = performAuthFromTab(tabId).finally(() => { authSyncPromise = null; });
+  }
+  return authSyncPromise;
+}
+
+async function performAuthFromTab(tabId) {
   if (!tabId) return { state: "unauthenticated" };
   await chrome.scripting.executeScript({ target: { tabId }, files: ["page-bridge.js"] }).catch(() => {});
   try {
     const result = await chrome.tabs.sendMessage(tabId, { type: "later-space-auth" });
-    if (result?.state === "auth" && result.session?.access_token) {
-      await chrome.storage.local.set({ [CLOUD_SESSION_KEY]: result.session });
-      return result;
-    }
+    const session = await sessionFromAuthResult(result);
+    if (session?.access_token) return { ...result, state: "auth", session };
   } catch {
     await chrome.scripting.executeScript({ target: { tabId }, files: ["page-bridge.js"] }).catch(() => {});
     try {
       const result = await chrome.tabs.sendMessage(tabId, { type: "later-space-auth" });
-      if (result?.state === "auth" && result.session?.access_token) {
-        await chrome.storage.local.set({ [CLOUD_SESSION_KEY]: result.session });
-        return result;
-      }
+      const session = await sessionFromAuthResult(result);
+      if (session?.access_token) return { ...result, state: "auth", session };
     } catch {}
   }
   return { state: "unauthenticated" };
+}
+
+async function sessionFromAuthResult(result) {
+  if (result?.state !== "auth") return null;
+  let session = null;
+  if (result.handoffCode) {
+    const redeemResponse = await fetch(`${SUPABASE_URL}/functions/v1/pwa-auth-handoff`, {
+      method: "POST",
+      headers: { apikey: SUPABASE_ANON_KEY, "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "redeem", handoffCode: result.handoffCode }),
+    });
+    const redeem = await redeemResponse.json();
+    if (!redeemResponse.ok || !redeem.tokenHash) throw new Error(redeem.code || "handoff_invalid");
+    const verifyResponse = await fetch(`${SUPABASE_URL}/auth/v1/verify`, {
+      method: "POST",
+      headers: { apikey: SUPABASE_ANON_KEY, "Content-Type": "application/json" },
+      body: JSON.stringify({ token_hash: redeem.tokenHash, type: "email" }),
+    });
+    if (!verifyResponse.ok) throw new Error("handoff_verify_failed");
+    session = await verifyResponse.json();
+  } else {
+    session = result.session;
+  }
+  if (!session?.access_token) return null;
+  await chrome.storage.local.set({ [CLOUD_SESSION_KEY]: session });
+  return session;
 }
 
 async function connectAuth() {

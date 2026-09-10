@@ -16,7 +16,7 @@ const THUMBNAIL_VERSION = 5;
 const TEXT_CARD_WIDTH = 300;
 const TEXT_CARD_HEIGHT = 375;
 const STATIC_DEPLOYMENT = location.protocol !== "file:" && !["localhost", "127.0.0.1", "::1"].includes(location.hostname);
-document.documentElement.dataset.appVersion = "85";
+document.documentElement.dataset.appVersion = "86";
 document.documentElement.dataset.deployment = STATIC_DEPLOYMENT ? "static" : "local";
 
 const state = {
@@ -1343,19 +1343,24 @@ function renderPwaHandoffStatus() {
   }
 }
 
+async function createCloudAuthHandoff() {
+  if (!state.cloudSession?.user) throw new Error("not_authenticated");
+  const response = await cloudRequest("/functions/v1/pwa-auth-handoff", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action: "create" }),
+  });
+  const result = await response.json();
+  if (!response.ok || !result.handoffCode) throw new Error(result.code || "handoff_unavailable");
+  return result.handoffCode;
+}
+
 async function preparePwaAuthHandoff() {
   if (!state.cloudSession?.user || isStandaloneMode()) return false;
   state.pwaHandoffStatus = "preparing";
   renderPwaHandoffStatus();
   try {
-    const response = await cloudRequest("/functions/v1/pwa-auth-handoff", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "create" }),
-    });
-    const result = await response.json();
-    if (!response.ok || !result.handoffCode) throw new Error(result.code || "handoff_unavailable");
-    writePwaHandoffCookie(result.handoffCode);
+    writePwaHandoffCookie(await createCloudAuthHandoff());
     state.pwaHandoffStatus = "ready";
     renderPwaHandoffStatus();
     return true;
@@ -3786,12 +3791,22 @@ function bindExtensionBridge() {
       ? { label: `${user.email} · 云端同步已开启`, email: user.email, synced: true }
       : { label: "当前浏览器 · 本地保存", email: null, synced: false };
     if (event.data.type === "auth") {
+      let result = { state: "unauthenticated" };
+      if (state.cloudSession?.access_token) {
+        try {
+          result = {
+            state: "auth",
+            handoffCode: await createCloudAuthHandoff(),
+            session: state.cloudSession,
+          };
+        } catch {
+          result = { state: "auth", session: state.cloudSession };
+        }
+      }
       window.postMessage({
         source: "later-space-page",
         requestId: event.data.requestId,
-        result: state.cloudSession?.access_token
-          ? { state: "auth", session: state.cloudSession }
-          : { state: "unauthenticated" },
+        result,
       }, location.origin);
       return;
     }
