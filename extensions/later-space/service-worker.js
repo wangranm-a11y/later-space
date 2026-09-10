@@ -151,7 +151,7 @@ function isLaterSpaceCanvasTab(tab) {
 }
 
 async function laterSpaceTab(windowId) {
-  const tabs = (await chrome.tabs.query({ url: `${APP_URL}*` })).filter(isLaterSpaceCanvasTab);
+  const tabs = (await chrome.tabs.query({})).filter(isLaterSpaceCanvasTab);
   return tabs.find((tab) => tab.windowId === windowId) || tabs[0];
 }
 
@@ -412,7 +412,7 @@ function queryLaterSpaceTab(timeoutMs = 800) {
     };
     const timer = setTimeout(() => finish(null), timeoutMs);
     try {
-        chrome.tabs.query({ url: `${APP_URL}*` }, (tabs) => finish(tabs?.find(isLaterSpaceCanvasTab)));
+      chrome.tabs.query({}, (tabs) => finish(tabs?.find(isLaterSpaceCanvasTab)));
     } catch {
       finish(null);
     }

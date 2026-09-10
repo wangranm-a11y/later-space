@@ -67,7 +67,7 @@ class ExtensionOnboardingContractTests(unittest.TestCase):
         self.assertIn("#718e64", WELCOME_CSS)
 
     def test_release_version_is_current(self):
-        self.assertIn('"version": "1.10.0"', MANIFEST)
+        self.assertIn('"version": "1.10.1"', MANIFEST)
         self.assertIn('"https://wangranm-a11y.github.io/later-space/", "https://wangranm-a11y.github.io/later-space/index.html"', MANIFEST)
         self.assertNotIn('"exclude_matches": ["https://wangranm-a11y.github.io/later-space/*"]', MANIFEST)
 
@@ -81,6 +81,8 @@ class ExtensionOnboardingContractTests(unittest.TestCase):
         self.assertIn("chrome.tabs.reload(tab.id)", WORKER)
         self.assertIn("function isLaterSpaceCanvasTab", WORKER)
         self.assertIn('["/later-space/", "/later-space/index.html"]', WORKER)
+        self.assertIn("chrome.tabs.query({})", WORKER)
+        self.assertNotIn('chrome.tabs.query({ url: `${APP_URL}*` })', WORKER)
         popup_script = (EXTENSION / "popup.js").read_text(encoding="utf-8")
         self.assertIn("这次连接有点慢", popup_script)
         self.assertIn('state: "offline"', WORKER)
