@@ -67,7 +67,7 @@ class ExtensionOnboardingContractTests(unittest.TestCase):
         self.assertIn("#718e64", WELCOME_CSS)
 
     def test_release_version_is_current(self):
-        self.assertIn('"version": "1.10.5"', MANIFEST)
+        self.assertIn('"version": "1.10.6"', MANIFEST)
         self.assertIn('"https://wangranm-a11y.github.io/later-space/", "https://wangranm-a11y.github.io/later-space/index.html"', MANIFEST)
         self.assertNotIn('"exclude_matches": ["https://wangranm-a11y.github.io/later-space/*"]', MANIFEST)
 
@@ -150,6 +150,13 @@ class ExtensionOnboardingContractTests(unittest.TestCase):
         self.assertIn("directFailure", save)
         self.assertIn('state: "queued"', save)
         self.assertLess(save.index("return await sendCapture(normalized)"), save.index('state: "queued"'))
+
+    def test_capture_recovers_web_login_before_local_fallback(self):
+        save = WORKER[WORKER.index("async function saveCapture") : WORKER.index("async function cancelCaptureQueue")]
+        self.assertIn("const tabs = await queryLaterSpaceTabs(900)", save)
+        self.assertIn("requestAuthFromOpenTabs(tabs)", save)
+        self.assertIn("const recovered = await directCloudCapture(normalized)", save)
+        self.assertLess(save.index("requestAuthFromOpenTabs(tabs)"), save.index("return await sendCapture(normalized)"))
 
 
 if __name__ == "__main__":

@@ -16,8 +16,10 @@ const THUMBNAIL_VERSION = 5;
 const TEXT_CARD_WIDTH = 300;
 const TEXT_CARD_HEIGHT = 375;
 const STATIC_DEPLOYMENT = location.protocol !== "file:" && !["localhost", "127.0.0.1", "::1"].includes(location.hostname);
-document.documentElement.dataset.appVersion = "90";
+document.documentElement.dataset.appVersion = "91";
 document.documentElement.dataset.deployment = STATIC_DEPLOYMENT ? "static" : "local";
+let resolveCloudReady;
+const cloudReady = new Promise((resolve) => { resolveCloudReady = resolve; });
 
 const state = {
   db: null,
@@ -3818,6 +3820,7 @@ function bindExtensionBridge() {
   window.addEventListener("message", async (event) => {
     if (event.source !== window || event.origin !== location.origin) return;
     if (event.data?.source !== "later-space-extension" || !["capture", "status", "undo", "view", "auth"].includes(event.data?.type)) return;
+    await cloudReady;
     const user = state.cloudSession?.user;
     const destination = user
       ? { label: `${user.email} · 云端同步已开启`, email: user.email, synced: true }
@@ -4488,6 +4491,7 @@ async function init() {
     updateView();
     await loadImages();
     bindExtensionBridge();
+    if (!cloudConfigured()) resolveCloudReady();
     try {
       await redeemPwaAuthHandoff();
       await initializeCloud();
@@ -4495,6 +4499,8 @@ async function init() {
     } catch (error) {
       console.error("Cloud initialization failed", error);
       showToast("云端同步暂时不可用，本地画布仍可使用");
+    } finally {
+      resolveCloudReady();
     }
     showInitialWelcome();
     renderAccountEntry();

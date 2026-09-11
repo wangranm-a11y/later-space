@@ -122,6 +122,11 @@ class WebCloudContractTests(unittest.TestCase):
         capture = APP[APP.index("async function importExtensionCapture") : APP.index("async function undoExtensionCapture")]
         self.assertIn("[capture.id]", capture)
 
+    def test_extension_bridge_waits_for_cloud_initialization(self):
+        bridge = APP[APP.index("function bindExtensionBridge") : APP.index("function imageElementFromBlob")]
+        self.assertIn("await cloudReady", bridge)
+        self.assertIn("resolveCloudReady()", APP)
+
     def test_mobile_capture_token_can_be_created_copied_and_revoked(self):
         self.assertIn("createCaptureToken", APP)
         self.assertIn("copyPersonalCaptureUrl", APP)

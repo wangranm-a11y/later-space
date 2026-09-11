@@ -227,14 +227,32 @@ async function saveCapture(capture) {
   const normalized = { id: capture.id || captureId(), createdAt: capture.createdAt || Date.now(), source: "chrome-extension", ...capture };
   await queueCapture(normalized);
   let directFailure = null;
+  let directResult = null;
   try {
-    const direct = await directCloudCapture(normalized);
-    if (direct) {
+    directResult = await directCloudCapture(normalized);
+    if (directResult) {
       await removeQueued(normalized.id);
-      return direct;
+      return directResult;
     }
   } catch (error) {
     directFailure = error;
+  }
+  if (!directResult) {
+    const tabs = await queryLaterSpaceTabs(900);
+    if (tabs.length) {
+      const auth = await requestAuthFromOpenTabs(tabs);
+      if (auth.state === "auth") {
+        try {
+          const recovered = await directCloudCapture(normalized);
+          if (recovered) {
+            await removeQueued(normalized.id);
+            return recovered;
+          }
+        } catch (error) {
+          directFailure = error;
+        }
+      }
+    }
   }
   try {
     return await sendCapture(normalized);
