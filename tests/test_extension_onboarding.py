@@ -67,7 +67,7 @@ class ExtensionOnboardingContractTests(unittest.TestCase):
         self.assertIn("#718e64", WELCOME_CSS)
 
     def test_release_version_is_current(self):
-        self.assertIn('"version": "1.10.4"', MANIFEST)
+        self.assertIn('"version": "1.10.5"', MANIFEST)
         self.assertIn('"https://wangranm-a11y.github.io/later-space/", "https://wangranm-a11y.github.io/later-space/index.html"', MANIFEST)
         self.assertNotIn('"exclude_matches": ["https://wangranm-a11y.github.io/later-space/*"]', MANIFEST)
 
@@ -140,6 +140,16 @@ class ExtensionOnboardingContractTests(unittest.TestCase):
         self.assertIn("directFailure", save)
         self.assertIn("return await sendCapture(normalized)", save)
         self.assertIn("MAX_SOURCE_IMAGE_BYTES", WORKER)
+
+    def test_cloud_capture_is_confirmed_before_success_and_failures_stay_queued(self):
+        direct = WORKER[WORKER.index("async function directCloudCapture") : WORKER.index("function captureId")]
+        save = WORKER[WORKER.index("async function saveCapture") : WORKER.index("async function cancelCaptureQueue")]
+        self.assertIn("cloud record confirmation failed", direct)
+        self.assertIn("select=id,asset_path,asset_bytes", direct)
+        self.assertIn('capture.kind === "image"', direct)
+        self.assertIn("directFailure", save)
+        self.assertIn('state: "queued"', save)
+        self.assertLess(save.index("return await sendCapture(normalized)"), save.index('state: "queued"'))
 
 
 if __name__ == "__main__":

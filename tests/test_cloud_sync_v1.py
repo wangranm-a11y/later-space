@@ -112,6 +112,16 @@ class WebCloudContractTests(unittest.TestCase):
         self.assertIn('window.setInterval(() => syncCloud(), 30000)', APP)
         self.assertIn('window.addEventListener("focus", () => syncCloud())', APP)
 
+    def test_login_refresh_is_serialized_and_does_not_clear_session_on_transient_failure(self):
+        refresh = APP[APP.index("async function refreshCloudSession") : APP.index("function hasCloudAuthParameters")]
+        self.assertIn('navigator.locks.request("later-space-cloud-session-refresh", refresh)', refresh)
+        self.assertIn('cache: "no-store"', refresh)
+        self.assertNotIn("saveCloudSession(null)", refresh)
+
+    def test_extension_image_fallback_keeps_the_capture_id(self):
+        capture = APP[APP.index("async function importExtensionCapture") : APP.index("async function undoExtensionCapture")]
+        self.assertIn("[capture.id]", capture)
+
     def test_mobile_capture_token_can_be_created_copied_and_revoked(self):
         self.assertIn("createCaptureToken", APP)
         self.assertIn("copyPersonalCaptureUrl", APP)

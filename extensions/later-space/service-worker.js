@@ -52,6 +52,7 @@ async function cloudRequest(path, options = {}) {
   const session = await getCloudSession();
   if (!session?.access_token || !session.user?.id) return null;
   const response = await fetch(`${SUPABASE_URL}${path}`, {
+    cache: "no-store",
     ...options,
     headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${session.access_token}`, ...(options.headers || {}) },
   });
@@ -109,6 +110,24 @@ async function directCloudCapture(capture) {
       await fetch(discardUrl, { method: "POST", headers: { Authorization: `Bearer ${cloud.session.access_token}`, "Content-Type": "application/json" }, body: JSON.stringify({ assetPath: asset.assetPath, assetBytes: asset.assetBytes }) }).catch(() => null);
     }
     throw new Error(await result?.response.text());
+  }
+  try {
+    const confirmation = await cloudRequest(`/rest/v1/later_space_items?id=eq.${encodeURIComponent(id)}&select=id,asset_path,asset_bytes&limit=1`, {
+      headers: { "Cache-Control": "no-cache" },
+    });
+    if (!confirmation?.response.ok) throw new Error("cloud record confirmation failed");
+    const confirmedRows = await confirmation.response.json();
+    const confirmed = confirmedRows[0];
+    if (!confirmed || (capture.kind === "image" && (!confirmed.asset_path || Number(confirmed.asset_bytes || 0) <= 0))) {
+      throw new Error("cloud record confirmation failed");
+    }
+  } catch (error) {
+    if (asset?.assetPath && asset?.assetBytes) {
+      const discardUrl = new URL(`${SUPABASE_URL}/functions/v1/mobile-inbox`);
+      discardUrl.searchParams.set("mode", "discard");
+      await fetch(discardUrl, { method: "POST", headers: { Authorization: `Bearer ${cloud.session.access_token}`, "Content-Type": "application/json" }, body: JSON.stringify({ assetPath: asset.assetPath, assetBytes: asset.assetBytes }) }).catch(() => null);
+    }
+    throw error;
   }
   return { state: "saved", recordIds: [id], windowId: capture.windowId, capture: captureSummary(capture), destination: { label: `${cloud.session.user.email || "Later Space"} · 云端同步已开启`, email: cloud.session.user.email, synced: true } };
 }

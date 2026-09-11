@@ -26,7 +26,7 @@ class CanvasRenderStabilityTests(unittest.TestCase):
 
     def test_static_assets_are_cache_busted(self):
         self.assertIn('styles.css?v=87', INDEX)
-        self.assertIn('app.js?v=89', INDEX)
+        self.assertIn('app.js?v=90', INDEX)
 
     def test_account_panel_scrolls_independently_at_every_desktop_width(self):
         self.assertIn(".sync-panel { top: 78px", STYLES)

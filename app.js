@@ -16,7 +16,7 @@ const THUMBNAIL_VERSION = 5;
 const TEXT_CARD_WIDTH = 300;
 const TEXT_CARD_HEIGHT = 375;
 const STATIC_DEPLOYMENT = location.protocol !== "file:" && !["localhost", "127.0.0.1", "::1"].includes(location.hostname);
-document.documentElement.dataset.appVersion = "89";
+document.documentElement.dataset.appVersion = "90";
 document.documentElement.dataset.deployment = STATIC_DEPLOYMENT ? "static" : "local";
 
 const state = {
@@ -1311,6 +1311,11 @@ function isStandaloneMode() {
   return window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
 }
 
+function isMobileInstallDevice() {
+  if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) return true;
+  return navigator.maxTouchPoints > 1 && /Macintosh/i.test(navigator.userAgent);
+}
+
 function pwaCookiePath() {
   return new URL(".", location.href).pathname;
 }
@@ -1386,10 +1391,11 @@ function closeInstallDialog() {
 
 function updateMobileInstallEntry() {
   const installed = isStandaloneMode();
+  const available = isMobileInstallDevice();
   [elements.mobileInstallButton, elements.syncInstallButton, elements.welcomeInstallButton].forEach((button) => {
     if (!button) return;
-    button.hidden = installed;
-    button.setAttribute("aria-hidden", String(installed));
+    button.hidden = installed || !available;
+    button.setAttribute("aria-hidden", String(installed || !available));
   });
   if (installed) closeInstallDialog();
   if (elements.installIosSteps) elements.installIosSteps.hidden = Boolean(state.deferredInstallPrompt);
@@ -1847,7 +1853,7 @@ function createVideoThumbnail(blob) {
   });
 }
 
-async function saveFiles(fileList, source, screenPoint, purpose = "", tags = [], confirmDuplicates = true) {
+async function saveFiles(fileList, source, screenPoint, purpose = "", tags = [], confirmDuplicates = true, recordIds = []) {
   const files = Array.from(fileList).filter((file) => file?.type?.startsWith("image/"));
   if (!files.length) return showToast("第一版暂时只支持图片");
   if (state.cloudSession?.user && files.some((file) => file.type.startsWith("image/")) && cloudUsageRatio() >= .85) {
@@ -1877,7 +1883,7 @@ async function saveFiles(fileList, source, screenPoint, purpose = "", tags = [],
     const placement = openPlacement(center, canvasWidth, canvasWidth * ratio);
     const now = Date.now() + index;
     const record = {
-      id: makeId(), workspaceId: activeWorkspaceId(), ...(isVideo ? { kind: "video" } : {}), thumbnail, thumbnailVersion: THUMBNAIL_VERSION, name: file.name || `${isVideo ? "粘贴视频" : "粘贴图片"} ${new Date(now).toLocaleTimeString("zh-CN")}`,
+      id: recordIds[index] || makeId(), workspaceId: activeWorkspaceId(), ...(isVideo ? { kind: "video" } : {}), thumbnail, thumbnailVersion: THUMBNAIL_VERSION, name: file.name || `${isVideo ? "粘贴视频" : "粘贴图片"} ${new Date(now).toLocaleTimeString("zh-CN")}`,
       type: file.type, size: file.size, width: dimensions.width, height: dimensions.height, duration: dimensions.duration || 0, fingerprint,
       status: "inbox", tags: [...tags], note: purpose, source, createdAt: now, updatedAt: now,
       canvasX: placement.x,
@@ -3222,7 +3228,7 @@ function cloudHeaders(extra = {}) {
 }
 
 async function cloudRequest(path, options = {}) {
-  const response = await fetch(`${cloudConfig().supabaseUrl}${path}`, { ...options, headers: cloudHeaders(options.headers) });
+  const response = await fetch(`${cloudConfig().supabaseUrl}${path}`, { cache: "no-store", ...options, headers: cloudHeaders(options.headers) });
   if (response.status === 401 && state.cloudSession?.refresh_token && !options.skipRefresh) {
     await refreshCloudSession();
     return cloudRequest(path, { ...options, skipRefresh: true });
@@ -3231,16 +3237,36 @@ async function cloudRequest(path, options = {}) {
 }
 
 async function refreshCloudSession() {
-  const response = await fetch(`${cloudConfig().supabaseUrl}/auth/v1/token?grant_type=refresh_token`, {
-    method: "POST",
-    headers: { apikey: cloudConfig().supabaseAnonKey, "Content-Type": "application/json" },
-    body: JSON.stringify({ refresh_token: state.cloudSession.refresh_token }),
-  });
-  if (!response.ok) {
-    saveCloudSession(null);
-    throw new Error("session expired");
-  }
-  saveCloudSession(await response.json());
+  const refresh = async () => {
+    const requestedToken = state.cloudSession?.refresh_token;
+    if (!requestedToken) throw new Error("session expired");
+    let storedSession = null;
+    try { storedSession = JSON.parse(localStorage.getItem(CLOUD_SESSION_KEY)); } catch {}
+    if (storedSession?.refresh_token && storedSession.refresh_token !== requestedToken) {
+      saveCloudSession(storedSession);
+      return storedSession;
+    }
+    const response = await fetch(`${cloudConfig().supabaseUrl}/auth/v1/token?grant_type=refresh_token`, {
+      method: "POST",
+      cache: "no-store",
+      headers: { apikey: cloudConfig().supabaseAnonKey, "Content-Type": "application/json" },
+      body: JSON.stringify({ refresh_token: requestedToken }),
+    });
+    if (!response.ok) {
+      try { storedSession = JSON.parse(localStorage.getItem(CLOUD_SESSION_KEY)); } catch {}
+      if (storedSession?.refresh_token && storedSession.refresh_token !== requestedToken) {
+        saveCloudSession(storedSession);
+        return storedSession;
+      }
+      throw new Error("session refresh failed");
+    }
+    const refreshed = await response.json();
+    saveCloudSession(refreshed);
+    return refreshed;
+  };
+  return navigator.locks?.request
+    ? navigator.locks.request("later-space-cloud-session-refresh", refresh)
+    : refresh();
 }
 
 function hasCloudAuthParameters() {
@@ -3743,7 +3769,7 @@ async function importExtensionCapture(capture) {
     const duplicate = state.images.find((record) => isMediaRecord(record) && record.fingerprint === fingerprint);
     if (duplicate) return { state: "duplicate", recordIds: [duplicate.id] };
     const file = new File([blob], capture.name || "网页图片.jpg", { type: capture.mimeType || blob.type || "image/jpeg" });
-    const records = await saveFiles([file], "chrome-extension", screenCenter(), capture.purpose || "", [], false);
+    const records = await saveFiles([file], "chrome-extension", screenCenter(), capture.purpose || "", [], false, [capture.id]);
     return { state: records.length ? "saved" : "duplicate", recordIds: records.map((record) => record.id) };
   }
   if (capture.kind === "link" && capture.url) {
