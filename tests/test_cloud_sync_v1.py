@@ -75,6 +75,18 @@ class MobileInboxContractTests(unittest.TestCase):
         self.assertIn("Later Space 图片空间暂时已满，仍可收藏文字和链接", MOBILE_INBOX)
         self.assertNotRegex(MOBILE_INBOX, re.compile(r'fixed success|always success', re.I))
 
+    def test_shared_social_links_are_normalized_instead_of_saved_as_markup(self):
+        self.assertIn("function extractSharedUrl", MOBILE_INBOX)
+        self.assertIn("new URL(candidate)", MOBILE_INBOX)
+        self.assertIn("function normalizeSharedText", MOBILE_INBOX)
+        self.assertIn("unsupported_shared_file", MOBILE_INBOX)
+
+    def test_shortcuts_file_wrappers_are_unpacked_before_parsing(self):
+        self.assertIn('contentType === "multipart/form-data"', MOBILE_INBOX)
+        self.assertIn('await request.formData()', MOBILE_INBOX)
+        self.assertIn('contentType === "application/octet-stream"', MOBILE_INBOX)
+        self.assertIn('new TextDecoder().decode(bytes)', MOBILE_INBOX)
+
 
 class WebCloudContractTests(unittest.TestCase):
     def test_guest_and_user_workspaces_are_separate(self):
@@ -117,6 +129,18 @@ class WebCloudContractTests(unittest.TestCase):
         self.assertIn("controller.abort()", APP)
         self.assertIn('id="mobileFocusDeleteButton"', INDEX)
         self.assertIn("deleteMobileFocusRecord", APP)
+
+    def test_mobile_inbox_supports_confirmed_long_press_delete(self):
+        self.assertIn("从右往左滑可删除", INDEX)
+        self.assertIn("deleteMobileInboxRecord", APP)
+
+    def test_mobile_inbox_supports_swipe_delete_and_recycle_bin(self):
+        self.assertIn("startMobileSwipe", APP)
+        self.assertIn("moveMobileSwipe", APP)
+        self.assertIn("mobile-inbox-swipe-delete", APP)
+        self.assertIn("mobileTrashList", INDEX)
+        self.assertIn("永久删除", APP)
+        self.assertIn("30 * 24 * 60 * 60 * 1000", APP)
 
     def test_sync_button_reports_success_and_dirty_state(self):
         self.assertIn('textContent = syncing ? "同步中…"', APP)

@@ -127,6 +127,7 @@
           <button class="mobile-install-action" id="mobileInstallButton" type="button">安装到主屏幕</button>
         </div>
         <div class="mobile-inbox-summary"><strong id="mobileInboxCount">0 条收藏</strong><span id="mobileInboxUnsorted">0 条未整理</span></div>
+        <p class="mobile-inbox-hint">点击打开详情 · 从右往左滑可删除</p>
         <div class="mobile-inbox-list" id="mobileInboxList"></div>
         <div class="mobile-inbox-empty" id="mobileInboxEmpty" hidden><span>🫳</span><strong>这里还没有内容</strong><p>去 Safari 或其他 App 点“分享”，选择 Later Space。</p></div>
       </section>
@@ -256,6 +257,7 @@
       <div class="sync-entry"><strong>浏览器插件</strong><span>保存网页、图片和选中文字</span><a href="plugin-story.html" target="_blank">了解并安装</a></div>
       <div class="sync-entry sync-entry-shortcut"><strong>手机分享入口</strong><span id="captureTokenStatus">登录后生成你的专属收件地址</span><div class="sync-entry-actions"><button class="secondary-button sync-install-button" id="syncInstallButton" type="button">安装到主屏幕</button><a href="docs/mobile-later-space-guide.html" target="_blank">打开完整教程</a></div></div>
       <div class="capture-token-actions" id="captureTokenActions" hidden><button class="primary-button" id="createCaptureTokenButton" type="button">生成专属地址</button><button class="secondary-button" id="copyCaptureUrlButton" type="button" hidden>复制收件地址</button><button class="text-button" id="revokeCaptureTokenButton" type="button" hidden>停用</button></div>
+      <div class="sync-entry mobile-trash-entry"><strong>云端回收站</strong><span>误删内容会保留 30 天</span><div id="mobileTrashList" class="mobile-trash-list"></div><p id="mobileTrashEmpty" class="mobile-trash-empty">回收站是空的</p></div>
       <div class="sync-entry"><strong>Agent 只读入口</strong><span id="agentTokenStatus">让 CLI / MCP 读取你的收藏；重新生成会让旧 Token 失效</span><button class="secondary-button" id="createAgentTokenButton" type="button">生成 Token</button></div>
     </aside>
 

@@ -90,6 +90,9 @@ const state = {
   pwaHandoffStatus: "idle",
   pwaHandoffRestored: false,
   mobileCanvasRecordId: null,
+  mobileSwipeHandled: false,
+  mobileSwipe: null,
+  trashRecords: [],
 };
 
 const elements = {
@@ -1264,7 +1267,7 @@ function renderMobileInbox() {
   elements.mobileInboxList.innerHTML = recent.map((record) => {
     const media = isMediaRecord(record) && record.kind !== "video" ? `<img src="${escapeHtml(imageUrl(record))}" alt="" />` : "";
     const icon = record.kind === "link" ? "↗" : record.kind === "text" ? "✎" : record.kind === "video" ? "▶" : "▧";
-    return `<button class="mobile-inbox-item" type="button" data-mobile-record-id="${escapeHtml(record.id)}"><span class="mobile-inbox-thumb">${media || icon}</span><span class="mobile-inbox-meta"><strong>${escapeHtml(mobileRecordTitle(record))}</strong><span>${escapeHtml(mobileRecordMeta(record))}</span></span><span class="mobile-inbox-arrow" aria-hidden="true">›</span></button>`;
+    return `<div class="mobile-inbox-swipe" data-mobile-record-id="${escapeHtml(record.id)}"><button class="mobile-inbox-item" type="button"><span class="mobile-inbox-thumb">${media || icon}</span><span class="mobile-inbox-meta"><strong>${escapeHtml(mobileRecordTitle(record))}</strong><span>${escapeHtml(mobileRecordMeta(record))}</span></span><span class="mobile-inbox-arrow" aria-hidden="true">›</span></button><button class="mobile-inbox-swipe-delete" type="button" data-mobile-delete-id="${escapeHtml(record.id)}" aria-label="删除这条内容">删除</button></div>`;
   }).join("");
 }
 
@@ -1291,12 +1294,115 @@ function openMobileFocus(record) {
 
 async function deleteMobileFocusRecord() {
   const recordId = elements.mobileFocusContent?.dataset.recordId || state.selectedId;
+  await deleteMobileInboxRecord(recordId, true);
+}
+
+async function deleteMobileInboxRecord(recordId, askForConfirmation = true) {
   if (!recordId || !state.images.some((record) => record.id === recordId)) return;
-  if (!confirm("确定删除这条内容吗？")) return;
+  if (askForConfirmation && !confirm("确定删除这条内容吗？")) return;
   state.selectedId = recordId;
   state.selectedIds.clear();
   await deleteSelected();
-  closeMobileFocus();
+  if (!elements.mobileFocusDialog?.hidden) closeMobileFocus();
+}
+
+function trashRecordTitle(row) {
+  return row.data?.title || row.data?.name || row.data?.text || row.data?.url || "未命名内容";
+}
+
+function renderTrash() {
+  const list = document.querySelector("#mobileTrashList");
+  const empty = document.querySelector("#mobileTrashEmpty");
+  if (!list || !empty) return;
+  empty.hidden = state.trashRecords.length > 0;
+  list.innerHTML = state.trashRecords.map((row) => `<div class="mobile-trash-item"><div><strong>${escapeHtml(trashRecordTitle(row).slice(0, 80))}</strong><span>删除于 ${escapeHtml(new Date(row.deleted_at).toLocaleDateString("zh-CN"))}</span></div><div><button type="button" data-trash-restore="${escapeHtml(row.id)}">恢复</button><button type="button" class="danger" data-trash-delete="${escapeHtml(row.id)}">永久删除</button></div></div>`).join("");
+}
+
+async function restoreTrashRecord(recordId) {
+  const row = state.trashRecords.find((entry) => entry.id === recordId);
+  const user = state.cloudSession?.user;
+  if (!row || !user) return;
+  await upsertCloudRows([{ ...row, deleted_at: null, client_updated_at: Date.now(), source_device_id: cloudDeviceId() }]);
+  state.trashRecords = state.trashRecords.filter((entry) => entry.id !== recordId);
+  renderTrash();
+  await syncCloud({ notify: true });
+}
+
+async function permanentlyDeleteTrashRecord(recordId) {
+  const row = state.trashRecords.find((entry) => entry.id === recordId);
+  if (!row || !confirm("永久删除后将无法恢复，确定继续吗？")) return;
+  if (row.asset_path && row.asset_bytes) await discardCloudAsset(row.asset_path, row.asset_bytes);
+  const response = await cloudRequest(`/rest/v1/later_space_items?id=eq.${encodeURIComponent(recordId)}`, { method: "DELETE" });
+  if (!response.ok) throw new Error(await response.text());
+  state.trashRecords = state.trashRecords.filter((entry) => entry.id !== recordId);
+  renderTrash();
+  showToast("已永久删除");
+}
+
+async function purgeExpiredTrashRows(rows) {
+  const expired = rows.filter((row) => row.deleted_at && Date.now() - new Date(row.deleted_at).getTime() >= 30 * 24 * 60 * 60 * 1000);
+  for (const row of expired) {
+    if (row.asset_path && row.asset_bytes) await discardCloudAsset(row.asset_path, row.asset_bytes).catch(() => null);
+    await cloudRequest(`/rest/v1/later_space_items?id=eq.${encodeURIComponent(row.id)}`, { method: "DELETE" }).catch(() => null);
+  }
+  return expired.length;
+}
+
+function handleMobileInboxClick(event) {
+  const deleteButton = event.target.closest("[data-mobile-delete-id]");
+  if (deleteButton) {
+    event.preventDefault();
+    deleteMobileInboxRecord(deleteButton.dataset.mobileDeleteId, true);
+    return;
+  }
+  const button = event.target.closest("[data-mobile-record-id]");
+  if (!button) return;
+  if (state.mobileSwipeHandled) {
+    state.mobileSwipeHandled = false;
+    event.preventDefault();
+    return;
+  }
+  const record = state.images.find((entry) => entry.id === button.dataset.mobileRecordId);
+  if (!record) return;
+  state.selectedId = record.id;
+  openMobileFocus(record);
+}
+
+function startMobileSwipe(event) {
+  const wrapper = event.target.closest("[data-mobile-record-id]");
+  if (!wrapper || event.target.closest("[data-mobile-delete-id]")) return;
+  state.mobileSwipeHandled = false;
+  state.mobileSwipe = { wrapper, startX: event.clientX, startY: event.clientY, deltaX: 0, horizontal: false };
+}
+
+function moveMobileSwipe(event) {
+  const swipe = state.mobileSwipe;
+  if (!swipe || swipe.wrapper !== event.target.closest("[data-mobile-record-id]")) return;
+  const deltaX = event.clientX - swipe.startX;
+  const deltaY = event.clientY - swipe.startY;
+  if (!swipe.horizontal && Math.abs(deltaX) < 10) return;
+  if (!swipe.horizontal && Math.abs(deltaY) > Math.abs(deltaX)) { state.mobileSwipe = null; return; }
+  swipe.horizontal = true;
+  swipe.deltaX = Math.min(0, Math.max(-190, deltaX));
+  swipe.wrapper.style.setProperty("--mobile-swipe-x", `${swipe.deltaX}px`);
+  swipe.wrapper.classList.add("is-swiping");
+  event.preventDefault();
+}
+
+function finishMobileSwipe() {
+  const swipe = state.mobileSwipe;
+  if (!swipe) return;
+  if (swipe.horizontal) {
+    state.mobileSwipeHandled = true;
+    swipe.wrapper.classList.toggle("is-swiped", swipe.deltaX < -65 && swipe.deltaX > -150);
+    if (swipe.deltaX <= -150) {
+      state.mobileSwipeHandled = true;
+      deleteMobileInboxRecord(swipe.wrapper.dataset.mobileRecordId, true);
+    }
+    swipe.wrapper.style.removeProperty("--mobile-swipe-x");
+    swipe.wrapper.classList.remove("is-swiping");
+  }
+  state.mobileSwipe = null;
 }
 
 function closeMobileFocus() {
@@ -3677,6 +3783,10 @@ async function syncCloud({ notify = false } = {}) {
   if (!elements.syncPanel.hidden) openSyncPanel();
   try {
     let remoteRows = await fetchCloudRows();
+    await purgeExpiredTrashRows(remoteRows);
+    if (remoteRows.some((row) => row.deleted_at && Date.now() - new Date(row.deleted_at).getTime() >= 30 * 24 * 60 * 60 * 1000)) remoteRows = await fetchCloudRows();
+    state.trashRecords = remoteRows.filter((row) => row.deleted_at && Date.now() - new Date(row.deleted_at).getTime() < 30 * 24 * 60 * 60 * 1000);
+    renderTrash();
     const remoteById = new Map(remoteRows.map((row) => [row.id, row]));
     const deletions = cloudDeletionMap();
     const uploadRows = [];
@@ -3720,12 +3830,14 @@ async function syncCloud({ notify = false } = {}) {
     await Promise.all(uploadedAssets
       .filter(({ current, previous }) => previous?.assetPath && previous.assetPath !== current.assetPath)
       .map(({ previous }) => discardCloudAsset(previous.assetPath, previous.assetBytes)));
-    await Promise.all(deletedAssets.map(({ assetPath, assetBytes }) => discardCloudAsset(assetPath, assetBytes)));
+    // Keep deleted assets for the 30-day recycle bin. Permanent deletion removes them later.
     Object.keys(deletions).forEach((id) => {
       if (uploadRows.some((row) => row.id === id && row.deleted_at)) delete deletions[id];
     });
     saveCloudDeletionMap(deletions);
     if (uploadRows.length) remoteRows = await fetchCloudRows();
+    state.trashRecords = remoteRows.filter((row) => row.deleted_at && Date.now() - new Date(row.deleted_at).getTime() < 30 * 24 * 60 * 60 * 1000);
+    renderTrash();
     state.cloudSyncPhase = "下载其他设备更新";
     const localById = new Map(state.images.map((record) => [record.id, record]));
     for (const row of remoteRows) {
@@ -4403,13 +4515,17 @@ function bindEvents() {
   elements.mobileFocusCloseButton?.addEventListener("click", closeMobileFocus);
   elements.mobileFocusCanvasButton?.addEventListener("click", enterMobileCanvas);
   elements.mobileFocusDeleteButton?.addEventListener("click", deleteMobileFocusRecord);
-  elements.mobileInboxList?.addEventListener("click", (event) => {
-    const button = event.target.closest("[data-mobile-record-id]");
-    if (!button) return;
-    const record = state.images.find((entry) => entry.id === button.dataset.mobileRecordId);
-    if (!record) return;
-    state.selectedId = record.id;
-    openMobileFocus(record);
+  elements.mobileInboxList?.addEventListener("pointerdown", startMobileSwipe);
+  elements.mobileInboxList?.addEventListener("pointermove", moveMobileSwipe, { passive: false });
+  elements.mobileInboxList?.addEventListener("pointerup", finishMobileSwipe);
+  elements.mobileInboxList?.addEventListener("pointercancel", finishMobileSwipe);
+  elements.mobileInboxList?.addEventListener("contextmenu", (event) => event.preventDefault());
+  elements.mobileInboxList?.addEventListener("click", handleMobileInboxClick);
+  document.querySelector("#mobileTrashList")?.addEventListener("click", (event) => {
+    const restore = event.target.closest("[data-trash-restore]");
+    const remove = event.target.closest("[data-trash-delete]");
+    if (restore) restoreTrashRecord(restore.dataset.trashRestore).catch(() => showToast("恢复失败，请稍后重试"));
+    if (remove) permanentlyDeleteTrashRecord(remove.dataset.trashDelete).catch(() => showToast("永久删除失败，请稍后重试"));
   });
   elements.copyImageButton.addEventListener("click", copySelectedImage);
   elements.cropImageButton.addEventListener("click", openCropEditor);
