@@ -3840,6 +3840,7 @@ async function syncCloud({ notify = false } = {}) {
     renderTrash();
     state.cloudSyncPhase = "下载其他设备更新";
     const localById = new Map(state.images.map((record) => [record.id, record]));
+    const rowsToApply = [];
     for (const row of remoteRows) {
       const local = localById.get(row.id);
       const localUpdatedAt = Number(local?.updatedAt || local?.createdAt || 0);
@@ -3850,8 +3851,23 @@ async function syncCloud({ notify = false } = {}) {
         await transactAsset("readwrite", (store) => store.delete(row.id));
         localById.delete(row.id);
       } else {
-        localById.set(row.id, await applyCloudRow(row));
+        rowsToApply.push(row);
       }
+    }
+    // Put links and text into the inbox first. They do not need an asset download,
+    // so a large image library cannot hide a newly shared URL for minutes.
+    const quickRows = rowsToApply.filter((row) => !["image", "video"].includes(row.kind));
+    const mediaRows = rowsToApply.filter((row) => ["image", "video"].includes(row.kind));
+    for (const row of quickRows) localById.set(row.id, await applyCloudRow(row));
+    state.images = [...localById.values()].sort((left, right) => left.createdAt - right.createdAt);
+    render();
+    // Download media in small batches to avoid a single long serial sync.
+    for (let index = 0; index < mediaRows.length; index += 6) {
+      const batch = mediaRows.slice(index, index + 6);
+      const applied = await Promise.all(batch.map((row) => applyCloudRow(row)));
+      applied.forEach((record) => localById.set(record.id, record));
+      state.images = [...localById.values()].sort((left, right) => left.createdAt - right.createdAt);
+      renderMobileInbox();
     }
     state.images = [...localById.values()].sort((left, right) => left.createdAt - right.createdAt);
     state.cloudLastSyncAt = Date.now();
