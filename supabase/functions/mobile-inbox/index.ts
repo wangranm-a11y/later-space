@@ -68,10 +68,96 @@ function looksLikeUrl(value: string) {
   }
 }
 
+function decodeHtmlEntities(value: string) {
+  return value
+    .replace(/&amp;/gi, "&")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;|&apos;/gi, "'")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">");
+}
+
+function canonicalCandidate(value: string) {
+  const candidate = decodeHtmlEntities(value).replace(/[),.;!?]+$/, "");
+  try {
+    const url = new URL(candidate);
+    if (!["http:", "https:"].includes(url.protocol)) return "";
+    return canonicalUrl(url.href);
+  } catch {
+    return "";
+  }
+}
+
+function extractSharedUrl(value: string) {
+  const withoutMarkup = value
+    .replace(/<a\b[^>]*href=["']([^"']+)["'][^>]*>[\s\S]*?<\/a>/gi, "$1")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  const metadataPatterns = [
+    /<meta\b[^>]*(?:property|name)=["'](?:og:url|twitter:url)["'][^>]*content=["']([^"']+)["'][^>]*>/i,
+    /<meta\b[^>]*content=["']([^"']+)["'][^>]*(?:property|name)=["'](?:og:url|twitter:url)["'][^>]*>/i,
+    /<link\b[^>]*rel=["'][^"']*canonical[^"']*["'][^>]*href=["']([^"']+)["'][^>]*>/i,
+    /<link\b[^>]*href=["']([^"']+)["'][^>]*rel=["'][^"']*canonical[^"']*["'][^>]*>/i,
+  ];
+  for (const pattern of metadataPatterns) {
+    const metadataMatch = value.match(pattern);
+    const metadataUrl = metadataMatch ? canonicalCandidate(metadataMatch[1]) : "";
+    if (metadataUrl) return metadataUrl;
+  }
+
+  const match = withoutMarkup.match(/https?:\/\/[^\s<>"']+/i);
+  if (!match) return "";
+  return canonicalCandidate(match[0]);
+}
+
+function normalizeSharedText(value: string) {
+  return value
+    .replace(/<[^>]+>/g, " ")
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, "")
+    .replace(/\uFFFD/g, "")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
 async function sha256Hex(value: string | Uint8Array) {
   const bytes = typeof value === "string" ? new TextEncoder().encode(value) : value;
   const digest = await crypto.subtle.digest("SHA-256", bytes);
   return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+function payloadFromSharedText(rawValue: string, forcedKind?: string): CapturePayload {
+  const rawText = cleanText(rawValue);
+  if (!rawText) throw new Error("empty_text");
+  const sharedUrl = extractSharedUrl(rawText);
+  if (forcedKind === "link" || sharedUrl || looksLikeUrl(rawText)) {
+    return { kind: "link", url: sharedUrl || canonicalUrl(rawText) };
+  }
+  const text = normalizeSharedText(rawText);
+  if (!text) throw new Error("unsupported_shared_file");
+  return { kind: "text", text };
+}
+
+async function payloadFromSharedFile(file: File, forcedKind?: string): Promise<CapturePayload> {
+  const mimeType = (file.type || "").toLowerCase().split(";")[0];
+  if (mimeType.startsWith("image/")) {
+    if (!ALLOWED_IMAGE_TYPES.has(mimeType)) throw new Error("unsupported_image");
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    if (!bytes.length) throw new Error("empty_image");
+    if (bytes.length > MAX_IMAGE_BYTES) throw new Error("image_too_large");
+    return {
+      kind: "image",
+      bytes,
+      mimeType,
+      name: cleanText(file.name, 240) || `Later Space ${new Date().toISOString()}.${extensionForType(mimeType)}`,
+    };
+  }
+  return payloadFromSharedText(await file.text(), forcedKind);
 }
 
 function extensionForType(type: string) {
@@ -81,11 +167,22 @@ function extensionForType(type: string) {
 }
 
 async function readCapture(request: Request): Promise<CapturePayload> {
-  const contentType = (request.headers.get("content-type") || "text/plain").split(";")[0].toLowerCase();
+  const fullContentType = request.headers.get("content-type") || "text/plain";
+  const contentType = fullContentType.split(";")[0].toLowerCase();
   const forcedKind = request.headers.get("x-later-space-kind")?.toLowerCase();
 
   if (contentType === "application/json") {
-    const body = await request.json();
+    const rawJson = await request.text();
+    let body: Record<string, unknown> | string;
+    try {
+      body = JSON.parse(rawJson);
+    } catch {
+      return payloadFromSharedText(rawJson, forcedKind);
+    }
+    if (typeof body === "string") return payloadFromSharedText(body, forcedKind);
+    if (body.url && typeof body.url === "string") {
+      return { kind: "link", url: canonicalUrl(cleanText(body.url)), title: cleanText(body.title, 500) };
+    }
     const declaredKind = cleanText(body.kind, 20);
     if (declaredKind === "link") {
       const url = canonicalUrl(cleanText(body.url));
@@ -113,10 +210,31 @@ async function readCapture(request: Request): Promise<CapturePayload> {
     };
   }
 
-  const text = cleanText(await request.text());
-  if (!text) throw new Error("empty_text");
-  if (forcedKind === "link" || looksLikeUrl(text)) return { kind: "link", url: canonicalUrl(text) };
-  return { kind: "text", text };
+  // Shortcuts may encode “Request Body: File” as multipart/form-data.
+  // Unwrap the file before trying to parse X/Safari HTML or plain text.
+  if (contentType === "multipart/form-data") {
+    const form = await request.formData();
+    let textParts = "";
+    for (const value of form.values()) {
+      if (typeof value === "string") {
+        textParts += `\n${value}`;
+      } else if (value && typeof value === "object" && "text" in value) {
+        const payload = await payloadFromSharedFile(value as File, forcedKind);
+        if (payload.kind === "image" || payload.kind === "link") return payload;
+        textParts += `\n${payload.text || ""}`;
+      }
+    }
+    return payloadFromSharedText(textParts, forcedKind);
+  }
+
+  // Some iOS versions label a text/HTML file as application/octet-stream.
+  // Decode it as text so the og:url/canonical URL can still be recovered.
+  if (contentType === "application/octet-stream") {
+    const bytes = new Uint8Array(await request.arrayBuffer());
+    return payloadFromSharedText(new TextDecoder().decode(bytes), forcedKind);
+  }
+
+  return payloadFromSharedText(await request.text(), forcedKind);
 }
 
 function userMessageForError(code: string) {
@@ -127,6 +245,7 @@ function userMessageForError(code: string) {
     empty_text: "没有找到可以保存的文字",
     empty_image: "没有找到可以保存的图片",
     unsupported_kind: "这个内容暂时还不能收进 Later Space",
+    unsupported_shared_file: "这个分享格式无法识别，请从 X 分享原始链接或图片",
     unsupported_image: "请先把图片转换成 JPG、PNG 或 WebP",
     image_too_large: "图片仍然太大，请先缩小后再试",
     user_storage_full: "你的图片空间已满，请先在 Later Space 删除一些图片",
@@ -282,7 +401,7 @@ Deno.serve(async (request: Request) => {
     if (code === "duplicate") return textResponse("✓ 已加入 Later Space", 200, "duplicate");
     const clientCodes = new Set([
       "missing_token", "invalid_token", "invalid_session", "empty_text", "empty_image", "unsupported_kind",
-      "unsupported_image", "image_too_large", "user_storage_full", "system_storage_full", "image_uploads_disabled",
+      "unsupported_image", "unsupported_shared_file", "image_too_large", "user_storage_full", "system_storage_full", "image_uploads_disabled",
     ]);
     return textResponse(userMessageForError(code), clientCodes.has(code) ? 400 : 503, code);
   }
