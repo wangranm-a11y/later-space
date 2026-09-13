@@ -12,6 +12,7 @@ const INSTALL_GUIDE_SHOWN_KEY = "later-space-install-guide-shown-v1";
 const PWA_HANDOFF_COOKIE = "later_space_pwa_handoff";
 const PWA_HANDOFF_MAX_AGE_SECONDS = 15 * 60;
 const CLOUD_REFRESH_LEEWAY_MS = 5 * 60 * 1000;
+const CLOUD_REQUEST_TIMEOUT_MS = 15000;
 const THUMBNAIL_VERSION = 5;
 const TEXT_CARD_WIDTH = 300;
 const TEXT_CARD_HEIGHT = 375;
@@ -70,6 +71,8 @@ const state = {
   cloudSyncTimer: null,
   cloudPollTimer: null,
   cloudSyncing: false,
+  cloudSyncPhase: "idle",
+  cloudSyncError: "",
   cloudLastSyncAt: 0,
   cloudRealtime: null,
   cloudAuthClient: null,
@@ -274,6 +277,7 @@ const elements = {
   mobileFocusBackButton: document.querySelector("#mobileFocusBackButton"),
   mobileFocusCloseButton: document.querySelector("#mobileFocusCloseButton"),
   mobileFocusCanvasButton: document.querySelector("#mobileFocusCanvasButton"),
+  mobileFocusDeleteButton: document.querySelector("#mobileFocusDeleteButton"),
   installBackdrop: document.querySelector("#installBackdrop"),
   installDialog: document.querySelector("#installDialog"),
   installDialogIntro: document.querySelector("#installDialogIntro"),
@@ -1281,6 +1285,16 @@ function openMobileFocus(record) {
   elements.mobileFocusContent.innerHTML = `<span class="mobile-focus-type">${escapeHtml(mobileRecordMeta(record))}</span><h2 id="mobileFocusTitle">${escapeHtml(mobileRecordTitle(record))}</h2>${body}`;
   elements.mobileFocusContent.dataset.recordId = record.id;
   elements.mobileFocusDialog.hidden = false;
+}
+
+async function deleteMobileFocusRecord() {
+  const recordId = elements.mobileFocusContent?.dataset.recordId || state.selectedId;
+  if (!recordId || !state.images.some((record) => record.id === recordId)) return;
+  if (!confirm("确定删除这条内容吗？")) return;
+  state.selectedId = recordId;
+  state.selectedIds.clear();
+  await deleteSelected();
+  closeMobileFocus();
 }
 
 function closeMobileFocus() {
@@ -3230,7 +3244,19 @@ function cloudHeaders(extra = {}) {
 }
 
 async function cloudRequest(path, options = {}) {
-  const response = await fetch(`${cloudConfig().supabaseUrl}${path}`, { cache: "no-store", ...options, headers: cloudHeaders(options.headers) });
+  const { skipRefresh, signal: externalSignal, ...requestOptions } = options;
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), CLOUD_REQUEST_TIMEOUT_MS);
+  if (externalSignal) externalSignal.addEventListener("abort", () => controller.abort(), { once: true });
+  let response;
+  try {
+    response = await fetch(`${cloudConfig().supabaseUrl}${path}`, { cache: "no-store", ...requestOptions, signal: controller.signal, headers: cloudHeaders(options.headers) });
+  } catch (error) {
+    if (error.name === "AbortError") throw new Error("cloud_request_timeout");
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+  }
   if (response.status === 401 && state.cloudSession?.refresh_token && !options.skipRefresh) {
     await refreshCloudSession();
     return cloudRequest(path, { ...options, skipRefresh: true });
@@ -3543,7 +3569,7 @@ async function uploadCloudAsset(userId, record) {
   record.size = blob.size;
   record.name = optimized.name;
   await storeImageAsset(record, blob);
-  const response = await fetch(cloudFunctionUrl({ mode: "asset", record_id: record.id }), {
+  const response = await cloudRequest(cloudFunctionUrl({ mode: "asset", record_id: record.id }), {
     method: "POST",
     headers: {
       Authorization: `Bearer ${state.cloudSession.access_token}`,
@@ -3559,7 +3585,7 @@ async function uploadCloudAsset(userId, record) {
 
 async function discardCloudAsset(assetPath, assetBytes) {
   if (!assetPath || !assetBytes) return;
-  await fetch(cloudFunctionUrl({ mode: "discard" }), {
+  await cloudRequest(cloudFunctionUrl({ mode: "discard" }), {
     method: "POST",
     headers: { Authorization: `Bearer ${state.cloudSession.access_token}`, "Content-Type": "application/json" },
     body: JSON.stringify({ assetPath, assetBytes }),
@@ -3604,6 +3630,9 @@ async function syncCloud({ notify = false } = {}) {
   const user = state.cloudSession?.user;
   if (!user || state.cloudSyncing || !navigator.onLine) return false;
   state.cloudSyncing = true;
+  state.cloudSyncError = "";
+  state.cloudSyncPhase = "读取云端内容";
+  if (!elements.syncPanel.hidden) openSyncPanel();
   try {
     let remoteRows = await fetchCloudRows();
     const remoteById = new Map(remoteRows.map((row) => [row.id, row]));
@@ -3623,6 +3652,7 @@ async function syncCloud({ notify = false } = {}) {
       const localUpdatedAt = Number(record.updatedAt || record.createdAt || 0);
       if (!remote || localUpdatedAt > Number(remote.client_updated_at || 0)) {
         if (record.kind === "video") continue;
+        state.cloudSyncPhase = isMediaRecord(record) ? "上传图片" : "上传内容";
         const asset = isMediaRecord(record) ? await uploadCloudAsset(user.id, record) : null;
         if (asset) uploadedAssets.push({ current: asset, previous: remote ? { assetPath: remote.asset_path, assetBytes: remote.asset_bytes } : null });
         uploadRows.push({
@@ -3654,6 +3684,7 @@ async function syncCloud({ notify = false } = {}) {
     });
     saveCloudDeletionMap(deletions);
     if (uploadRows.length) remoteRows = await fetchCloudRows();
+    state.cloudSyncPhase = "下载其他设备更新";
     const localById = new Map(state.images.map((record) => [record.id, record]));
     for (const row of remoteRows) {
       const local = localById.get(row.id);
@@ -3670,6 +3701,7 @@ async function syncCloud({ notify = false } = {}) {
     }
     state.images = [...localById.values()].sort((left, right) => left.createdAt - right.createdAt);
     state.cloudLastSyncAt = Date.now();
+    state.cloudSyncPhase = "已完成";
     await loadCloudUsage();
     renderCloudUsage();
     notifyCloudUsage();
@@ -3679,6 +3711,8 @@ async function syncCloud({ notify = false } = {}) {
     return true;
   } catch (error) {
     console.warn("Cloud sync unavailable", error);
+    state.cloudSyncError = error.message === "cloud_request_timeout" ? "同步超时，请检查网络后重试" : "同步失败，请稍后重试";
+    state.cloudSyncPhase = "同步未完成";
     if (notify) showToast("云端暂时不可用，本地收藏不受影响");
     return false;
   } finally {
@@ -3733,9 +3767,14 @@ async function openSyncPanel() {
   elements.syncLoginForm.hidden = true;
   if (elements.syncMailLink) elements.syncMailLink.hidden = true;
   elements.syncActions.hidden = false;
-  elements.syncStatus.classList.toggle("is-ready", Boolean(user));
-  elements.syncStatusTitle.textContent = "多设备同步已开启";
-  elements.syncStatusDetail.textContent = `${user.email} · ${state.cloudLastSyncAt ? `最近同步 ${new Date(state.cloudLastSyncAt).toLocaleTimeString("zh-CN")}` : "等待首次同步"}`;
+  elements.syncStatus.classList.toggle("is-ready", Boolean(user) && !state.cloudSyncError);
+  elements.syncStatus.classList.toggle("is-error", Boolean(state.cloudSyncError));
+  elements.syncStatusTitle.textContent = state.cloudSyncing ? state.cloudSyncPhase : state.cloudSyncError ? state.cloudSyncPhase : "多设备同步已开启";
+  elements.syncStatusDetail.textContent = state.cloudSyncing
+    ? `${user.email} · 请保持页面打开`
+    : state.cloudSyncError
+      ? `${user.email} · ${state.cloudSyncError}`
+      : `${user.email} · ${state.cloudLastSyncAt ? `最近同步 ${new Date(state.cloudLastSyncAt).toLocaleTimeString("zh-CN")}` : "等待首次同步"}`;
   await refreshMigrationOffer();
 }
 
@@ -4317,6 +4356,7 @@ function bindEvents() {
   elements.mobileFocusBackButton?.addEventListener("click", closeMobileFocus);
   elements.mobileFocusCloseButton?.addEventListener("click", closeMobileFocus);
   elements.mobileFocusCanvasButton?.addEventListener("click", enterMobileCanvas);
+  elements.mobileFocusDeleteButton?.addEventListener("click", deleteMobileFocusRecord);
   elements.mobileInboxList?.addEventListener("click", (event) => {
     const button = event.target.closest("[data-mobile-record-id]");
     if (!button) return;

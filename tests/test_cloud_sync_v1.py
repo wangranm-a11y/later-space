@@ -112,6 +112,12 @@ class WebCloudContractTests(unittest.TestCase):
         self.assertIn('window.setInterval(() => syncCloud(), 30000)', APP)
         self.assertIn('window.addEventListener("focus", () => syncCloud())', APP)
 
+    def test_cloud_requests_have_timeout_and_mobile_focus_can_delete(self):
+        self.assertIn("CLOUD_REQUEST_TIMEOUT_MS = 15000", APP)
+        self.assertIn("controller.abort()", APP)
+        self.assertIn('id="mobileFocusDeleteButton"', INDEX)
+        self.assertIn("deleteMobileFocusRecord", APP)
+
     def test_login_refresh_is_serialized_and_does_not_clear_session_on_transient_failure(self):
         refresh = APP[APP.index("async function refreshCloudSession") : APP.index("function hasCloudAuthParameters")]
         self.assertIn('navigator.locks.request("later-space-cloud-session-refresh", refresh)', refresh)

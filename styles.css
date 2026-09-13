@@ -681,6 +681,7 @@ button:focus-visible, .canvas-item:focus-visible { outline: 3px solid rgba(80,97
   .mobile-focus-media { display: block; width: 100%; max-height: 58vh; object-fit: contain; border-radius: 14px; background: #eae9e4; }
   .mobile-focus-footer { padding: 14px 20px max(20px, env(safe-area-inset-bottom)); border-top: 1px solid var(--hairline); background: rgba(255,255,255,.82); }
   .mobile-focus-footer button { width: 100%; min-height: 46px; }
+  .mobile-focus-footer .mobile-focus-delete { min-height: 34px; margin-top: 6px; color: #a44f45; }
   .brand-bar { top: 12px; left: 12px; }
   .account-button { top: 12px; right: 12px; min-width: 44px; width: 44px; padding: 5px; }
   .account-copy { display: none; }
