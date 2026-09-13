@@ -118,6 +118,12 @@ class WebCloudContractTests(unittest.TestCase):
         self.assertIn('id="mobileFocusDeleteButton"', INDEX)
         self.assertIn("deleteMobileFocusRecord", APP)
 
+    def test_sync_button_reports_success_and_dirty_state(self):
+        self.assertIn('textContent = syncing ? "同步中…"', APP)
+        self.assertIn('textContent = syncing ? "同步中…" : failed ? "点击重试"', APP)
+        self.assertIn('classList.toggle("is-synced"', APP)
+        self.assertIn('state.cloudNeedsSync = true', APP)
+
     def test_login_refresh_is_serialized_and_does_not_clear_session_on_transient_failure(self):
         refresh = APP[APP.index("async function refreshCloudSession") : APP.index("function hasCloudAuthParameters")]
         self.assertIn('navigator.locks.request("later-space-cloud-session-refresh", refresh)', refresh)

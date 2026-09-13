@@ -10,6 +10,7 @@ const AUTH_RETURN_STATE_KEY = "later-space-auth-return-v1";
 const LAST_LOGIN_EMAIL_KEY = "later-space-last-login-email-v1";
 const INSTALL_GUIDE_SHOWN_KEY = "later-space-install-guide-shown-v1";
 const PWA_HANDOFF_COOKIE = "later_space_pwa_handoff";
+const PWA_HANDOFF_STORAGE_KEY = "later-space-pwa-handoff-v1";
 const PWA_HANDOFF_MAX_AGE_SECONDS = 15 * 60;
 const CLOUD_REFRESH_LEEWAY_MS = 5 * 60 * 1000;
 const CLOUD_REQUEST_TIMEOUT_MS = 15000;
@@ -73,6 +74,7 @@ const state = {
   cloudSyncing: false,
   cloudSyncPhase: "idle",
   cloudSyncError: "",
+  cloudNeedsSync: false,
   cloudLastSyncAt: 0,
   cloudRealtime: null,
   cloudAuthClient: null,
@@ -1172,7 +1174,7 @@ function renderAccountEntry() {
   const name = accountDisplayName(user);
   elements.accountAvatar.textContent = user ? name.trim().slice(0, 1).toUpperCase() : "L";
   elements.accountName.textContent = user ? name : "登录";
-  elements.accountStatus.textContent = user ? (state.cloudLastSyncAt ? "已同步" : "同步中") : "开启同步";
+  elements.accountStatus.textContent = user ? (state.cloudNeedsSync ? "待同步" : state.cloudLastSyncAt ? "已同步" : "同步中") : "开启同步";
   elements.accountButton.classList.toggle("is-signed-in", Boolean(user));
   elements.accountProfile.hidden = !user;
   if (user) {
@@ -1339,17 +1341,42 @@ function pwaCookiePath() {
 function writePwaHandoffCookie(handoffCode) {
   const secure = location.protocol === "https:" ? "; Secure" : "";
   document.cookie = `${PWA_HANDOFF_COOKIE}=${encodeURIComponent(handoffCode)}; Max-Age=${PWA_HANDOFF_MAX_AGE_SECONDS}; Path=${pwaCookiePath()}; SameSite=Strict${secure}`;
+  localStorage.setItem(PWA_HANDOFF_STORAGE_KEY, JSON.stringify({ code: handoffCode, expiresAt: Date.now() + PWA_HANDOFF_MAX_AGE_SECONDS * 1000 }));
+  const handoffUrl = new URL(location.href);
+  handoffUrl.searchParams.set("pwa_handoff", handoffCode);
+  history.replaceState(null, "", `${handoffUrl.pathname}${handoffUrl.search}${handoffUrl.hash}`);
 }
 
 function readPwaHandoffCookie() {
+  const urlCode = new URLSearchParams(location.search).get("pwa_handoff");
+  if (urlCode) return urlCode;
   const prefix = `${PWA_HANDOFF_COOKIE}=`;
   const match = document.cookie.split(";").map((part) => part.trim()).find((part) => part.startsWith(prefix));
-  return match ? decodeURIComponent(match.slice(prefix.length)) : "";
+  if (match) return decodeURIComponent(match.slice(prefix.length));
+  try {
+    const stored = JSON.parse(localStorage.getItem(PWA_HANDOFF_STORAGE_KEY));
+    if (stored?.expiresAt > Date.now()) return stored.code || "";
+  } catch {}
+  return "";
 }
 
 function clearPwaHandoffCookie() {
   const secure = location.protocol === "https:" ? "; Secure" : "";
   document.cookie = `${PWA_HANDOFF_COOKIE}=; Max-Age=0; Path=${pwaCookiePath()}; SameSite=Strict${secure}`;
+  localStorage.removeItem(PWA_HANDOFF_STORAGE_KEY);
+  const cleanUrl = new URL(location.href);
+  cleanUrl.searchParams.delete("pwa_handoff");
+  history.replaceState(null, "", `${cleanUrl.pathname}${cleanUrl.search}${cleanUrl.hash}`);
+}
+
+function renderSyncNowButton() {
+  if (!elements.syncNowButton) return;
+  const syncing = state.cloudSyncing;
+  const failed = Boolean(state.cloudSyncError);
+  elements.syncNowButton.disabled = syncing;
+  elements.syncNowButton.classList.toggle("is-synced", !syncing && !failed && !state.cloudNeedsSync && Boolean(state.cloudLastSyncAt));
+  elements.syncNowButton.classList.toggle("is-retry", !syncing && failed);
+  elements.syncNowButton.textContent = syncing ? "同步中…" : failed ? "点击重试" : state.cloudNeedsSync || !state.cloudLastSyncAt ? "立即同步" : "✓ 已同步";
 }
 
 function renderPwaHandoffStatus() {
@@ -2296,6 +2323,11 @@ async function persistRecord(record) {
   record.updatedAt = Date.now();
   record.workspaceId = record.workspaceId || activeWorkspaceId();
   await transact("readwrite", (store) => store.put(record));
+  if (state.cloudSession?.user && record.workspaceId === userWorkspaceId(state.cloudSession.user.id)) {
+    state.cloudNeedsSync = true;
+    renderSyncNowButton();
+    renderAccountEntry();
+  }
     scheduleBackup();
   }
 
@@ -3212,11 +3244,19 @@ async function redeemPwaAuthHandoff() {
   if (!handoffCode) return false;
   try {
     const config = cloudConfig();
-    const response = await fetch(`${config.supabaseUrl}/functions/v1/pwa-auth-handoff`, {
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), CLOUD_REQUEST_TIMEOUT_MS);
+    let response;
+    try {
+      response = await fetch(`${config.supabaseUrl}/functions/v1/pwa-auth-handoff`, {
       method: "POST",
       headers: { apikey: config.supabaseAnonKey, "Content-Type": "application/json" },
       body: JSON.stringify({ action: "redeem", handoffCode }),
-    });
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timeoutId);
+    }
     const result = await response.json();
     if (!response.ok || !result.tokenHash) throw new Error(result.code || "handoff_invalid");
     const client = window.supabase.createClient(config.supabaseUrl, config.supabaseAnonKey, {
@@ -3231,7 +3271,7 @@ async function redeemPwaAuthHandoff() {
   } catch (error) {
     console.warn("PWA auth handoff redemption failed", error);
     state.pwaHandoffStatus = "failed";
-    showToast("登录状态没有自动带过来，请重新登录一次");
+    showToast(error.name === "AbortError" ? "登录状态恢复超时，请重新打开 Later Space" : "登录状态没有自动带过来，请重新登录一次");
     return false;
   } finally {
     clearPwaHandoffCookie();
@@ -3305,7 +3345,7 @@ function hasCloudAuthParameters() {
 
 function clearCloudAuthParameters() {
   const clean = new URL(location.href);
-  ["code", "error", "error_code", "error_description", "type", "onboarding", "guide"].forEach((key) => clean.searchParams.delete(key));
+  ["code", "error", "error_code", "error_description", "type", "onboarding", "guide", "pwa_handoff"].forEach((key) => clean.searchParams.delete(key));
   clean.hash = "";
   history.replaceState(null, "", `${clean.pathname}${clean.search}`);
 }
@@ -3630,8 +3670,10 @@ async function syncCloud({ notify = false } = {}) {
   const user = state.cloudSession?.user;
   if (!user || state.cloudSyncing || !navigator.onLine) return false;
   state.cloudSyncing = true;
+  state.cloudNeedsSync = false;
   state.cloudSyncError = "";
   state.cloudSyncPhase = "读取云端内容";
+  renderSyncNowButton();
   if (!elements.syncPanel.hidden) openSyncPanel();
   try {
     let remoteRows = await fetchCloudRows();
@@ -3717,6 +3759,9 @@ async function syncCloud({ notify = false } = {}) {
     return false;
   } finally {
     state.cloudSyncing = false;
+    if (state.cloudSyncError) state.cloudNeedsSync = true;
+    renderSyncNowButton();
+    renderAccountEntry();
     if (!elements.syncPanel.hidden) openSyncPanel();
   }
 }
@@ -3775,6 +3820,7 @@ async function openSyncPanel() {
     : state.cloudSyncError
       ? `${user.email} · ${state.cloudSyncError}`
       : `${user.email} · ${state.cloudLastSyncAt ? `最近同步 ${new Date(state.cloudLastSyncAt).toLocaleTimeString("zh-CN")}` : "等待首次同步"}`;
+  renderSyncNowButton();
   await refreshMigrationOffer();
 }
 

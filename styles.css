@@ -555,6 +555,8 @@ kbd { min-width: 26px; height: 24px; display: grid; place-items: center; padding
 .secondary-button, .primary-button { min-height: 44px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 0 15px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; }
 .secondary-button { border: 1px solid var(--hairline); background: white; color: var(--ink); }
 .primary-button { border: 1px solid var(--ink); background: var(--ink); color: white; }
+.primary-button.is-synced { border-color: #2f7550; background: #2f7550; }
+.primary-button.is-retry { border-color: #a44f45; background: #a44f45; }
 .primary-button:disabled { cursor: default; opacity: .45; }
 .secondary-button svg { width: 17px; height: 17px; }
 .crop-backdrop { position: fixed; inset: 0; z-index: 90; background: rgba(20,20,22,.38); backdrop-filter: blur(5px); }
