@@ -18,7 +18,7 @@ const THUMBNAIL_VERSION = 5;
 const TEXT_CARD_WIDTH = 300;
 const TEXT_CARD_HEIGHT = 375;
 const STATIC_DEPLOYMENT = location.protocol !== "file:" && !["localhost", "127.0.0.1", "::1"].includes(location.hostname);
-document.documentElement.dataset.appVersion = "94";
+document.documentElement.dataset.appVersion = "95";
 document.documentElement.dataset.deployment = STATIC_DEPLOYMENT ? "static" : "local";
 let resolveCloudReady;
 const cloudReady = new Promise((resolve) => { resolveCloudReady = resolve; });
@@ -3844,6 +3844,17 @@ async function syncCloud({ notify = false } = {}) {
           deleted_at: null,
         });
       }
+    }
+    // A user may deliberately keep two copies of one image. Their records have
+    // separate IDs and assets, while the optional hash index permits one hash.
+    const uploadingIds = new Set(uploadRows.map((row) => row.id));
+    const occupiedHashes = new Set(remoteRows
+      .filter((row) => !row.deleted_at && !uploadingIds.has(row.id) && row.content_hash)
+      .map((row) => row.content_hash));
+    for (const row of uploadRows) {
+      if (!row.content_hash || row.deleted_at) continue;
+      if (occupiedHashes.has(row.content_hash)) row.content_hash = null;
+      else occupiedHashes.add(row.content_hash);
     }
     try {
       await upsertCloudRows(uploadRows);
