@@ -18,7 +18,7 @@ const THUMBNAIL_VERSION = 5;
 const TEXT_CARD_WIDTH = 300;
 const TEXT_CARD_HEIGHT = 375;
 const STATIC_DEPLOYMENT = location.protocol !== "file:" && !["localhost", "127.0.0.1", "::1"].includes(location.hostname);
-document.documentElement.dataset.appVersion = "93";
+document.documentElement.dataset.appVersion = "94";
 document.documentElement.dataset.deployment = STATIC_DEPLOYMENT ? "static" : "local";
 let resolveCloudReady;
 const cloudReady = new Promise((resolve) => { resolveCloudReady = resolve; });
@@ -3396,7 +3396,10 @@ async function cloudRequest(path, options = {}) {
   if (externalSignal) externalSignal.addEventListener("abort", () => controller.abort(), { once: true });
   let response;
   try {
-    response = await fetch(`${cloudConfig().supabaseUrl}${path}`, { cache: "no-store", ...requestOptions, signal: controller.signal, headers: cloudHeaders(options.headers) });
+    const requestUrl = path instanceof URL || /^https?:\/\//i.test(String(path))
+      ? String(path)
+      : `${cloudConfig().supabaseUrl}${path}`;
+    response = await fetch(requestUrl, { cache: "no-store", ...requestOptions, signal: controller.signal, headers: cloudHeaders(options.headers) });
   } catch (error) {
     if (error.name === "AbortError") throw new Error("cloud_request_timeout");
     throw error;
