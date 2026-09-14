@@ -1,4 +1,4 @@
-const CACHE_NAME = "later-space-shell-v87";
+const CACHE_NAME = "later-space-shell-v88";
 const SHELL = [
   "./",
   "index.html",
