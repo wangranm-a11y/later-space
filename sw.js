@@ -1,8 +1,8 @@
-const CACHE_NAME = "later-space-shell-v90";
+const CACHE_NAME = "later-space-shell-v91";
 const SHELL = [
   "./",
   "index.html",
-  "styles.css?v=85",
+  "styles.css?v=88",
   "app.js?v=95",
   "cloud-config.js?v=1",
   "manifest.webmanifest",

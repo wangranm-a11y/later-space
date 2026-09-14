@@ -11,7 +11,7 @@
     <link rel="icon" href="assets/favicon.svg?v=2" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="assets/apple-touch-icon.png?v=2" />
     <link rel="manifest" href="manifest.webmanifest" />
-    <link rel="stylesheet" href="styles.css?v=87" />
+    <link rel="stylesheet" href="styles.css?v=88" />
   </head>
   <body>
     <main class="canvas" id="canvas" tabindex="0" aria-label="Later Space 无限内容画布">
@@ -225,6 +225,42 @@
           <button class="welcome-guest-button" id="welcomeGuestButton" type="button">先体验 Later Space</button>
           <button class="welcome-install-button" id="welcomeInstallButton" type="button">安装到主屏幕</button>
           <small>无需密码。先体验的内容保存在当前浏览器，之后登录仍可迁移。</small>
+          <section class="welcome-resources" aria-labelledby="welcomeResourcesTitle">
+            <div class="welcome-resources-heading">
+              <span class="welcome-resource-kicker">START HERE</span>
+              <h2 id="welcomeResourcesTitle">从哪里开始，都能收住。</h2>
+              <p>电脑、手机或代码入口，选你现在最顺手的一条。</p>
+            </div>
+            <div class="welcome-resource-grid">
+              <a class="welcome-resource-card resource-mobile" href="docs/mobile-later-space-guide.html" target="_blank" rel="noopener noreferrer">
+                <span class="resource-number">01</span>
+                <strong>手机端设置</strong>
+                <span>先配置快捷指令，再从 X、Safari 或其他 App 分享。</span>
+                <em>打开手机教程 ↗</em>
+              </a>
+              <a class="welcome-resource-card resource-plugin" href="plugin-story.html" target="_blank" rel="noopener noreferrer">
+                <span class="resource-number">02</span>
+                <strong>浏览器插件</strong>
+                <span>在 Chrome 里收藏网页、图片和选中文字。</span>
+                <em>了解并安装插件 ↗</em>
+              </a>
+              <a class="welcome-resource-card resource-web" href="./" aria-label="打开 Later Space 工作台">
+                <span class="resource-number">03</span>
+                <strong>Later Space 网页</strong>
+                <span>登录后进入自己的画布，跨设备查看和整理收藏。</span>
+                <em>打开工作台 ↗</em>
+              </a>
+              <div class="welcome-resource-card resource-code">
+                <span class="resource-number">04</span>
+                <strong>项目资料</strong>
+                <span>查看完整项目和浏览器插件的源码、说明与更新。</span>
+                <div class="resource-links">
+                  <a href="https://github.com/wangranm-a11y/later-space" target="_blank" rel="noopener noreferrer">主项目 GitHub ↗</a>
+                  <a href="https://github.com/wangranm-a11y/later-space/tree/main/extensions/later-space" target="_blank" rel="noopener noreferrer">插件源码 ↗</a>
+                </div>
+              </div>
+            </div>
+          </section>
         </div>
       </div>
     </section>
