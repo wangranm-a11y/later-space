@@ -3755,7 +3755,7 @@ async function upsertCloudRows(rows) {
 }
 
 async function fetchCloudRows() {
-  const response = await cloudRequest("/rest/v1/later_space_items?select=*");
+  const response = await cloudRequest("/rest/v1/later_space_items?select=*&order=client_updated_at.desc&limit=1000");
   if (!response.ok) throw new Error(await response.text());
   return response.json();
 }

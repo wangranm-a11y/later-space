@@ -124,6 +124,9 @@ class WebCloudContractTests(unittest.TestCase):
         self.assertIn('window.setInterval(() => syncCloud(), 30000)', APP)
         self.assertIn('window.addEventListener("focus", () => syncCloud())', APP)
 
+    def test_cloud_sync_reads_latest_rows_first(self):
+        self.assertIn("order=client_updated_at.desc&limit=1000", APP)
+
     def test_cloud_requests_have_timeout_and_mobile_focus_can_delete(self):
         self.assertIn("CLOUD_REQUEST_TIMEOUT_MS = 15000", APP)
         self.assertIn("controller.abort()", APP)
