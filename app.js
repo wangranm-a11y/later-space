@@ -18,7 +18,7 @@ const THUMBNAIL_VERSION = 5;
 const TEXT_CARD_WIDTH = 300;
 const TEXT_CARD_HEIGHT = 375;
 const STATIC_DEPLOYMENT = location.protocol !== "file:" && !["localhost", "127.0.0.1", "::1"].includes(location.hostname);
-document.documentElement.dataset.appVersion = "91";
+document.documentElement.dataset.appVersion = "93";
 document.documentElement.dataset.deployment = STATIC_DEPLOYMENT ? "static" : "local";
 let resolveCloudReady;
 const cloudReady = new Promise((resolve) => { resolveCloudReady = resolve; });
@@ -3786,6 +3786,7 @@ async function syncCloud({ notify = false } = {}) {
   state.cloudSyncPhase = "读取云端内容";
   renderSyncNowButton();
   if (!elements.syncPanel.hidden) openSyncPanel();
+  let downloadedQuickCount = 0;
   try {
     let remoteRows = await fetchCloudRows();
     await purgeExpiredTrashRows(remoteRows);
@@ -3794,6 +3795,21 @@ async function syncCloud({ notify = false } = {}) {
     renderTrash();
     const remoteById = new Map(remoteRows.map((row) => [row.id, row]));
     const deletions = cloudDeletionMap();
+    const localById = new Map(state.images.map((record) => [record.id, record]));
+    // A broken upload of an old local image must not block newly shared links
+    // and text from reaching the mobile inbox.
+    for (const row of remoteRows) {
+      if (row.deleted_at || deletions[row.id] || ["image", "video"].includes(row.kind)) continue;
+      const local = localById.get(row.id);
+      const localUpdatedAt = Number(local?.updatedAt || local?.createdAt || 0);
+      if (local && Number(row.client_updated_at || 0) <= localUpdatedAt) continue;
+      localById.set(row.id, await applyCloudRow(row));
+      downloadedQuickCount += 1;
+    }
+    if (downloadedQuickCount) {
+      state.images = [...localById.values()].sort((left, right) => left.createdAt - right.createdAt);
+      render();
+    }
     const uploadRows = [];
     const uploadedAssets = [];
     const deletedAssets = [];
@@ -3844,7 +3860,6 @@ async function syncCloud({ notify = false } = {}) {
     state.trashRecords = remoteRows.filter((row) => row.deleted_at && Date.now() - new Date(row.deleted_at).getTime() < 30 * 24 * 60 * 60 * 1000);
     renderTrash();
     state.cloudSyncPhase = "下载其他设备更新";
-    const localById = new Map(state.images.map((record) => [record.id, record]));
     const rowsToApply = [];
     for (const row of remoteRows) {
       const local = localById.get(row.id);
@@ -3886,8 +3901,10 @@ async function syncCloud({ notify = false } = {}) {
     return true;
   } catch (error) {
     console.warn("Cloud sync unavailable", error);
-    state.cloudSyncError = error.message === "cloud_request_timeout" ? "同步超时，请检查网络后重试" : "同步失败，请稍后重试";
-    state.cloudSyncPhase = "同步未完成";
+    state.cloudSyncError = downloadedQuickCount && state.cloudSyncPhase === "上传图片"
+      ? "部分图片上传失败，新收藏已显示，可点击重试"
+      : error.message === "cloud_request_timeout" ? "同步超时，请检查网络后重试" : "同步失败，请稍后重试";
+    state.cloudSyncPhase = downloadedQuickCount ? "部分同步完成" : "同步未完成";
     if (notify) showToast("云端暂时不可用，本地收藏不受影响");
     return false;
   } finally {
