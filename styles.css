@@ -711,16 +711,23 @@ button:focus-visible, .canvas-item:focus-visible { outline: 3px solid rgba(80,97
   .mobile-focus-footer { padding: 14px 20px max(20px, env(safe-area-inset-bottom)); border-top: 1px solid var(--hairline); background: rgba(255,255,255,.82); }
   .mobile-focus-footer button { width: 100%; min-height: 46px; }
   .mobile-focus-footer .mobile-focus-delete { min-height: 34px; margin-top: 6px; color: #a44f45; }
-  .mobile-trash-entry { margin-top: 12px; }
-  .mobile-trash-list { display: grid; gap: 8px; margin-top: 10px; }
-  .mobile-trash-item { display: grid; gap: 8px; padding: 10px; border: 1px solid var(--hairline); border-radius: 8px; background: #fafaf8; }
-  .mobile-trash-item > div:first-child { display: grid; gap: 3px; }
+  .mobile-trash-entry { margin-top: 12px; padding: 14px; border: 1px solid rgba(113,142,100,.22); border-radius: 12px; background: linear-gradient(145deg,#f1f5ed,#fbfbf9); }
+  .trash-entry-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .trash-entry-heading > div { display: grid; gap: 4px; }
+  .trash-entry-heading strong { font-size: 13px; }
+  .trash-entry-heading span:not(.trash-entry-icon) { color: var(--muted); font-size: 10px; }
+  .trash-entry-icon { width: 30px; height: 30px; display: grid; place-items: center; border-radius: 50%; background: rgba(113,142,100,.14); color: #718e64; font-size: 19px; }
+  .mobile-trash-list { display: grid; gap: 8px; margin-top: 13px; }
+  .mobile-trash-item { display: grid; grid-template-columns: minmax(0,1fr) auto; align-items: center; gap: 12px; padding: 12px; border: 1px solid rgba(29,29,31,.09); border-radius: 9px; background: rgba(255,255,255,.78); }
+  .trash-item-main { min-width: 0; display: grid; gap: 3px; }
+  .trash-item-type { color: #718e64 !important; font-size: 9px !important; font-weight: 700; letter-spacing: .08em; }
   .mobile-trash-item strong { overflow: hidden; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
   .mobile-trash-item span, .mobile-trash-empty { color: var(--muted); font-size: 10px; }
-  .mobile-trash-item > div:last-child { display: flex; gap: 7px; }
-  .mobile-trash-item button { min-height: 28px; padding: 0 8px; border: 1px solid var(--hairline); border-radius: 6px; background: white; color: var(--ink); font-size: 10px; }
+  .trash-item-actions { display: flex; gap: 6px; }
+  .mobile-trash-item button { min-height: 30px; padding: 0 9px; border: 1px solid var(--hairline); border-radius: 7px; background: white; color: var(--ink); font-size: 10px; }
+  .mobile-trash-item button.trash-restore { border-color: rgba(113,142,100,.45); color: #5e8053; font-weight: 700; }
   .mobile-trash-item button.danger { color: #a44f45; }
-  .mobile-trash-empty { margin: 10px 0 0; }
+  .mobile-trash-empty { margin: 14px 0 2px; padding: 12px; border: 1px dashed rgba(29,29,31,.12); border-radius: 8px; text-align: center; }
   .brand-bar { top: 12px; left: 12px; }
   .account-button { top: 12px; right: 12px; min-width: 44px; width: 44px; padding: 5px; }
   .account-copy { display: none; }

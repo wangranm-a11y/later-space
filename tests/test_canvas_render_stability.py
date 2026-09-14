@@ -25,7 +25,7 @@ class CanvasRenderStabilityTests(unittest.TestCase):
         self.assertIn("backface-visibility: hidden", STYLES)
 
     def test_static_assets_are_cache_busted(self):
-        self.assertIn('styles.css?v=87', INDEX)
+        self.assertIn('styles.css?v=88', INDEX)
         self.assertIn('app.js?v=95', INDEX)
 
     def test_account_panel_scrolls_independently_at_every_desktop_width(self):

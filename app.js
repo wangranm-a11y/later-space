@@ -1315,7 +1315,7 @@ function renderTrash() {
   const empty = document.querySelector("#mobileTrashEmpty");
   if (!list || !empty) return;
   empty.hidden = state.trashRecords.length > 0;
-  list.innerHTML = state.trashRecords.map((row) => `<div class="mobile-trash-item"><div><strong>${escapeHtml(trashRecordTitle(row).slice(0, 80))}</strong><span>删除于 ${escapeHtml(new Date(row.deleted_at).toLocaleDateString("zh-CN"))}</span></div><div><button type="button" data-trash-restore="${escapeHtml(row.id)}">恢复</button><button type="button" class="danger" data-trash-delete="${escapeHtml(row.id)}">永久删除</button></div></div>`).join("");
+  list.innerHTML = state.trashRecords.map((row) => `<div class="mobile-trash-item"><div class="trash-item-main"><span class="trash-item-type">${row.data?.url ? "链接" : row.data?.text ? "文字" : "素材"}</span><strong>${escapeHtml(trashRecordTitle(row).slice(0, 80))}</strong><span>删除于 ${escapeHtml(new Date(row.deleted_at).toLocaleDateString("zh-CN"))}</span></div><div class="trash-item-actions"><button type="button" class="trash-restore" data-trash-restore="${escapeHtml(row.id)}">恢复</button><button type="button" class="danger" data-trash-delete="${escapeHtml(row.id)}">永久删除</button></div></div>`).join("");
 }
 
 async function restoreTrashRecord(recordId) {
