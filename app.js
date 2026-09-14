@@ -3757,7 +3757,12 @@ async function upsertCloudRows(rows) {
 async function fetchCloudRows() {
   const response = await cloudRequest("/rest/v1/later_space_items?select=*&order=client_updated_at.desc&limit=1000");
   if (!response.ok) throw new Error(await response.text());
-  return response.json();
+  const rows = await response.json();
+  return rows.sort((left, right) => {
+    const updatedDelta = Number(right.client_updated_at || 0) - Number(left.client_updated_at || 0);
+    if (updatedDelta) return updatedDelta;
+    return new Date(right.created_at || 0).getTime() - new Date(left.created_at || 0).getTime();
+  });
 }
 
 async function applyCloudRow(row) {
