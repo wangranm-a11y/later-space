@@ -17,8 +17,12 @@ const CLOUD_REQUEST_TIMEOUT_MS = 15000;
 const THUMBNAIL_VERSION = 5;
 const TEXT_CARD_WIDTH = 300;
 const TEXT_CARD_HEIGHT = 375;
+const LAYOUT_SNAPSHOT_KEY = "later-space-layout-snapshots-v1";
+const LEGACY_LAYOUT_SNAPSHOT_KEY = "later-space-layout-snapshot";
+const LAYOUT_SNAPSHOT_LIMIT = 10;
+const LAYOUT_DRAG_SNAPSHOT_DELAY_MS = 2000;
 const STATIC_DEPLOYMENT = location.protocol !== "file:" && !["localhost", "127.0.0.1", "::1"].includes(location.hostname);
-document.documentElement.dataset.appVersion = "95";
+document.documentElement.dataset.appVersion = "97";
 document.documentElement.dataset.deployment = STATIC_DEPLOYMENT ? "static" : "local";
 let resolveCloudReady;
 const cloudReady = new Promise((resolve) => { resolveCloudReady = resolve; });
@@ -50,7 +54,9 @@ const state = {
   deletionUndoSnapshot: null,
   tagManageEdit: null,
   crop: null,
-  layoutSnapshot: null,
+  layoutSnapshots: [],
+  layoutDragBaseline: null,
+  layoutDragTimer: null,
   recentIds: new Set(),
   arrivingIds: new Set(),
   duplicateFocusId: null,
@@ -143,6 +149,11 @@ const elements = {
   fileInput: document.querySelector("#fileInput"),
   fitButton: document.querySelector("#fitButton"),
   organizeButton: document.querySelector("#organizeButton"),
+  organizeControl: document.querySelector("#organizeControl"),
+  organizePanel: document.querySelector("#organizePanel"),
+  organizeHistory: document.querySelector("#organizeHistory"),
+  restoreLastButton: document.querySelector("#restoreLastButton"),
+  restorePreviousButton: document.querySelector("#restorePreviousButton"),
   resetZoomButton: document.querySelector("#resetZoomButton"),
   exportButton: document.querySelector("#exportButton"),
   importButton: document.querySelector("#importButton"),
@@ -1027,12 +1038,8 @@ async function loadImages(workspaceId = activeWorkspaceId()) {
       }
     }
   }
-  try {
-    state.layoutSnapshot = JSON.parse(localStorage.getItem("later-space-layout-snapshot")) || null;
-  } catch {
-    state.layoutSnapshot = null;
-  }
-  updateOrganizeButton();
+  loadLayoutSnapshots();
+  renderOrganizeMenu();
   if (migrated) {
     for (const record of state.images) await transact("readwrite", (store) => store.put(record));
   }
@@ -2270,18 +2277,8 @@ function revealDuplicate(record, label) {
   revealRecord(record, `${label}已经收藏过，已带你找到原内容`);
 }
 
-function updateOrganizeButton() {
-  const organized = Boolean(state.layoutSnapshot);
-  elements.organizeButton.classList.toggle("is-organized", organized);
-  elements.organizeButton.setAttribute("aria-label", organized ? "一键还原画布" : "一键整理画布");
-  elements.organizeButton.title = organized ? "一键还原" : "一键整理";
-}
-
-async function organizeCanvas() {
-  const records = visibleRecords();
-  if (!records.length) return showToast("当前视图里没有可整理的内容");
-  if (state.layoutSnapshot) return restoreCanvas();
-  state.layoutSnapshot = records.map((record) => ({
+function captureLayoutItems(records = state.images) {
+  return records.map((record) => ({
     id: record.id,
     canvasX: record.canvasX,
     canvasY: record.canvasY,
@@ -2289,7 +2286,213 @@ async function organizeCanvas() {
     textHeight: record.textHeight,
     zIndex: record.zIndex,
   }));
-  localStorage.setItem("later-space-layout-snapshot", JSON.stringify(state.layoutSnapshot));
+}
+
+function layoutItemsSignature(items) {
+  return (items || []).map((item) => [
+    item.id,
+    Math.round(Number(item.canvasX) || 0),
+    Math.round(Number(item.canvasY) || 0),
+    Math.round(Number(item.canvasWidth) || 0),
+    Math.round(Number(item.textHeight) || 0),
+    Number(item.zIndex) || 0,
+  ].join(":")).sort().join("|");
+}
+
+function normalizeLayoutSnapshots(raw) {
+  if (!Array.isArray(raw) || !raw.length) return [];
+  if (raw[0]?.items) {
+    return raw.filter((entry) => entry && Array.isArray(entry.items)).slice(-LAYOUT_SNAPSHOT_LIMIT);
+  }
+  if (raw[0]?.id) {
+    return [{
+      id: "legacy-layout",
+      createdAt: Date.now(),
+      label: "整理前",
+      items: raw,
+    }];
+  }
+  return [];
+}
+
+function persistLayoutSnapshots() {
+  localStorage.setItem(LAYOUT_SNAPSHOT_KEY, JSON.stringify(state.layoutSnapshots));
+  localStorage.removeItem(LEGACY_LAYOUT_SNAPSHOT_KEY);
+}
+
+function loadLayoutSnapshots() {
+  try {
+    const stored = localStorage.getItem(LAYOUT_SNAPSHOT_KEY);
+    const legacy = stored ? null : localStorage.getItem(LEGACY_LAYOUT_SNAPSHOT_KEY);
+    state.layoutSnapshots = normalizeLayoutSnapshots(JSON.parse(stored || legacy || "null"));
+    if (!stored && legacy) persistLayoutSnapshots();
+  } catch {
+    state.layoutSnapshots = [];
+  }
+}
+
+function pushLayoutSnapshot({ items, label } = {}) {
+  const snapshotItems = items || captureLayoutItems();
+  if (!snapshotItems.length) return false;
+  const signature = layoutItemsSignature(snapshotItems);
+  const last = state.layoutSnapshots[state.layoutSnapshots.length - 1];
+  if (last && layoutItemsSignature(last.items) === signature) return false;
+  state.layoutSnapshots.push({
+    id: `layout-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    createdAt: Date.now(),
+    label: label || "布局",
+    items: snapshotItems,
+  });
+  if (state.layoutSnapshots.length > LAYOUT_SNAPSHOT_LIMIT) {
+    state.layoutSnapshots.splice(0, state.layoutSnapshots.length - LAYOUT_SNAPSHOT_LIMIT);
+  }
+  persistLayoutSnapshots();
+  renderOrganizeMenu();
+  return true;
+}
+
+function scheduleDragLayoutSnapshot() {
+  if (!state.layoutDragBaseline) return;
+  clearTimeout(state.layoutDragTimer);
+  state.layoutDragTimer = setTimeout(() => {
+    state.layoutDragTimer = null;
+    if (state.pointer && ["item", "resize"].includes(state.pointer.mode)) {
+      scheduleDragLayoutSnapshot();
+      return;
+    }
+    if (!state.layoutDragBaseline) return;
+    pushLayoutSnapshot({ items: state.layoutDragBaseline, label: "拖动前" });
+    state.layoutDragBaseline = null;
+  }, LAYOUT_DRAG_SNAPSHOT_DELAY_MS);
+}
+
+function flushDragLayoutSnapshot() {
+  clearTimeout(state.layoutDragTimer);
+  state.layoutDragTimer = null;
+  if (!state.layoutDragBaseline) return;
+  pushLayoutSnapshot({ items: state.layoutDragBaseline, label: "拖动前" });
+  state.layoutDragBaseline = null;
+}
+
+function rememberDragLayoutBaseline() {
+  if (!state.layoutDragBaseline) state.layoutDragBaseline = captureLayoutItems();
+}
+
+function layoutSnapshotTimeLabel(createdAt) {
+  const delta = Date.now() - createdAt;
+  if (delta < 60 * 1000) return "刚刚";
+  if (delta < 60 * 60 * 1000) return `${Math.max(1, Math.floor(delta / 60000))} 分钟前`;
+  const date = new Date(createdAt);
+  const sameDay = new Date().toDateString() === date.toDateString();
+  return sameDay
+    ? date.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })
+    : date.toLocaleString("zh-CN", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
+}
+
+function layoutSnapshotMatchesCurrent(snapshot) {
+  return layoutItemsSignature(snapshot?.items) === layoutItemsSignature(captureLayoutItems());
+}
+
+function selectableLayoutSnapshots() {
+  return state.layoutSnapshots.filter((snapshot) => !layoutSnapshotMatchesCurrent(snapshot));
+}
+
+function renderOrganizeMenu() {
+  if (!elements.organizeButton) return;
+  const count = state.layoutSnapshots.length;
+  const selectable = selectableLayoutSnapshots();
+  elements.organizeButton.classList.toggle("has-snapshots", count > 0);
+  elements.organizeButton.setAttribute("aria-label", "整理与恢复画布布局");
+  elements.organizeButton.title = count ? `整理与恢复（${count}）` : "整理与恢复";
+  if (elements.restoreLastButton) elements.restoreLastButton.disabled = selectable.length < 1;
+  if (elements.restorePreviousButton) elements.restorePreviousButton.disabled = selectable.length < 2;
+  if (!elements.organizeHistory) return;
+  if (!count) {
+    elements.organizeHistory.innerHTML = `<p class="organize-history-empty">还没有可恢复的布局</p>`;
+    return;
+  }
+  const entries = [...state.layoutSnapshots].reverse();
+  elements.organizeHistory.innerHTML = entries.map((snapshot, index) => {
+    const ordinal = index === 0 ? "上次" : index === 1 ? "上上次" : "";
+    const stamp = [snapshot.label || "布局", ordinal, layoutSnapshotTimeLabel(snapshot.createdAt)].filter(Boolean).join(" · ");
+    return `<button type="button" role="menuitem" data-layout-restore="${escapeHtml(snapshot.id)}">${escapeHtml(stamp)}</button>`;
+  }).join("");
+}
+
+function toggleOrganizeMenu() {
+  if (!elements.organizePanel) return;
+  if (elements.organizePanel.hidden) openOrganizeMenu();
+  else closeOrganizeMenu();
+}
+
+function openOrganizeMenu() {
+  renderOrganizeMenu();
+  elements.organizePanel.hidden = false;
+  elements.organizeButton.setAttribute("aria-expanded", "true");
+}
+
+function closeOrganizeMenu() {
+  if (!elements.organizePanel || elements.organizePanel.hidden) return;
+  elements.organizePanel.hidden = true;
+  elements.organizeButton.setAttribute("aria-expanded", "false");
+}
+
+async function applyLayoutSnapshot(snapshot) {
+  if (!snapshot?.items?.length) return false;
+  const snapshotById = new Map(snapshot.items.map((item) => [item.id, item]));
+  const changed = [];
+  state.images.forEach((record) => {
+    const previous = snapshotById.get(record.id);
+    if (!previous) return;
+    Object.assign(record, previous);
+    changed.push(record);
+  });
+  for (const record of changed) await persistRecord(record);
+  state.selectedId = null;
+  state.selectedIds.clear();
+  closeOrganizeMenu();
+  render();
+  renderOrganizeMenu();
+  fitAll();
+  return true;
+}
+
+async function restoreLayoutFromStack(offset, message) {
+  flushDragLayoutSnapshot();
+  const candidates = selectableLayoutSnapshots();
+  const snapshot = candidates[candidates.length - 1 - offset];
+  if (!snapshot) return showToast(offset ? "还没有上上次的布局" : "还没有可恢复的布局");
+  pushLayoutSnapshot({ label: "恢复前" });
+  await applyLayoutSnapshot(snapshot);
+  showToast(message);
+}
+
+async function restoreLayoutById(snapshotId) {
+  flushDragLayoutSnapshot();
+  const snapshot = state.layoutSnapshots.find((entry) => entry.id === snapshotId);
+  if (!snapshot) return showToast("没有找到这份布局");
+  pushLayoutSnapshot({ label: "恢复前" });
+  await applyLayoutSnapshot(snapshot);
+  showToast("已恢复所选布局");
+}
+
+async function applyCanvasLayout(mutator, { emptyMessage, doneMessage, snapshotLabel } = {}) {
+  const records = visibleRecords();
+  if (!records.length) return showToast(emptyMessage || "当前视图里没有可整理的内容");
+  flushDragLayoutSnapshot();
+  pushLayoutSnapshot({ label: snapshotLabel || "整理前" });
+  mutator(records);
+  for (const record of records) await persistRecord(record);
+  state.selectedId = null;
+  state.selectedIds.clear();
+  closeOrganizeMenu();
+  render();
+  renderOrganizeMenu();
+  fitAll();
+  showToast(doneMessage);
+}
+
+function layoutRecordsTidy(records) {
   const columns = Math.max(1, Math.min(records.length, Math.ceil(Math.sqrt(records.length * 2.4))));
   const gap = 34;
   const cardWidth = 280;
@@ -2308,34 +2511,51 @@ async function organizeCanvas() {
     record.canvasX = column * (cardWidth + gap);
     record.canvasY = columnHeights[column];
     record.zIndex = index + 1;
-    const height = itemHeight(record);
-    columnHeights[column] += height + gap;
+    columnHeights[column] += itemHeight(record) + gap;
   });
-  for (const record of records) await persistRecord(record);
-  state.selectedId = null;
-  state.selectedIds.clear();
-  render();
-  updateOrganizeButton();
-  fitAll();
-  showToast(state.activeView === "all" ? "当前结果已整理整齐" : "当前分类已整理整齐");
 }
 
-async function restoreCanvas() {
-  if (!state.layoutSnapshot) return;
-  const snapshotById = new Map(state.layoutSnapshot.map((item) => [item.id, item]));
-  state.images.forEach((record) => {
-    const previous = snapshotById.get(record.id);
-    if (previous) Object.assign(record, previous);
+function layoutRecordsHeart(records) {
+  const count = records.length;
+  const scale = Math.max(26, 18 + count * 3.4);
+  const centerX = records.reduce((sum, record) => sum + record.canvasX + itemWidth(record) / 2, 0) / count;
+  const centerY = records.reduce((sum, record) => sum + record.canvasY + itemHeight(record) / 2, 0) / count;
+  records.forEach((record, index) => {
+    const t = (Math.PI * 2 * index) / count - Math.PI / 2;
+    const x = 16 * (Math.sin(t) ** 3);
+    const y = -(13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t));
+    record.canvasX = centerX + x * scale - itemWidth(record) / 2;
+    record.canvasY = centerY + y * scale - itemHeight(record) / 2;
+    record.zIndex = index + 1;
   });
-  for (const record of state.images) await persistRecord(record);
-  state.layoutSnapshot = null;
-  localStorage.removeItem("later-space-layout-snapshot");
-  state.selectedId = null;
-  state.selectedIds.clear();
-  render();
-  updateOrganizeButton();
-  fitAll();
-  showToast("已还原整理前的位置");
+}
+
+async function organizeCanvas() {
+  await applyCanvasLayout(layoutRecordsTidy, {
+    snapshotLabel: "整齐前",
+    doneMessage: state.activeView === "all" ? "当前结果已整理整齐" : "当前分类已整理整齐",
+  });
+}
+
+async function arrangeCanvasHeart() {
+  await applyCanvasLayout(layoutRecordsHeart, {
+    snapshotLabel: "心形前",
+    doneMessage: "已排成心形，可从菜单恢复之前的布局",
+  });
+}
+
+function handleOrganizeAction(event) {
+  const restore = event.target.closest("[data-layout-restore]");
+  if (restore) {
+    restoreLayoutById(restore.dataset.layoutRestore);
+    return;
+  }
+  const action = event.target.closest("[data-layout-action]")?.dataset.layoutAction;
+  if (!action) return;
+  if (action === "tidy") organizeCanvas();
+  else if (action === "heart") arrangeCanvasHeart();
+  else if (action === "restore-last") restoreLayoutFromStack(0, "已恢复上次的布局");
+  else if (action === "restore-previous") restoreLayoutFromStack(1, "已恢复上上次的布局");
 }
 
 function overlapsExisting(x, y, width, height) {
@@ -2505,7 +2725,7 @@ function selectItem(id) {
 
 function beginPointer(event) {
   if (event.button !== 0) return;
-  if (event.target.closest("button, a, input, textarea, select, label")) return;
+  if (event.target.closest("button, a, input, textarea, select, label, .organize-control")) return;
   if (event.target.closest("video")) return;
   const openButton = event.target.closest("[data-open-link]");
   if (openButton) {
@@ -2526,6 +2746,7 @@ function beginPointer(event) {
       return;
     }
     if (state.selectedId !== id) selectItem(id);
+    rememberDragLayoutBaseline();
     state.pointer = {
       mode: resize ? "resize" : "item",
       resizeDirection: resize?.dataset.resizeDirection || "se",
@@ -2602,6 +2823,10 @@ function endPointer() {
   elements.selectionMarquee.hidden = true;
   state.pointer = null;
   elements.canvas.classList.remove("is-panning");
+  if (["item", "resize"].includes(pointer.mode) && pointer.moved) scheduleDragLayoutSnapshot();
+  else if (["item", "resize"].includes(pointer.mode) && !pointer.moved && !state.layoutDragTimer) {
+    state.layoutDragBaseline = null;
+  }
   if (["pan", "marquee"].includes(pointer.mode)) scheduleViewportRender();
 }
 
@@ -4521,7 +4746,17 @@ function bindEvents() {
     elements.fileInput.value = "";
   });
   elements.fitButton.addEventListener("click", fitAll);
-  elements.organizeButton.addEventListener("click", organizeCanvas);
+  elements.organizeButton.addEventListener("click", (event) => {
+    event.stopPropagation();
+    toggleOrganizeMenu();
+  });
+  elements.organizePanel?.addEventListener("click", handleOrganizeAction);
+  elements.organizePanel?.addEventListener("wheel", (event) => event.stopPropagation(), { passive: true });
+  document.addEventListener("pointerdown", (event) => {
+    if (elements.organizePanel?.hidden) return;
+    if (event.target.closest(".organize-control")) return;
+    closeOrganizeMenu();
+  });
   elements.resetZoomButton.addEventListener("click", resetView);
   elements.exportButton.addEventListener("click", exportBackup);
   elements.importButton.addEventListener("click", () => elements.backupInput.click());
@@ -4642,7 +4877,7 @@ function bindEvents() {
   elements.canvas.addEventListener("pointerup", endPointer);
   elements.canvas.addEventListener("pointercancel", endPointer);
   elements.canvas.addEventListener("dblclick", (event) => {
-    if (event.target.closest("button, a, input, textarea, select, label")) return;
+    if (event.target.closest("button, a, input, textarea, select, label, .organize-control")) return;
     const item = event.target.closest(".text-card-item");
     if (!item) return;
     const record = state.images.find((entry) => entry.id === item.dataset.id);
@@ -4696,6 +4931,9 @@ function bindEvents() {
     else if (event.key === "Escape" && !elements.duplicateDialog.hidden) closeDuplicatePrompt(false);
     else if (event.key === "Escape" && !elements.cropDialog.hidden) closeCropEditor();
     else if (event.key === "Escape" && !elements.captureDialog.hidden) closeCapture();
+    else if (event.key === "Escape" && elements.organizePanel && !elements.organizePanel.hidden) {
+      closeOrganizeMenu();
+    }
     else if (event.key === "Escape" && !elements.filterPanel.hidden) {
       elements.filterPanel.hidden = true;
       elements.filterToggleButton.setAttribute("aria-expanded", "false");
