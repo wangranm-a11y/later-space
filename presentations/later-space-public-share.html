@@ -532,6 +532,8 @@
                 this.currentSlide = 0;
                 this.stage = document.getElementById('deckStage');
                 this.progress = document.getElementById('progress');
+                this.navigationLocked = false;
+                this.navigationCooldown = 950;
                 this.setupStageScale();
                 this.setupKeyboardNav();
                 this.setupTouchNav();
@@ -551,20 +553,31 @@
             setupKeyboardNav() {
                 document.addEventListener('keydown', (event) => {
                     if (event.target?.isContentEditable) return;
-                    if (['ArrowRight', 'ArrowDown', 'PageDown', ' '].includes(event.key)) { event.preventDefault(); this.showSlide(this.currentSlide + 1); }
-                    if (['ArrowLeft', 'ArrowUp', 'PageUp'].includes(event.key)) { event.preventDefault(); this.showSlide(this.currentSlide - 1); }
-                    if (event.key === 'Home') this.showSlide(0);
-                    if (event.key === 'End') this.showSlide(this.slides.length - 1);
+                    if (event.repeat) return;
+                    if (['ArrowRight', 'ArrowDown', 'PageDown', ' '].includes(event.key)) { event.preventDefault(); this.navigate(1); }
+                    if (['ArrowLeft', 'ArrowUp', 'PageUp'].includes(event.key)) { event.preventDefault(); this.navigate(-1); }
+                    if (event.key === 'Home') this.navigateTo(0);
+                    if (event.key === 'End') this.navigateTo(this.slides.length - 1);
                 });
             }
             setupTouchNav() {
                 let startX = 0;
                 document.addEventListener('touchstart', (event) => { startX = event.changedTouches[0].screenX; }, { passive: true });
-                document.addEventListener('touchend', (event) => { const delta = event.changedTouches[0].screenX - startX; if (Math.abs(delta) > 45) this.showSlide(this.currentSlide + (delta < 0 ? 1 : -1)); }, { passive: true });
+                document.addEventListener('touchend', (event) => { const delta = event.changedTouches[0].screenX - startX; if (Math.abs(delta) > 45) this.navigate(delta < 0 ? 1 : -1); }, { passive: true });
             }
             setupWheelNav() {
-                let wheelLock = false;
-                document.addEventListener('wheel', (event) => { if (wheelLock) return; wheelLock = true; this.showSlide(this.currentSlide + (event.deltaY > 0 ? 1 : -1)); setTimeout(() => { wheelLock = false; }, 650); }, { passive: true });
+                document.addEventListener('wheel', (event) => { this.navigate(event.deltaY > 0 ? 1 : -1); }, { passive: true });
+            }
+            navigate(direction) {
+                this.navigateTo(this.currentSlide + direction);
+            }
+            navigateTo(index) {
+                if (this.navigationLocked) return;
+                const nextIndex = Math.max(0, Math.min(index, this.slides.length - 1));
+                if (nextIndex === this.currentSlide) return;
+                this.navigationLocked = true;
+                this.showSlide(nextIndex);
+                window.setTimeout(() => { this.navigationLocked = false; }, this.navigationCooldown);
             }
             showSlide(index) {
                 this.currentSlide = Math.max(0, Math.min(index, this.slides.length - 1));
