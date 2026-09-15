@@ -30,7 +30,7 @@ class LayoutSnapshotStackTests(unittest.TestCase):
         self.assertIn("function layoutRecordsHeart(records)", APP)
 
     def test_drag_writes_one_debounced_snapshot_after_pause(self):
-        self.assertIn("const LAYOUT_DRAG_SNAPSHOT_DELAY_MS = 1500", APP)
+        self.assertIn("const LAYOUT_DRAG_SNAPSHOT_DELAY_MS = 2000", APP)
         self.assertIn("function scheduleDragLayoutSnapshot()", APP)
         self.assertIn("LAYOUT_DRAG_SNAPSHOT_DELAY_MS", APP[APP.index("function scheduleDragLayoutSnapshot()") :])
         self.assertIn('pushLayoutSnapshot({ items: state.layoutDragBaseline, label: "拖动前" })', APP)
@@ -45,7 +45,8 @@ class LayoutSnapshotStackTests(unittest.TestCase):
         self.assertIn('data-layout-action="restore-last"', INDEX)
         self.assertIn('data-layout-action="restore-previous"', INDEX)
         self.assertIn('id="organizeHistory"', INDEX)
-        self.assertIn("function restoreLayoutFromStack(offset, message)", APP)
+        restore = APP[APP.index("async function restoreLayoutFromStack") : APP.index("async function restoreLayoutById")]
+        self.assertIn("selectableLayoutSnapshots()", restore)
         self.assertIn("restoreLayoutFromStack(0, ", APP)
         self.assertIn("restoreLayoutFromStack(1, ", APP)
         self.assertIn("function restoreLayoutById(snapshotId)", APP)
@@ -73,7 +74,7 @@ class LayoutSnapshotStackTests(unittest.TestCase):
     def test_readme_describes_the_restore_stack(self):
         self.assertIn("最多保留 10 份", README)
         self.assertIn("恢复上次", README)
-        self.assertIn("1.5 秒", README)
+        self.assertIn("2 秒", README)
 
 
 if __name__ == "__main__":

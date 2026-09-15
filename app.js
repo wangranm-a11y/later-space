@@ -20,9 +20,9 @@ const TEXT_CARD_HEIGHT = 375;
 const LAYOUT_SNAPSHOT_KEY = "later-space-layout-snapshots-v1";
 const LEGACY_LAYOUT_SNAPSHOT_KEY = "later-space-layout-snapshot";
 const LAYOUT_SNAPSHOT_LIMIT = 10;
-const LAYOUT_DRAG_SNAPSHOT_DELAY_MS = 1500;
+const LAYOUT_DRAG_SNAPSHOT_DELAY_MS = 2000;
 const STATIC_DEPLOYMENT = location.protocol !== "file:" && !["localhost", "127.0.0.1", "::1"].includes(location.hostname);
-document.documentElement.dataset.appVersion = "96";
+document.documentElement.dataset.appVersion = "97";
 document.documentElement.dataset.deployment = STATIC_DEPLOYMENT ? "static" : "local";
 let resolveCloudReady;
 const cloudReady = new Promise((resolve) => { resolveCloudReady = resolve; });
@@ -2356,6 +2356,10 @@ function scheduleDragLayoutSnapshot() {
   clearTimeout(state.layoutDragTimer);
   state.layoutDragTimer = setTimeout(() => {
     state.layoutDragTimer = null;
+    if (state.pointer && ["item", "resize"].includes(state.pointer.mode)) {
+      scheduleDragLayoutSnapshot();
+      return;
+    }
     if (!state.layoutDragBaseline) return;
     pushLayoutSnapshot({ items: state.layoutDragBaseline, label: "拖动前" });
     state.layoutDragBaseline = null;
@@ -2385,14 +2389,23 @@ function layoutSnapshotTimeLabel(createdAt) {
     : date.toLocaleString("zh-CN", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
+function layoutSnapshotMatchesCurrent(snapshot) {
+  return layoutItemsSignature(snapshot?.items) === layoutItemsSignature(captureLayoutItems());
+}
+
+function selectableLayoutSnapshots() {
+  return state.layoutSnapshots.filter((snapshot) => !layoutSnapshotMatchesCurrent(snapshot));
+}
+
 function renderOrganizeMenu() {
   if (!elements.organizeButton) return;
   const count = state.layoutSnapshots.length;
+  const selectable = selectableLayoutSnapshots();
   elements.organizeButton.classList.toggle("has-snapshots", count > 0);
   elements.organizeButton.setAttribute("aria-label", "整理与恢复画布布局");
   elements.organizeButton.title = count ? `整理与恢复（${count}）` : "整理与恢复";
-  if (elements.restoreLastButton) elements.restoreLastButton.disabled = count < 1;
-  if (elements.restorePreviousButton) elements.restorePreviousButton.disabled = count < 2;
+  if (elements.restoreLastButton) elements.restoreLastButton.disabled = selectable.length < 1;
+  if (elements.restorePreviousButton) elements.restorePreviousButton.disabled = selectable.length < 2;
   if (!elements.organizeHistory) return;
   if (!count) {
     elements.organizeHistory.innerHTML = `<p class="organize-history-empty">还没有可恢复的布局</p>`;
@@ -2400,8 +2413,9 @@ function renderOrganizeMenu() {
   }
   const entries = [...state.layoutSnapshots].reverse();
   elements.organizeHistory.innerHTML = entries.map((snapshot, index) => {
-    const ordinal = index === 0 ? "上次" : index === 1 ? "上上次" : `第 ${index + 1} 近`;
-    return `<button type="button" role="menuitem" data-layout-restore="${escapeHtml(snapshot.id)}">${escapeHtml(snapshot.label || "布局")} · ${escapeHtml(ordinal)} · ${escapeHtml(layoutSnapshotTimeLabel(snapshot.createdAt))}</button>`;
+    const ordinal = index === 0 ? "上次" : index === 1 ? "上上次" : "";
+    const stamp = [snapshot.label || "布局", ordinal, layoutSnapshotTimeLabel(snapshot.createdAt)].filter(Boolean).join(" · ");
+    return `<button type="button" role="menuitem" data-layout-restore="${escapeHtml(snapshot.id)}">${escapeHtml(stamp)}</button>`;
   }).join("");
 }
 
@@ -2445,9 +2459,9 @@ async function applyLayoutSnapshot(snapshot) {
 
 async function restoreLayoutFromStack(offset, message) {
   flushDragLayoutSnapshot();
-  const index = state.layoutSnapshots.length - 1 - offset;
-  if (index < 0) return showToast(offset ? "还没有上上次的布局" : "还没有可恢复的布局");
-  const snapshot = state.layoutSnapshots[index];
+  const candidates = selectableLayoutSnapshots();
+  const snapshot = candidates[candidates.length - 1 - offset];
+  if (!snapshot) return showToast(offset ? "还没有上上次的布局" : "还没有可恢复的布局");
   pushLayoutSnapshot({ label: "恢复前" });
   await applyLayoutSnapshot(snapshot);
   showToast(message);
