@@ -74,9 +74,16 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width:
 .tool-button:hover { color: var(--ink); background: rgba(29,29,31,.06); }
 .tool-button:active { background: rgba(29,29,31,.1); }
 .tool-button[href] { text-decoration: none; }
-#organizeButton .restore-icon { display: none; }
-#organizeButton.is-organized .organize-icon { display: none; }
-#organizeButton.is-organized .restore-icon { display: block; }
+#organizeButton.has-snapshots { color: var(--ink); }
+.organize-control { position: relative; }
+.organize-panel { position: absolute; left: 50%; bottom: calc(100% + 10px); z-index: 30; width: 236px; display: grid; padding: 6px; border: 1px solid var(--hairline); border-radius: 12px; background: rgba(255,255,255,.96); box-shadow: 0 14px 36px rgba(20,20,22,.14); transform: translateX(-50%); }
+.organize-panel[hidden] { display: none; }
+.organize-panel > button, .organize-restore-group button, .organize-history button { width: 100%; min-height: 36px; padding: 0 10px; border: 0; border-radius: 8px; background: transparent; color: var(--ink); font-size: 12px; text-align: left; cursor: pointer; }
+.organize-panel > button:hover, .organize-restore-group button:hover:not(:disabled), .organize-history button:hover { background: rgba(29,29,31,.06); }
+.organize-panel > button:disabled, .organize-restore-group button:disabled { color: #b0b0b4; cursor: default; }
+.organize-restore-group { display: grid; gap: 2px; margin: 4px 0; padding: 4px 0; border-block: 1px solid var(--hairline); }
+.organize-history { display: grid; gap: 2px; max-height: 168px; overflow: auto; }
+.organize-history-empty { margin: 4px 8px 6px; color: var(--muted); font-size: 11px; }
 .divider { width: 1px; height: 20px; margin: 0 3px; background: var(--hairline); }
 .zoom-value { min-width: 55px; height: 40px; padding: 0 8px; border: 0; border-radius: 8px; background: transparent; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; cursor: pointer; }
 .zoom-value:hover { color: var(--ink); background: rgba(29,29,31,.06); }

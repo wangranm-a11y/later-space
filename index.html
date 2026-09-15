@@ -11,7 +11,7 @@
     <link rel="icon" href="assets/favicon.svg?v=2" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="assets/apple-touch-icon.png?v=2" />
     <link rel="manifest" href="manifest.webmanifest" />
-    <link rel="stylesheet" href="styles.css?v=88" />
+    <link rel="stylesheet" href="styles.css?v=89" />
   </head>
   <body>
     <main class="canvas" id="canvas" tabindex="0" aria-label="Later Space 无限内容画布">
@@ -94,10 +94,21 @@
         <button class="tool-button" id="fitButton" type="button" aria-label="显示全部图片" title="显示全部图片">
           <svg viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
         </button>
-        <button class="tool-button" id="organizeButton" type="button" aria-label="一键整理画布" title="一键整理">
-          <svg class="organize-icon" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
-          <svg class="restore-icon" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>
-        </button>
+        <div class="organize-control" id="organizeControl">
+          <button class="tool-button" id="organizeButton" type="button" aria-label="整理与恢复画布布局" title="整理与恢复" aria-haspopup="menu" aria-expanded="false" aria-controls="organizePanel">
+            <svg class="organize-icon" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+          </button>
+          <div class="organize-panel" id="organizePanel" role="menu" aria-label="整理与恢复" hidden>
+            <button type="button" role="menuitem" data-layout-action="tidy">整齐</button>
+            <button type="button" role="menuitem" data-layout-action="heart">心形</button>
+            <button type="button" role="menuitem" data-layout-action="scatter" disabled title="即将推出">随意</button>
+            <div class="organize-restore-group">
+              <button type="button" role="menuitem" id="restoreLastButton" data-layout-action="restore-last">恢复上次</button>
+              <button type="button" role="menuitem" id="restorePreviousButton" data-layout-action="restore-previous">恢复上上次</button>
+            </div>
+            <div class="organize-history" id="organizeHistory"></div>
+          </div>
+        </div>
         <button class="zoom-value" id="resetZoomButton" type="button" aria-label="重置为百分之百缩放" title="重置缩放">100%</button>
         <button class="tool-button" id="exportButton" type="button" aria-label="导出备份" title="导出备份">
           <svg viewBox="0 0 24 24"><path d="M12 3v12m0 0 4-4m-4 4-4-4"/><path d="M5 15v4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4"/></svg>
@@ -438,6 +449,6 @@
         });
       }
     </script>
-    <script src="app.js?v=95" defer></script>
+    <script src="app.js?v=96" defer></script>
   </body>
 </html>
