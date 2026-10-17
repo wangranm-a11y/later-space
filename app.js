@@ -18,7 +18,7 @@ const THUMBNAIL_VERSION = 5;
 const TEXT_CARD_WIDTH = 300;
 const TEXT_CARD_HEIGHT = 375;
 const STATIC_DEPLOYMENT = location.protocol !== "file:" && !["localhost", "127.0.0.1", "::1"].includes(location.hostname);
-document.documentElement.dataset.appVersion = "95";
+document.documentElement.dataset.appVersion = "96";
 document.documentElement.dataset.deployment = STATIC_DEPLOYMENT ? "static" : "local";
 let resolveCloudReady;
 const cloudReady = new Promise((resolve) => { resolveCloudReady = resolve; });
@@ -1059,6 +1059,7 @@ async function switchWorkspace(workspaceId) {
 }
 
 function showWelcomeScreen() {
+  if (!cloudConfigured()) return showCanvasGuide();
   if (!state.images.length) elements.canvasGuide.hidden = false;
   elements.welcomeScreen.hidden = false;
   renderWelcomeEmailSuggestion();
@@ -1105,6 +1106,7 @@ function closeWelcomeScreen() {
 }
 
 function showInitialWelcome() {
+  if (!cloudConfigured()) return showCanvasGuide();
   if (state.authReturnActive) return;
   if (state.onboardingForced) return showWelcomeScreen();
   if (state.cloudSession?.user || state.images.length || localStorage.getItem(WELCOME_COMPLETED_KEY) === "true") return showCanvasGuide();
@@ -1176,8 +1178,8 @@ function renderAccountEntry() {
   const user = state.cloudSession?.user;
   const name = accountDisplayName(user);
   elements.accountAvatar.textContent = user ? name.trim().slice(0, 1).toUpperCase() : "L";
-  elements.accountName.textContent = user ? name : "登录";
-  elements.accountStatus.textContent = user ? (state.cloudNeedsSync ? "待同步" : state.cloudLastSyncAt ? "已同步" : "同步中") : "开启同步";
+  elements.accountName.textContent = !cloudConfigured() ? "本机收藏" : user ? name : "登录";
+  elements.accountStatus.textContent = !cloudConfigured() ? "无需登录" : user ? (state.cloudNeedsSync ? "待同步" : state.cloudLastSyncAt ? "已同步" : "同步中") : "开启同步";
   elements.accountButton.classList.toggle("is-signed-in", Boolean(user));
   elements.accountProfile.hidden = !user;
   if (user) {
@@ -3951,7 +3953,16 @@ async function openSyncPanel() {
   elements.syncStatus.className = "sync-status";
   if (!cloudConfigured()) {
     elements.syncStatusTitle.textContent = "当前为本地模式";
-    elements.syncStatusDetail.textContent = "云端同步尚未配置";
+    elements.syncStatusDetail.textContent = "无需登录，收藏保存在当前浏览器。可通过导出备份保存副本，或导入备份找回内容。";
+    elements.syncAuthDivider.hidden = true;
+    elements.syncGoogleButton.hidden = true;
+    elements.syncMailLink.hidden = true;
+    elements.captureTokenActions.hidden = true;
+    elements.accountMigration.hidden = true;
+    elements.cloudUsage.hidden = true;
+    elements.captureTokenStatus.closest(".sync-entry").hidden = true;
+    elements.agentTokenStatus.closest(".sync-entry").hidden = true;
+    document.querySelector(".mobile-trash-entry").hidden = true;
     elements.syncLoginForm.hidden = true;
     elements.syncActions.hidden = true;
     return;
@@ -4454,7 +4465,7 @@ function bindEvents() {
   });
   elements.textReaderBody.addEventListener("scroll", updateTextReaderScrollCue, { passive: true });
   elements.accountButton.addEventListener("click", () => {
-    if (state.cloudSession?.user) openSyncPanel();
+    if (!cloudConfigured() || state.cloudSession?.user) openSyncPanel();
     else showWelcomeScreen();
   });
   elements.syncGoogleButton.addEventListener("click", () => signInWithGoogle(elements.syncGoogleButton));

@@ -4,7 +4,7 @@
 
 ## 在线版
 
-在线版采用本地优先架构。未登录时，收藏只保存在当前浏览器 IndexedDB 中；正常关闭网页不会丢失，但不能多端同步，清理网站数据后也无法恢复。邮箱登录后，本机内容会默认安全迁移到 Supabase，Mac、iPhone 和其他浏览器共享同一账号数据；断网操作先保存在本机，联网后继续同步。
+当前恢复为免登录的本地模式，打开即可收藏。内容保存在当前浏览器 IndexedDB；Supabase 登录与云同步已停用。请定期导出完整备份，换浏览器或设备时通过导入备份迁移；清理网站数据前先导出。
 
 选中图片后，可以点击「复制图片」或按 `Command/Ctrl + C`，再粘贴到飞书、微信或 Figma。
 
@@ -54,7 +54,7 @@ python3 phone_inbox.py
 
 GitHub Pages 仍是静态网页，手机公网收件由 Supabase Edge Function 提供。每位用户使用一枚可撤销的个人收件密钥，Supabase 只保存密钥哈希。
 
-## 云端同步
+## 云端同步（历史实现，当前已停用）
 
 公开多用户版本采用“本地优先 + Supabase Auth/Database/Storage”的逐条同步方案。数据库、私有媒体桶、RLS 权限和部署步骤见 `docs/SUPABASE_SETUP.md`；`service_role` 密钥绝不能放进前端。
 

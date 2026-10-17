@@ -67,7 +67,7 @@
       </div>
       <button class="floating account-button" id="accountButton" type="button" aria-label="打开我的 Later Space">
         <span class="account-avatar" id="accountAvatar">L</span>
-        <span class="account-copy"><strong id="accountName">登录</strong><small id="accountStatus">开启同步</small></span>
+        <span class="account-copy"><strong id="accountName">本机收藏</strong><small id="accountStatus">无需登录</small></span>
       </button>
       <div class="floating workflow-switcher" id="workflowSwitcher" role="group" aria-label="标签快捷筛选">
         <button type="button" class="workflow-button is-active" data-workflow="all">全部</button>
@@ -417,8 +417,7 @@
       <p class="crop-hint">拖动框选择区域，拖动任意边缘或四角调整大小</p>
       <footer><button class="secondary-button" id="resetCropButton" type="button">重置</button><button class="primary-button" id="applyCropButton" type="button">完成裁剪</button></footer>
     </section>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" defer></script>
-    <script src="cloud-config.js?v=1"></script>
+    <script src="cloud-config.js?v=2"></script>
     <script>
       if ("serviceWorker" in navigator && location.protocol !== "file:") {
         let refreshing = false;
@@ -438,6 +437,6 @@
         });
       }
     </script>
-    <script src="app.js?v=95" defer></script>
+    <script src="app.js?v=96" defer></script>
   </body>
 </html>

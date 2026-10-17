@@ -1,4 +1,2 @@
-window.LATER_SPACE_CLOUD = {
-  supabaseUrl: "https://hesftvntzoawxryhadcw.supabase.co",
-  supabaseAnonKey: "sb_publishable_LXghe2HYouHlFBgi_9NWPw_LZ3B7j_d",
-};
+// Local-first mode: open the canvas without a Supabase account or network request.
+window.LATER_SPACE_CLOUD = {};
